@@ -1,0 +1,17 @@
+# YA2026 tax parameters. ⚠verify all figures vs LHDN before production.
+version: "YA2026.1"
+income_tax:
+  sme_paidup_max: 2500000
+  sme_gross_max: 50000000
+  sme_bands:
+    - {upto: 150000, rate: 0.15}
+    - {upto: 600000, rate: 0.17}   # next RM450k (150k -> 600k)
+    - {upto: null, rate: 0.24}
+  non_sme_rate: 0.24
+einvoice_phases:
+  - {min_turnover: 100000000, max_turnover: null, mandatory_from: "2024-08-01"}
+  - {min_turnover: 25000000, max_turnover: 100000000, mandatory_from: "2025-01-01"}
+  - {min_turnover: 5000000, max_turnover: 25000000, mandatory_from: "2025-07-01"}
+  - {min_turnover: 1000000, max_turnover: 5000000, mandatory_from: "2026-01-01"}
+sst:
+  registration_threshold: 500000
