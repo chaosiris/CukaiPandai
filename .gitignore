@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local research scratch (intermediate workflow JSON; deliverables live in docs/)
+_research/
+
+# Env / secrets
+.env
+.env.local
