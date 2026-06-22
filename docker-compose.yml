@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Default = Anthropic (Claude). Sovereign mode: set LLM_PROVIDER=openai and point
+      # LLM_BASE_URL/LLM_API_KEY/LLM_MODEL at ILMU Claw. Agents fall back to fixtures/tests without a key.
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-claude-opus-4-8}
