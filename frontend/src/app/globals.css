@@ -1,0 +1,166 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: "Playfair Display";
+    --font-mono: "JetBrains Mono";
+    --font-sans: "Inter";
+
+    /* light — warm paper / sepia */
+    --paper: #efe7d5;
+    --panel: #f6f0e1;
+    --panel-raised: #fbf7ec;
+    --ink: #211f1a;
+    --muted: #6f6857;
+    --line: #d8cdb4;
+    --line-strong: #b9ac8d;
+    --accent: #355a7d;
+    --accent-ink: #f7f2e6;
+    --ok: #3f7a52;
+    --warn: #b3781f;
+    --danger: #a23b34;
+    --grid: rgba(53, 90, 125, 0.07);
+  }
+
+  .dark {
+    --paper: #1a1916;
+    --panel: #232017;
+    --panel-raised: #2b2719;
+    --ink: #efe7d5;
+    --muted: #a89e86;
+    --line: #3a352a;
+    --line-strong: #4d4636;
+    --accent: #7ba0c4;
+    --accent-ink: #15140f;
+    --ok: #74b88c;
+    --warn: #d6a14a;
+    --danger: #d97a72;
+    --grid: rgba(123, 160, 196, 0.08);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+}
+
+@layer components {
+  /* faint engineering-paper grid used on inner pages */
+  .paper-grid {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono), monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.28em;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .display {
+    font-family: var(--font-display), Georgia, serif;
+    line-height: 0.98;
+    letter-spacing: -0.01em;
+  }
+
+  /* window-chrome card — rounded, not blocky */
+  .window {
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
+      0 14px 34px -22px rgba(0, 0, 0, 0.5);
+  }
+
+  .window__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.9rem;
+    background: var(--panel-raised);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono), monospace;
+    font-size: 0.78rem;
+  }
+
+  .btn {
+    font-family: var(--font-mono), monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    border-radius: 10px;
+    padding: 0.6rem 1.1rem;
+    border: 1px solid transparent;
+    transition: transform 0.08s ease, filter 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+  .btn--primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn--primary:hover {
+    filter: brightness(1.08);
+  }
+  .btn--ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line-strong);
+  }
+  .btn--ghost:hover {
+    background: var(--panel-raised);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .chip {
+    font-family: var(--font-mono), monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    border-radius: 999px;
+    padding: 0.18rem 0.6rem;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .field {
+    background: var(--panel-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+    color: var(--ink);
+    width: 100%;
+    font-family: var(--font-sans), sans-serif;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}

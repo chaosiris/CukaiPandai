@@ -16,6 +16,17 @@ docker compose up --build       # API on http://localhost:8000
 ```
 > ⚠ The Dockerfile is authored but **not yet built in CI** — build once on a Docker-capable machine and confirm `/health` before relying on it for the demo.
 
+## 2b. Frontend (Next.js consoles)
+```bash
+cd frontend
+npm install
+npm test            # 11 component/api tests
+npm run dev         # http://localhost:3000  (landing + /obligations /filing /audit-defense)
+```
+- **Mock-by-default** — the UI runs end-to-end with **no backend** (seeded Acme; Form C = RM31,000).
+- To hit the live API instead: set `NEXT_PUBLIC_API_MOCK=0` and `NEXT_PUBLIC_API_BASE=http://localhost:8000`.
+- Sovereign badge: `NEXT_PUBLIC_SOVEREIGN=1`. Light/dark toggle is in the top bar.
+
 ## 3. Model / sovereign mode (env)
 | Var | Default | Notes |
 |---|---|---|
