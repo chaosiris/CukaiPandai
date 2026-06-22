@@ -12,6 +12,7 @@ const config: Config = {
         ink: "var(--ink)",
         muted: "var(--muted)",
         line: "var(--line)",
+        "line-strong": "var(--line-strong)",
         accent: "var(--accent)",
         "accent-ink": "var(--accent-ink)",
         ok: "var(--ok)",

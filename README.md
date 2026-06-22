@@ -58,8 +58,8 @@ Python 3.11 · **FastAPI** · **LangGraph** (human-in-the-loop interrupts) · `L
 - ✅ **Deterministic core** (`core/`) — obligation + computation engines, law corpus, citation gate, evidence vault. **TDD.**
 - ✅ **Agentic API** (`api/`) — 5 agents + LLM citation-critic + FastAPI endpoints + LangGraph orchestrator (HITL). **TDD.**
 - ✅ **YA2026 tax figures verified** vs LHDN/RMCD (cited).
-- ✅ **Frontend** (`frontend/`) — Next.js landing + 3 consoles (Obligations, Filing Studio w/ approval gate, Audit-Defense), retro/sepia themed, **mock-by-default** so it demos with no backend. **TDD.**
-- **40 backend tests + 11 frontend tests passing**; `next build` clean.
+- ✅ **Frontend** (`frontend/`) — Next.js landing + 3 consoles (Obligations, Filing Studio w/ approval gate, Audit-Defense) + FAQ, Settings, Plans, retro/sepia themed with light/dark, **mock-by-default** so it demos with no backend. **TDD.**
+- **40 backend tests + 16 frontend tests passing**; `next build` clean (8 routes).
 
 ## Quickstart
 ```bash

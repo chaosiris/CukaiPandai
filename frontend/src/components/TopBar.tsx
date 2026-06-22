@@ -7,6 +7,8 @@ const NAV = [
   { href: "/obligations", label: "Obligations" },
   { href: "/filing", label: "Filing" },
   { href: "/audit-defense", label: "Audit-Defense" },
+  { href: "/pricing", label: "Plans" },
+  { href: "/faq", label: "FAQ" },
 ];
 
 export function TopBar() {
@@ -29,6 +31,22 @@ export function TopBar() {
           <span className="hidden sm:inline">
             <SovereignToggle />
           </span>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            title="Settings"
+            className="btn btn--ghost !px-2.5 !py-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M12 2.8v2.3M12 18.9v2.3M21.2 12h-2.3M5.1 12H2.8M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2 5.6 5.6"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </Link>
           <ThemeToggle />
           <Link href="/obligations" className="btn btn--primary">
             Get Started

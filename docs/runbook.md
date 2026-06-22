@@ -20,8 +20,8 @@ docker compose up --build       # API on http://localhost:8000
 ```bash
 cd frontend
 npm install
-npm test            # 11 component/api tests
-npm run dev         # http://localhost:3000  (landing + /obligations /filing /audit-defense)
+npm test            # 16 component/api tests
+npm run dev         # http://localhost:3000  (landing · /obligations /filing /audit-defense · /faq /settings /pricing)
 ```
 - **Mock-by-default** — the UI runs end-to-end with **no backend** (seeded Acme; Form C = RM31,000).
 - To hit the live API instead: set `NEXT_PUBLIC_API_MOCK=0` and `NEXT_PUBLIC_API_BASE=http://localhost:8000`.
