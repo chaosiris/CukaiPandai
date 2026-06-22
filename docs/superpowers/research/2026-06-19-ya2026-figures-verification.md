@@ -19,7 +19,7 @@ The engine-critical figures in `core/config/ya_2026.yaml` are **verified correct
 | **SST — registration threshold** | RM500k general; **RM1m** for certain newly-scoped services; enforcement from 1 Jan 2026 (grace ended 31 Dec 2025) | ✅ refined | https://www.cleartax.com/my/en/sst-in-malaysia · https://arnifi.com/blog/malaysia-service-tax-registration-rules/ |
 | **CGT (unlisted MY shares)** | from **1 Mar 2024**, by companies/LLPs/trusts; **10% of net gain** OR **2% of gross** if acquired pre-1 Jan 2024 | ✅ added | https://www.hasil.gov.my/media/rgndkcuh/20250721-guidelines-on-capital-gains-tax-for-unlisted-shares.pdf · https://www.ey.com/en_my/technical/tax-alerts/malaysias-new-capital-gains-tax-regime-your-questions-answered |
 | **Transfer pricing (MTPG 2024)** | Full CTPD if gross business income **>RM30m AND** cross-border controlled txns **>RM10m**, OR financial assistance **>RM50m**; else Minimum CTPD | ✅ corrected (old TRD said RM3m) | https://www.hasil.gov.my/media/c55fiwyk/malaysia-transfer-pricing-guidelines-2024.pdf · https://www.crowe.com/my/insights/updated-malaysian-transfer-pricing-guidelines-2024 |
-| **Withholding tax rates** | CP37 within 1 month; rates not re-verified | ⚠ open | confirm vs LHDN ITA s.109/109B/109F |
+| **Withholding tax rates** | royalty **10%** (CP37) · interest **15%** (CP37) · s.4A special classes **10%** (CP37D) · non-resident contractor **10% + 3%** (CP37A); remit within 1 month; DTA-reducible with a COR | ✅ verified | https://www.hasil.gov.my/en/legislation/withholding-tax/ · https://taxsummaries.pwc.com/malaysia/corporate/withholding-taxes |
 
 ## Config changes made (`core/config/ya_2026.yaml`)
 - Kept `version: YA2026.1` and all `income_tax` band values **unchanged** (golden tests rely on them; computation semantics didn't change).
@@ -32,7 +32,7 @@ The engine-critical figures in `core/config/ya_2026.yaml` are **verified correct
 - Verified the file parses and **all 36 tests still pass**.
 
 ## Open / to confirm before the deck
-- Exact **WHT rates** (royalty/interest/technical/contract) and any 2026 changes.
+- ~~Exact WHT rates~~ ✅ **verified** (royalty 10% / interest 15% / s.4A 10% / contractor 10%+3%). Only DTA-specific (treaty) rates remain counterparty-dependent — confirm per payee with a COR.
 - SST **per-category** thresholds (which services are RM1m vs RM500k) for a production SST module.
 - Re-confirm SME **common-control/foreign-shareholding** disqualifiers for the rate (edge cases).
 

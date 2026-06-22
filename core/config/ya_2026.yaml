@@ -49,5 +49,12 @@ transfer_pricing:                  # VERIFIED (Malaysia TP Guidelines 2024; Crow
   full_doc_financial_assistance_over: 50000000  # OR controlled financial assistance > RM50m
   # else a "Minimum TP Documentation" suffices.
 
-withholding_tax:                   # rates NOT re-verified this pass — confirm vs LHDN s.109/109B
-  note: "CP37 filing within 1 month of paying/crediting a non-resident; confirm current rates"
+withholding_tax:                   # VERIFIED (LHDN; PwC) — domestic non-resident statutory rates
+  royalty: 0.10                    # ITA s.109; form CP37
+  interest: 0.15                   # ITA s.109; form CP37
+  special_classes_4a: 0.10         # ITA s.109B (technical/management/consultancy fees, movable-property rental); form CP37D
+  contract_non_resident:           # ITA s.107A; form CP37A
+    on_contractor: 0.10
+    on_employees: 0.03
+  remit_within: "1 month of paying/crediting the non-resident"
+  note: "DTA may reduce rates if the recipient supplies a valid Certificate of Residence (COR)"

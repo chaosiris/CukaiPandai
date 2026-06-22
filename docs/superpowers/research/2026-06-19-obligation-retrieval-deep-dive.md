@@ -23,6 +23,7 @@ Then `Entity Tax Profile → Obligation Rules Engine → Obligation Calendar`. S
 
 ## Channel 3 — LHDN MyInvois (TIN + turnover + evidence)
 - **TIN validation API** confirms a taxpayer's TIN (identity anchor). **Search Documents** returns issued/received e-invoices (last 31 days per call) → aggregate to **turnover** (→ e-invoice phase, SME test, SST threshold) and a **transaction ledger** that seeds the Evidence Vault. OAuth 2.0 (client credentials; TIN + NRIC/BRN); sandbox (preprod) + prod. Evidence: https://sdk.myinvois.hasil.gov.my/ · https://www.hasil.gov.my/en/e-invoice/reference-for-the-implementation-of-e-invoice/e-invoice-software-development-kit-sdk/
+- **Endpoints + rate limits (official SDK, per Client ID):** Login as Taxpayer `POST /connect/token` — **12 RPM**; Submit Documents `POST /api/v1.0/documentsubmissions` — **100 RPM**; Get Document — **60 RPM**; Get Document Details — **125 RPM**; plus Get Recent / Search Documents (≤31-day window) and Validate Taxpayer TIN. Throttling returns **429 + `Retry-After`** (standard rate-limit headers); **sandbox limits are lower than production** (since 28 Apr 2025) — submit in batches. Evidence: https://sdk.myinvois.hasil.gov.my/api/ · https://sdk.myinvois.hasil.gov.my/api/07-login-as-taxpayer-system/ · https://sdk.myinvois.hasil.gov.my/einvoicingapi/02-submit-documents/ · https://sdk.myinvois.hasil.gov.my/integration-practices/
 - **No public API** returns "which taxes is this TIN registered for" — registration status for income tax/SST/employer is **not** a single queryable field; it's **derived** from the profile + thresholds + the firm's own data.
 
 ## Channel 4 — RMCD MySST + internal data
@@ -63,9 +64,9 @@ TIN / BRN
 - **Production:** integrate **CTOS/Infomina** for SSM profile + **MyInvois** (sandbox → prod) for turnover/evidence; capture SST number at onboarding; keep all obligation logic in the deterministic rules engine.
 
 ## Open / to confirm
-- SSM **CSD pricing** + the exact list of the 4 authorised providers; **CTOS API** commercial terms + fields returned.
-- **MyInvois** TIN-validation + Search exact endpoint paths/quotas (sdk.myinvois.hasil.gov.my/api).
-- Whether **MyTax** offers any partner/agent API for registration status (currently assumed none → derive).
+- ~~MyInvois endpoint paths/quotas~~ ✅ **resolved** (Login 12 / Submit 100 / Get 60 / Details 125 RPM per Client ID; 429 + Retry-After; sandbox lower than prod). Remaining: **production client-ID onboarding** + the client's taxpayer authorisation.
+- ~~SSM data access~~ ✅ providers identified (**MYDATA/MYEG**, **Infomina**; **CTOS** via Infomina; SSM **e-Info/SAFEDATA**). Remaining: **pricing is quote/subscription-based, not public** — obtain a commercial quote (CTOS/Infomina API = simplest path).
+- Whether **MyTax** offers any partner/agent API for tax-registration status (assumed none → derive). This is the one genuinely unanswerable item — derivation stands.
 
 ## References (URLs inline above)
 SSM e-Info · MYDATA-SSM · SSM Company-Information · ktp blog · AsiaVerify KYB · The Edge (CTOS–Infomina) · CTOS report guide/API · Experian MY · MYEG · MyInvois SDK · LHDN e-Invoice SDK page · MySST · developer.data.gov.my.
