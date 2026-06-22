@@ -172,6 +172,16 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1._
 
 **Acceptance criteria:** Final video, deployed BE, verified figures, and a completed submission.
 
+#### TD-5 — Expand the plan through submission
+
+**Purpose:** Once `prd.md` + `trd.md` are finalized (TD-1), expand this plan to cover the full path to the 28 Jun submission.
+
+**Implementation:**
+
+- [ ] After **TD-1** lands, flesh out the remaining BE/FE/TD tasks, milestones, and timeline from now through submission (routing, consoles, deploy, demo dry-runs, 7-min video, final `⚠verify`, submit) → verify: every task from today to 28 Jun has a lane tag, acceptance criteria, and a timeline slot.
+
+**Acceptance criteria:** `plan.md` covers all work from now to the 28 Jun submission, lane-tagged with acceptance criteria; depends on **TD-1**.
+
 ---
 
 ## Done (Temporary Section; Will Be Deleted)
