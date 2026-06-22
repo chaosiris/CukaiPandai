@@ -61,3 +61,9 @@ class Citation(BaseModel):
     claim: str
     clause_ids: list[str]
     verified: bool = False
+
+
+class RiskFlag(BaseModel):
+    code: str
+    message: str
+    severity: str = "medium"
