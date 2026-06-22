@@ -63,10 +63,10 @@ Seeded synthetic entity: SSM profile JSON + trial balance + **MyInvois sandbox o
 - **Audit-Defense:** seeded query → asserts the pack cites the correct evidence + clause.
 Every implementation task in the plan has a failing test written first.
 
-## 10. Deferred decisions & assumptions
-- **Tech stack** — TBD by team; recommendation: reuse the `myai-future-hackathon` stack (Next.js + FastAPI + Cloud Run/Firebase + Vertex AI Search) with a pluggable model layer. Design is stack-neutral.
-- **Team size/skills** — TBD; scope assumes 1–3 people.
-- **MyInvois sandbox credentials** and **ILMU seat access** — to obtain.
+## 10. Decisions (locked) & remaining assumptions
+- **Tech stack — LOCKED:** FastAPI (Py 3.11) · LangGraph (HITL interrupts) · `LLMClient` adapter = `openai` SDK (OpenAI-compatible → ILMU Claw sovereign mode / Gemini) + `anthropic` SDK (Claude), provider via env · SQLite (MVP) → Postgres+pgvector (prod) · Docling for docs · Next.js + Tailwind + shadcn/ui · Docker. Rationale: ILMU is OpenAI-compatible, so the adapter makes ILMU/Claude/Gemini swappable by config — best sovereignty story, no GCP/ADK lock-in, lean for 2 devs. Full detail: [../../trd.md](../../trd.md) §12.
+- **Team — LOCKED:** 2 developers — **Chaos** (backend/agents: Plans 1✅ & 2) and **Tuna** (frontend/demo: Plan 3). Ownership + the FastAPI interface contract in [../../prd.md](../../prd.md) §3 and [../../trd.md](../../trd.md) §2.1/§7a.
+- **Remaining to obtain:** MyInvois sandbox credentials + ILMU Claw seat (mock until then); ⚠verify exact YA2026 tax figures vs LHDN.
 
 ## 11. Open ⚠verify list (reconcile vs LHDN/RMCD before the deck)
 YA2026 SME rate bands + SME qualifying thresholds; SST registration thresholds/scope; CGT/TP thresholds; exact MyInvois prod host + endpoint schema + rate limits; SSM CSD field names. (Tracked in [../../trd.md](../../trd.md) §13 and the research doc.)

@@ -1,6 +1,6 @@
 # CukaiPandai — Product Requirements Document (PRD)
 
-> Derived from [cukaipandai-spec.md](project-idea.md). Defines *what* we build and *for whom*. Technical *how* is in [trd.md](trd.md). Scope is split into **Hackathon MVP** (what we ship/demo by 26 Jun 2026) and **Roadmap** (post-hackathon, for the business case judges reward).
+> Derived from [project-idea.md](project-idea.md). Defines *what* we build and *for whom*. Technical *how* is in [trd.md](trd.md). Scope splits into **Hackathon MVP** (demo by 26 Jun 2026) and **Roadmap** (the business case judges reward). **Stack is locked** — see [trd.md §12](trd.md). **Team: 2 developers — Chaos & Tuna** (see §3).
 
 ---
 
@@ -9,103 +9,95 @@
 - **Mission (MVP):** turn a pile of source data into a *cited, audit-defensible* corporate-tax filing — and turn an LHDN audit query into a one-click, evidence-backed defense pack.
 - **One-liner:** *CukaiPandai — smart tax, audit-ready. Every figure cited to source + law, so the LHDN defense file writes itself.*
 
-## 2. Target users & personas
+## 2. Target users & personas (buyers)
 
-| Persona | Role | Primary jobs-to-be-done | Why they pay |
+| Persona | Role | Jobs-to-be-done | Why they pay |
 |---|---|---|---|
-| **Faizal — SME Financial Controller** | Finance lead at a RM5–50m Sdn Bhd | Know what's due; file correctly; not get audited; survive an audit if it comes | Penalties + agent fees + audit stress |
-| **Mei Ling — Licensed Tax Agent (s.153)** ⭐ | Runs/works at a tax firm filing for many clients | Onboard clients fast; standardise quality; defend client audits; do more clients per headcount | Billable efficiency + audit-defense premium = our **primary channel** |
-| **Anand — Group Tax Manager** | Tax function at a multi-entity group (e.g., Chin Hin-class) | Consistency across subsidiaries; audit trail; board-grade defensibility | Group-level risk + audit exposure |
-| **(Funnel) — Micro/owner-operator** | Owner of a small Sdn Bhd | "Just tell me what to file and prove it's right" | Low WTP; People's-Choice/funnel, not core |
+| **Mei Ling — Licensed Tax Agent (s.153)** ⭐ | Files for many client entities | Onboard fast; standardise quality; defend client audits; more clients per head | Billable efficiency + audit-defense premium = **primary channel** |
+| **Faizal — SME Financial Controller** | Finance lead, RM5–50m Sdn Bhd | Know what's due; file right; pre-empt audit; survive one | Penalties + agent fees + audit stress |
+| **Anand — Group Tax Manager** | Multi-entity group (Chin Hin-class) | Consistency across subsidiaries; board-grade audit trail | Group risk + audit exposure |
+| **(Funnel) Micro/owner-operator** | Small Sdn Bhd owner | "Tell me what to file and prove it's right" | Low WTP; People's-Choice funnel |
 
-**Primary buyer for MVP/GTM:** **tax agents (Mei Ling)** — a force-multiplier channel (one sale → many entities) — and **SME/group finance (Faizal/Anand)**.
+**Primary buyer for GTM:** **tax-agent firms (Mei Ling)** — one sale → many entities — plus SME/group finance.
 
-## 3. Value proposition
-- **For finance/tax teams & tax agents** who **must file accurately and survive LHDN audits**,
-- **CukaiPandai** is an **agentic tax-assurance platform**
-- that **derives each entity's obligations, prepares cited filings, flags audit risk, and auto-builds the audit-defense pack**,
-- **unlike** MyTax (dumb form), accounting tax modules (stop at computation), or human agents (manual & costly),
-- because **every figure carries its source document + the ITA/Public-Ruling clause that justifies it** — defensibility is built-in, with deterministic tax math and optional in-country (ILMU Claw) processing.
+## 3. Build team & responsibilities (Chaos & Tuna)
 
-## 4. Scope
+Two developers; ownership split to maximise parallelism after the shared core (Plan 1, done).
 
-### 4.1 Hackathon MVP (must demo by 26 Jun 2026)
-Focus = **corporate income tax (Form C / CP204) + the audit-defense loop** for a single Sdn Bhd, on seeded/sandbox data.
-- Obligation Radar for one entity (income tax + e-invoice + flags).
-- Cited Filing Studio for Form C computation from trial balance + MyInvois sandbox data.
+| Owner | Surface | Plans / scope |
+|---|---|---|
+| **Chaos** (repo owner) | **Backend & agents** | Plan 1 ✅ (deterministic core) · **Plan 2** (FastAPI, LangGraph orchestrator, `LLMClient` adapter incl. ILMU, the 5 agents, RAG + LLM citation-critic, MyInvois connector, audit-defense) |
+| **Tuna** | **Frontend & demo** | **Plan 3** (Next.js: Obligation Calendar, Cited Filing Studio, Audit-Defense console), API wiring, UX, demo polish, **7-min video + pitch-deck README** |
+| **Both** | Integration & seed data | Shared seeded entity/fixtures, end-to-end demo rehearsal, ⚠verify of tax figures vs LHDN |
+
+> Interface contract between the two: the **FastAPI endpoints in Plan 2** are the boundary; Tuna builds against them with mock responses until Chaos's endpoints land, so the two streams don't block each other.
+
+## 4. Value proposition
+**For** finance/tax teams & tax agents who **must file accurately and survive LHDN audits**, **CukaiPandai** is an **agentic tax-assurance platform** that **derives each entity's obligations, prepares cited filings, flags audit risk, and auto-builds the audit-defense pack** — **unlike** MyTax (dumb form), accounting tax modules (stop at computation), or human agents (manual & costly) — **because every figure carries its source document + the ITA/Public-Ruling clause that justifies it**, with deterministic tax math and optional in-country (ILMU Claw) processing.
+
+## 5. Scope
+
+### 5.1 Hackathon MVP (demo by 26 Jun 2026)
+A **general, config-driven engine** shown with **breadth + depth**: the Obligation Radar derives *multiple* obligations; we go deep end-to-end on **corporate income tax (Form C/CP204)** + the **Audit-Defense hero**, on seeded + MyInvois-sandbox data.
+- Obligation Radar (income tax, e-invoice phase, SST, employer) for one entity.
+- Cited Filing Studio (Form C/CP204) — every figure → source doc + ITA/PR clause.
 - Audit-Risk Pre-Flight (≥3 trigger checks).
-- **Audit-Defense Agent** (the hero demo).
-- Evidence Vault + audit trail + Citation Verifier.
-- ILMU Claw "sovereign mode" toggle (at least document-understanding/BM path).
+- **Audit-Defense Agent** (hero).
+- Evidence Vault + immutable audit trail + Citation Verifier.
+- ILMU Claw "sovereign mode" toggle (≥ the doc-understanding/BM path).
 
-### 4.2 Out of scope (MVP) / Roadmap
-- Live SSM CSD API, live MyTax submission, full SST/MTD/WHT/CGT/TP coverage, multi-tenant billing, mobile app, e-invoice issuance at scale. (All on the roadmap — shown in the pitch for the business case.)
+### 5.2 Out of scope (MVP) / roadmap
+Live SSM CSD API, live MyTax submission, full SST/MTD/WHT/CGT/TP *computation*, multi-entity console, e-invoice issuance at scale, billing, mobile. *(Configs for other taxes are stubbed — adding them is config, not new architecture.)*
 
-## 5. Functional requirements (MoSCoW)
+## 6. Functional requirements (MoSCoW)
 
-**Must (MVP):**
-- FR1 Onboard an entity (TIN/BRN) and build its **Tax Obligation Profile** from entity data + MyInvois (sandbox) + uploaded financials.
-- FR2 Generate the **Obligation Calendar** (obligation × form × deadline × est. amount × status), with holiday-shifted deadlines.
-- FR3 Ingest trial balance + MyInvois data + receipts; classify line items; assign tax treatment **with citations**.
-- FR4 Compute **Form C / CP204** on the deterministic engine; **every figure links to source doc + ITA/PR clause**.
-- FR5 **Audit-Risk Pre-Flight**: ≥3 trigger checks (anomalous deduction, MyInvois mismatch, abnormal ratio) → risk score + suggested fix.
-- FR6 **Audit-Defense Agent**: interpret a pasted LHDN query → retrieve evidence → draft a **cited defense pack** → compute penalty exposure (s.112/113).
-- FR7 **Citation Verifier** blocks any unsupported clause before a human sees it.
-- FR8 **Evidence Vault** + immutable audit trail of agent actions + human approvals.
-- FR9 **Human approval gate** before any submission/export.
+**Must:** FR1 onboard entity (TIN/BRN) → Tax Obligation Profile (entity data + MyInvois sandbox + uploads) · FR2 Obligation Calendar (obligation×form×deadline×est×status, holiday-shifted) · FR3 ingest trial balance + MyInvois + receipts → classify → assign treatment **with citations** · FR4 compute **Form C/CP204** deterministically, **every figure → source + ITA/PR clause** · FR5 **Audit-Risk Pre-Flight** (≥3 checks: anomalous deduction, MyInvois mismatch, abnormal ratio) → score + fix · FR6 **Audit-Defense Agent** (paste LHDN query → retrieve evidence → cited defense pack → exposure s.112/113) · FR7 **Citation Verifier** blocks unsupported clauses · FR8 **Evidence Vault** + immutable audit trail · FR9 **human approval gate** before any submit/export.
 
-**Should:** FR10 ILMU Claw sovereign-mode toggle · FR11 multi-entity tax-agent console · FR12 e-invoice submission to MyInvois sandbox.
+**Should:** FR10 ILMU sovereign-mode toggle · FR11 multi-entity console · FR12 e-invoice submission to MyInvois sandbox.
 
-**Could:** FR13 SST-02 module · FR14 MTD/PCB module · FR15 deadline reminders/notifications · FR16 industry-benchmark anomaly baselines from data.gov.my/DOSM.
+**Could:** FR13 SST-02 module · FR14 MTD/PCB module · FR15 deadline reminders · FR16 DOSM industry-ratio baselines.
 
-**Won't (this cycle):** live MyTax filing automation, WHT/CGT/TP modules, billing/payments, mobile.
+**Won't (this cycle):** live MyTax filing, WHT/CGT/TP modules, billing, mobile.
 
-## 6. Non-functional requirements (summary; detail in [trd.md](trd.md))
-- **Explainability:** every output traceable to source + law; no unexplained numbers.
-- **Determinism:** rates/thresholds/computations are deterministic config, never LLM-generated.
-- **Data residency / PDPA:** support in-country processing (ILMU Claw sovereign mode); encrypt PII at rest/in transit.
-- **Auditability:** immutable, exportable action log.
-- **Latency (demo):** audit-query → cited defense pack in <15s; filing computation in <60s on seeded data.
-- **Reliability of demo:** deterministic seeded scenarios for a flawless live run.
+## 7. Non-functional requirements (detail in [trd.md](trd.md))
+Explainability (every output → source + law) · Determinism (rates/thresholds/computations are config, never LLM-generated) · Data residency/PDPA (ILMU sovereign mode; encrypt PII) · Auditability (immutable, exportable log) · Latency (audit-query → pack <15s; filing <60s on seeded data) · Demo reliability (deterministic seeded scenarios).
 
-## 7. Success metrics / KPIs
-
+## 8. Success metrics / KPIs
 | Stage | Metric | Target |
 |---|---|---|
-| Hackathon demo | End-to-end live demo (obligations → cited filing → audit risk → cited defense) | Works in <10 min |
-| Hackathon judging | Coverage of rubric (Problem/Tech/Market/Innovation/Presentation) | Lead with audit-defense to protect Innovation |
-| Product (pilot) | Time to prepare a corporate return | ↓ ≥60% vs manual |
-| Product | Audit-query response time | hours → minutes |
-| Product | % of figures auto-cited to source + law | ≥95% |
-| Product | Tax-agent clients served per headcount | ↑ ≥2× |
-| Business | Paid pilots with tax-agent firms / SMEs | ≥1 within 3 months |
+| Hackathon | End-to-end live demo (obligations → cited filing → audit-risk → cited defense) | <10 min |
+| Judging | Rubric coverage | Lead with audit-defense to protect Innovation |
+| Pilot | Time to prepare a corporate return | ↓ ≥60% vs manual |
+| Pilot | Audit-query response time | hours → minutes |
+| Pilot | % figures auto-cited to source + law | ≥95% |
+| Business | Paid pilots (tax-agent firms / SMEs) | ≥1 in 3 months |
 
-## 8. Pricing & go-to-market (business case for judges)
-- **Tax-agent firm tier** (primary): per-firm SaaS + per-entity seats (e.g., **RM200–800/mo per firm + per-client**), audit-defense as a premium module. One firm = many entities.
-- **SME/enterprise direct:** **RM1,500–4,000/mo** per finance team (vs an in-house preparer or higher agent fees); group/multi-entity tiers.
-- **Per-audit-defense** premium (high WTP — audit defense is currently expensive billable work).
-- **GTM:** land via **tax-agent firms** (channel multiplier) + SME finance; wedge on the **audit-defense pain** (acute, urgent, budgeted), expand into full compliance calendar. Sovereign-mode (ILMU Claw) unlocks regulated/GLC buyers. Aligns with Xenber's enterprise/fintech sales motion (hire/incubation prize).
+## 9. Pricing & GTM (business case)
+- **Tax-agent firm tier** (primary): per-firm SaaS + per-entity seats (**RM200–800/mo + per-client**); audit-defense as a premium module. One firm = many entities.
+- **SME/enterprise direct:** **RM1,500–4,000/mo** per finance team; group/multi-entity tiers.
+- **Per-audit-defense** premium (high WTP — currently expensive billable work).
+- **GTM:** land via tax-agent firms (channel multiplier) + SME finance; wedge on the **audit-defense pain** (acute, budgeted), expand into the full compliance calendar. **Sovereign mode (ILMU)** unlocks regulated/GLC buyers. Aligns with Xenber's enterprise/fintech motion (hire/incubation prize).
 
-## 9. Milestones (3–4 week build to 26 Jun 2026)
-- **Wk 1:** data model + Obligation Rules Engine (income tax) + entity onboarding + MyInvois sandbox auth; seed dataset.
-- **Wk 2:** Filing Studio (computation + citations) + law-corpus RAG + Citation Verifier.
-- **Wk 3:** Audit-Risk Pre-Flight + **Audit-Defense Agent** + Evidence Vault; ILMU Claw sovereign-mode toggle.
-- **Wk 4:** UI polish, deterministic demo scenarios, 7-min video, pitch deck in README, deploy (localhost acceptable). Buffer for ⚠verify of tax figures.
+## 10. Milestones (3–4 wks → 26 Jun 2026; mapped to plans)
+- **Plan 1 — Deterministic Core** ✅ *done* (Chaos): obligation + computation engines, law corpus, citation gate, evidence vault, seeded data; 19 tests green.
+- **Plan 2 — Agent layer + API** (Chaos, Wk 2–3): FastAPI + LangGraph + `LLMClient` adapter (ILMU/Claude/Gemini) + the 5 agents + LLM citation-critic + MyInvois sandbox + **Audit-Defense**.
+- **Plan 3 — Frontend** (Tuna, Wk 2–4, parallel against mocked API): Obligation Calendar · Cited Filing Studio · Audit-Defense console.
+- **Wk 4 (both):** integration, deterministic demo scenarios, 7-min video, pitch-deck README, Docker deploy (localhost OK), ⚠verify tax figures.
 
-## 10. Risks (product) & mitigations
+## 11. Risks (product) & mitigations
 | Risk | Mitigation |
 |---|---|
 | Wrong tax figures | Versioned config + ⚠verify + human sign-off; never LLM-computed |
-| "Isn't this just TurboTax-MY?" (Innovation) | Lead with **audit-defense + cited audit-readiness**, the open lane; don't pitch "AI e-filing" |
+| "Isn't this TurboTax-MY?" (Innovation) | Lead with **audit-defense + cited audit-readiness**, the open lane |
 | Demo depends on real integrations | Seed/synthetic data + MyInvois sandbox; mock SSM/MyTax |
-| Hallucinated law citations | Citation-verifier agent + stable clause IDs + human review |
+| Hallucinated law citations | Citation-verifier (deterministic gate + LLM critic) + stable clause IDs + human review |
+| Two-dev coordination | FastAPI contract is the interface; Tuna builds on mocks; daily integration |
 | Liability framing | Decision-support, human-approved; augments tax agents |
 
-## 11. Open questions (to confirm)
-- Exact current-year rates/thresholds/deadlines (⚠verify vs LHDN/RMCD before the deck).
-- MyInvois sandbox access credentials for the team.
-- Whether to demo single-entity (simpler) or include the multi-entity tax-agent console.
-- Team size & skill mix (still TBD) — affects how much of "Should/Could" we attempt.
+## 12. Open items (confirm)
+- Exact current-year rates/thresholds/deadlines — ⚠verify vs LHDN/RMCD before the deck.
+- **MyInvois sandbox credentials** + **ILMU Claw seat** — to obtain (mock until then).
+- ~~Tech stack~~ ✅ locked ([trd.md §12](trd.md)). ~~Team~~ ✅ Chaos & Tuna (§3). MVP = single-entity (multi-entity is Should/roadmap).
 
 ---
-*See [trd.md](trd.md) for architecture, APIs, data model, security, and the build plan.*
+*See [trd.md](trd.md) for architecture, APIs, data model, security, ownership, and the build plan.*
