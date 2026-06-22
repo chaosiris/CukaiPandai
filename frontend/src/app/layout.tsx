@@ -5,9 +5,11 @@ import { TopBar } from "../components/TopBar";
 import "./globals.css";
 
 const FOOTER_LINKS = [
+  { href: "/entities", label: "Entities" },
   { href: "/obligations", label: "Obligations" },
   { href: "/filing", label: "Filing" },
   { href: "/audit-defense", label: "Audit-Defense" },
+  { href: "/corpus", label: "Corpus" },
   { href: "/pricing", label: "Plans" },
   { href: "/faq", label: "FAQ" },
   { href: "/settings", label: "Settings" },

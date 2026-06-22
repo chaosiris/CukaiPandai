@@ -4,11 +4,11 @@ import { SovereignToggle } from "./SovereignToggle";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
+  { href: "/entities", label: "Entities" },
   { href: "/obligations", label: "Obligations" },
   { href: "/filing", label: "Filing" },
   { href: "/audit-defense", label: "Audit-Defense" },
-  { href: "/pricing", label: "Plans" },
-  { href: "/faq", label: "FAQ" },
+  { href: "/corpus", label: "Corpus" },
 ];
 
 export function TopBar() {
