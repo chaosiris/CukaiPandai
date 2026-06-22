@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status: ✅ EXECUTED** — all tasks implemented via TDD; part of the 40-test green suite. (`api`/Plan 2 added Python 3.11; figures reconciled to YA2026; seeded Acme = mid-size SME with e-invoice obligation.)
+
 **Goal:** Build the stack-independent, deterministic Python core of CukaiPandai — the obligation rules engine, tax computation engine, law/citation store, evidence vault, and seeded data — with every tax figure traceable and TDD-verified.
 
 **Architecture:** A pure-Python package `core` (no web framework, no LLM, no cloud) that any backend (FastAPI/ADK/etc.) can import. Tax rules/rates/deadlines are versioned config keyed to Year of Assessment (YA); engines are deterministic and emit a full computation trace; the LLM/agent layer (Plan 2) calls into this core but never replaces its math.
@@ -52,7 +54,7 @@ tests/
 **Interfaces:**
 - Produces: importable package `core` with `__version__: str`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_smoke.py
 import core
@@ -60,10 +62,10 @@ import core
 def test_package_version():
     assert isinstance(core.__version__, str)
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_smoke.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'core'`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```toml
 # pyproject.toml
 [project]
@@ -78,10 +80,10 @@ pythonpath = ["."]
 # core/__init__.py
 __version__ = "0.1.0"
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pip install -e . && pytest tests/test_smoke.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add pyproject.toml core/__init__.py tests/test_smoke.py
 git commit -m "chore: scaffold core package"
@@ -106,7 +108,7 @@ git commit -m "chore: scaffold core package"
   - `Clause{clause_id:str, text:str, source:str}`
   - `Citation{claim:str, clause_ids:list[str], verified:bool=False}`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_models.py
 from datetime import date
@@ -124,10 +126,10 @@ def test_form_computation_holds_traces():
         value=100.0, inputs=["chargeable_income"], rule_id="cit.rate.sme", config_version="YA2026.1")})
     assert fc.fields["tax_payable"].rule_id == "cit.rate.sme"
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_models.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.models`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/models.py
 from __future__ import annotations
@@ -184,10 +186,10 @@ class Citation(BaseModel):
     clause_ids: list[str]
     verified: bool = False
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_models.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/models.py tests/test_models.py
 git commit -m "feat: add core domain models"
@@ -204,7 +206,7 @@ git commit -m "feat: add core domain models"
 **Interfaces:**
 - Produces: `load_ya_config(ya:int) -> dict` (raises `ValueError` for unknown YA); config dict has keys `version, income_tax{sme_paidup_max, sme_gross_max, sme_bands:[{upto,rate}], non_sme_rate}, einvoice_phases:[{min_turnover,max_turnover,mandatory_from}], sst{registration_threshold}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_config_loader.py
 import pytest
@@ -219,10 +221,10 @@ def test_unknown_ya_raises():
     with pytest.raises(ValueError):
         load_ya_config(1999)
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_config_loader.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.config_loader`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```yaml
 # core/config/ya_2026.yaml   (⚠verify all figures vs LHDN)
 version: "YA2026.1"
@@ -256,10 +258,10 @@ def load_ya_config(ya: int) -> dict:
         raise ValueError(f"No tax config for YA{ya}")
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_config_loader.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/config/ya_2026.yaml core/config_loader.py tests/test_config_loader.py
 git commit -m "feat: add YA2026 tax config and loader"
@@ -277,7 +279,7 @@ git commit -m "feat: add YA2026 tax config and loader"
 - Consumes: `EntityTaxProfile` (T2), `load_ya_config` (T3), `compute_form_c_deadline`/`compute_cp204_deadline` (T5 — import lazily; for T4 use `date` placeholders via deadline module).
 - Produces: `derive_obligations(profile:EntityTaxProfile, ya:int) -> ObligationCalendar`. Emits obligation_types from {`income_tax`,`einvoice`,`sst`,`employer_mtd`} per rules: income_tax always (form "C" + "CP204"); einvoice if `gross_income >= phase.min_turnover`; sst if `sst_registered`; employer_mtd if `employee_count>0`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_obligations.py
 from datetime import date
@@ -302,10 +304,10 @@ def test_no_employees_no_sst():
     assert "employer_mtd" not in types and "sst" not in types and "einvoice" not in types
     assert "income_tax" in types
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_obligations.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.obligations`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/obligations.py
 from __future__ import annotations
@@ -331,10 +333,10 @@ def derive_obligations(profile: EntityTaxProfile, ya: int) -> ObligationCalendar
             due_date=profile.basis_period_start, rule_id="oblig.employer.mtd", config_version=ver))
     return ObligationCalendar(entity_tin=profile.tin, obligations=obs)
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_obligations.py -v`
 Expected: PASS (requires Task 5's `deadlines.py`; implement T5 first or stub `form_c_deadline`/`cp204_deadline` then replace)
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/obligations.py tests/test_obligations.py
 git commit -m "feat: add obligation rules engine"
@@ -354,7 +356,7 @@ git commit -m "feat: add obligation rules engine"
   - `cp204_deadline(basis_start:date, commencement:date|None) -> date` — `commencement+3 months` if commenced within this basis period, else `basis_start - 30 days`.
   - `shift_for_holidays(d:date, holidays:set[date]) -> date` — push to next non-weekend, non-holiday day.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_deadlines.py
 from datetime import date
@@ -371,10 +373,10 @@ def test_shift_skips_weekend_and_holiday():
     assert shift_for_holidays(date(2026,7,31), {date(2026,8,3)}) == date(2026,7,31)  # Fri is fine
     assert shift_for_holidays(date(2026,8,1), {date(2026,8,3)}) == date(2026,8,4)    # Sat->skip Sun->skip Mon(hol)->Tue
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_deadlines.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.deadlines`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/deadlines.py
 from __future__ import annotations
@@ -399,10 +401,10 @@ def shift_for_holidays(d: date, holidays: set[date]) -> date:
         d += timedelta(days=1)
     return d
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_deadlines.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/deadlines.py tests/test_deadlines.py
 git commit -m "feat: add deadline calculator with holiday shift"
@@ -424,7 +426,7 @@ git commit -m "feat: add deadline calculator with holiday shift"
   - `tax_payable(chargeable:float, profile, cfg) -> FigureTrace` (apply SME bands or flat non-SME rate).
   - `compute_form_c(profile, items, ya) -> FormComputation` with fields `chargeable_income`, `tax_payable`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_computation.py
 from datetime import date
@@ -451,10 +453,10 @@ def test_non_sme_flat_rate():
     fc=compute_form_c(_p(paid_up_capital=5_000_000, gross_income=80_000_000), items, 2026)
     assert fc.fields["tax_payable"].value == 240_000  # 24% flat
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_computation.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.computation`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/computation.py
 from __future__ import annotations
@@ -492,10 +494,10 @@ def compute_form_c(profile: EntityTaxProfile, items: list[LineItem], ya: int) ->
     tp = tax_payable(ci.value, profile, cfg)
     return FormComputation(form="C", fields={"chargeable_income": ci, "tax_payable": tp})
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_computation.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/computation.py tests/test_computation.py
 git commit -m "feat: add Form C tax computation engine with traces"
@@ -512,7 +514,7 @@ git commit -m "feat: add Form C tax computation engine with traces"
 **Interfaces:**
 - Produces: `LawCorpus.load(path) -> LawCorpus`; `LawCorpus.get(clause_id) -> Clause|None`; `LawCorpus.exists(clause_id) -> bool`. Seed contains real clause IDs e.g. `ITA-1967-s33(1)` (general deductions), `ITA-1967-s39` (non-deductibles), `ITA-1967-s107C` (CP204), `ITA-1967-s112`, `ITA-1967-s113`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_lawcorpus.py
 from pathlib import Path
@@ -530,10 +532,10 @@ def test_unknown_clause_absent():
     assert not c.exists("ITA-1967-s999(fake)")
     assert c.get("ITA-1967-s999(fake)") is None
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_lawcorpus.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.lawcorpus`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```json
 // core/fixtures/lawcorpus_seed.json   (⚠verify wording vs ITA 1967)
 [
@@ -560,10 +562,10 @@ class LawCorpus:
     def get(self, clause_id: str) -> Clause | None: return self._c.get(clause_id)
     def exists(self, clause_id: str) -> bool: return clause_id in self._c
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_lawcorpus.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/lawcorpus.py core/fixtures/lawcorpus_seed.json tests/test_lawcorpus.py
 git commit -m "feat: add law corpus clause store with ITA seed"
@@ -581,7 +583,7 @@ git commit -m "feat: add law corpus clause store with ITA seed"
 - Consumes: `Citation` (T2), `LawCorpus` (T7).
 - Produces: `ground_citation(citation:Citation, corpus:LawCorpus) -> Citation` — sets `verified=True` ONLY if every `clause_id` exists in corpus; else `verified=False`. (The semantic "does the clause support the claim" LLM-critic is Plan 2; this is the deterministic existence gate it builds on.)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_citations.py
 from pathlib import Path
@@ -599,10 +601,10 @@ def test_planted_fake_citation_rejected():
     cit = ground_citation(Citation(claim="bogus", clause_ids=["ITA-1967-s33(1)","ITA-1967-s999(fake)"]), C)
     assert cit.verified is False
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_citations.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.citations`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/citations.py
 from __future__ import annotations
@@ -613,10 +615,10 @@ def ground_citation(citation: Citation, corpus: LawCorpus) -> Citation:
     citation.verified = bool(citation.clause_ids) and all(corpus.exists(cid) for cid in citation.clause_ids)
     return citation
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_citations.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/citations.py tests/test_citations.py
 git commit -m "feat: add deterministic citation grounding gate"
@@ -633,7 +635,7 @@ git commit -m "feat: add deterministic citation grounding gate"
 **Interfaces:**
 - Produces: `EvidenceVault(db_path=":memory:")` with `link(figure_id, document_id, clause_id)`, `links_for(figure_id) -> list[tuple]`, `log_action(actor, action, payload_hash)`, `audit_trail() -> list[dict]`. Audit log is append-only (no update/delete API).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_evidence.py
 from core.evidence import EvidenceVault
@@ -650,10 +652,10 @@ def test_audit_log_appends_in_order():
     trail = v.audit_trail()
     assert [t["action"] for t in trail] == ["compute_form_c","approve"]
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_evidence.py -v`
 Expected: FAIL — `ModuleNotFoundError: core.evidence`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```python
 # core/evidence.py
 from __future__ import annotations
@@ -675,10 +677,10 @@ class EvidenceVault:
         rows = self._c.execute("SELECT actor,action,payload_hash FROM audit ORDER BY id")
         return [{"actor": a, "action": ac, "payload_hash": h} for a, ac, h in rows]
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest tests/test_evidence.py -v`
 Expected: PASS
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/evidence.py tests/test_evidence.py
 git commit -m "feat: add evidence vault and append-only audit log"
@@ -696,7 +698,7 @@ git commit -m "feat: add evidence vault and append-only audit log"
 - Consumes: all prior modules.
 - Produces: proves `profile → derive_obligations → compute_form_c → ground_citation → evidence` runs deterministically (no LLM) on the seeded entity and yields the golden figures.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 ```python
 # tests/test_integration_core.py
 import json
@@ -723,10 +725,10 @@ def test_core_end_to_end_golden():
     v = EvidenceVault(); v.link("tax_payable","trial_balance_acme","ITA-1967-s33(1)")
     assert v.links_for("tax_payable")
 ```
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_integration_core.py -v`
 Expected: FAIL — fixtures missing → `FileNotFoundError`
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 ```json
 // core/fixtures/entity_acme.json
 {"tin":"C2581234509","entity_type":"sdn_bhd","msic_codes":["46900"],
@@ -743,10 +745,10 @@ Expected: FAIL — fixtures missing → `FileNotFoundError`
 [{"uuid":"INV-0001","supplier_tin":"C2581234509","buyer_tin":"C9990001112",
   "classification":"022","tax_type":"01","tax_amount":0,"total_excl_tax":120000,"total_incl_tax":120000}]
 ```
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 Run: `pytest -v`
 Expected: PASS (all suites green)
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add core/fixtures/*.json tests/test_integration_core.py
 git commit -m "test: add seeded entity and core end-to-end integration test"

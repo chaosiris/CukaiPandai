@@ -5,7 +5,7 @@ From hackathon prototype → production tax-assurance platform. Each phase keeps
 ## Phase 0 — Hackathon MVP (now ✅)
 - Deterministic core (obligation + computation engines, law corpus, citation gate, evidence vault).
 - Agentic API (5 agents + LLM citation-critic, FastAPI, LangGraph HITL).
-- YA2026 figures verified; 36 tests; seeded Acme demo.
+- YA2026 figures verified; 40 tests (incl. offline e2e pipeline); seeded Acme demo.
 - SSM/MySST mocked; MyInvois via fixtures.
 
 ## Phase 1 — Pilot-ready (0–3 months)

@@ -59,13 +59,13 @@ Python 3.11 · **FastAPI** · **LangGraph** (human-in-the-loop interrupts) · `L
 - ✅ **Agentic API** (`api/`) — 5 agents + LLM citation-critic + FastAPI endpoints + LangGraph orchestrator (HITL). **TDD.**
 - ✅ **YA2026 tax figures verified** vs LHDN/RMCD (cited).
 - ⏳ **Frontend** (Next.js consoles) — planned ([`docs/superpowers/plans/2026-06-19-frontend.md`](docs/superpowers/plans/2026-06-19-frontend.md)).
-- **36 automated tests passing.**
+- **40 automated tests passing** (incl. an offline end-to-end pipeline test).
 
 ## Quickstart
 ```bash
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e .
-pytest -q                                          # 36 passing
+pytest -q                                          # 40 passing
 uvicorn api.main:app --reload                      # http://localhost:8000/docs
 # Sovereign mode: set LLM_PROVIDER=openai, LLM_BASE_URL/key/model to ILMU Claw
 ```

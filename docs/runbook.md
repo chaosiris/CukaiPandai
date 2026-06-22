@@ -4,7 +4,7 @@
 ```bash
 python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -e .
-pytest -q                                         # expect: 36 passed
+pytest -q                                         # expect: 40 passed
 uvicorn api.main:app --reload                     # http://localhost:8000  (Swagger: /docs)
 ```
 - **Health:** `GET /health` → `{"status":"ok"}`.

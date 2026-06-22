@@ -14,7 +14,7 @@
 | **5:00–5:30** | Slide 5 — The hard part | "Obligations are derived" diagram | "The non-obvious problem: no government API tells you what a company owes. We derive it — SSM for the entity, MyInvois for turnover, MySST for registration, plus the firm's own data — through our rules engine. That derivation is the moat." |
 | **5:30–6:05** | Slide 6 — Market + pricing | Buyer + pricing tiers | "Who pays: tax-agent firms — one platform across many clients — at RM200–800 a month plus per-client, with audit-defense as a premium module; SMEs direct at RM1,500–4,000. We land on the audit-defense pain and expand into the whole compliance calendar." |
 | **6:05–6:30** | Slide 7 — Roadmap + Responsible AI | Phased roadmap | "Roadmap: shadow-mode today, cited filing, then human-approved autonomous audit-defense — with live CTOS, MyInvois and SST integrations next. Responsible by design: deterministic math, cited outputs, human sign-off, sovereign hosting." |
-| **6:30–6:45** | Slide 8 — Close | Logo + repo + "36 tests passing" | "CukaiPandai — smart tax, audit-ready. The engine and agentic API are built and tested today. Every figure cited, every audit defensible. Terima kasih." |
+| **6:30–6:45** | Slide 8 — Close | Logo + repo + "40 tests passing" | "CukaiPandai — smart tax, audit-ready. The engine and agentic API are built and tested today. Every figure cited, every audit defensible. Terima kasih." |
 
 ## Production notes
 - **Live beats (1:35–4:15)** are the score-makers — pre-seed the Acme entity so they're deterministic; have the audit-query + the fake-citation rejection rehearsed.
