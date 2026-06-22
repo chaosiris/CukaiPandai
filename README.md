@@ -76,10 +76,10 @@ cd frontend && npm install && npm run dev        # http://localhost:3000
 Or backend via `docker compose up` (see [`docs/runbook.md`](docs/runbook.md)).
 
 ## Docs
-- Inception: [`docs/project-idea.md`](docs/project-idea.md) · [`docs/prd.md`](docs/prd.md) · [`docs/trd.md`](docs/trd.md)
+- Inception: [`docs/cukaipandai-spec.md`](docs/cukaipandai-spec.md) · [`docs/prd.md`](docs/prd.md) · [`docs/trd.md`](docs/trd.md)
 - Design + plans: [`docs/superpowers/specs/`](docs/superpowers/specs/) · [`docs/superpowers/plans/`](docs/superpowers/plans/)
 - Research (cited): [`docs/superpowers/research/`](docs/superpowers/research/)
-- Run / demo / final-day: [`docs/runbook.md`](docs/runbook.md) · Roadmap: [`docs/roadmap.md`](docs/roadmap.md)
+- Run / demo: [`docs/runbook.md`](docs/runbook.md) · Status: [`docs/progress.md`](docs/progress.md) · Plan: [`docs/plan.md`](docs/plan.md)
 
 ## Team
 **Chaos** (backend / agents) · **Tuna** (frontend / demo).

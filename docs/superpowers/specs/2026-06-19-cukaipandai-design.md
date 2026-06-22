@@ -1,6 +1,6 @@
 # CukaiPandai — Design Document
 
-> Status: **validated in brainstorming (2026-06-19)**, ready for `writing-plans`. Produced via the Superpowers brainstorming flow. Consolidates the locked decisions; supersedes the inception drafts ([../../project-idea.md](../../project-idea.md), [../../prd.md](../../prd.md), [../../trd.md](../../trd.md)) where they differ. Research backing: [../research/2026-06-19-tax-obligation-determination.md](../research/2026-06-19-tax-obligation-determination.md) and [../../initial-analysis/](../../initial-analysis/).
+> Status: **validated in brainstorming (2026-06-19)**, ready for `writing-plans`. Produced via the Superpowers brainstorming flow. Consolidates the locked decisions; supersedes the inception drafts ([../../prd.md](../../prd.md), [../../trd.md](../../trd.md), and the former project-idea draft now folded into [../../cukaipandai-spec.md](../../cukaipandai-spec.md)) where they differ. Research backing: [../research/2026-06-19-tax-obligation-determination.md](../research/2026-06-19-tax-obligation-determination.md) and [../../initial-analysis/](../../initial-analysis/).
 
 ## 1. Overview
 
@@ -48,7 +48,7 @@ Frontend: **Obligation Calendar**, **Cited Filing Studio** (approval inbox), **A
 **Filing:** onboard → Profiler builds `EntityTaxProfile` → Obligation Rules Engine → `ObligationCalendar` (deadlines holiday-shifted) → Filing Studio: doc-understanding → deductibility(+citations) → Computation Engine → Citation Verifier → Audit-Risk → **human approve** → Evidence Vault. **Audit-defense:** paste LHDN query → Audit-Defense agent retrieves Vault + ledger → reasons + computes exposure → DefensePack → Citation Verifier → **human approve/export.**
 
 ## 6. Agentic flow & deterministic gates
-LLM agents never compute final tax or assert an unverified citation. The **deterministic engines compute and gate**; the **Citation Verifier gates** citations; the **human gates** filing/sending. This is the "deterministic agentic AI, policy-locked, audit-logged" pattern. (Agent topology diagram in [../../project-idea.md](../../project-idea.md) §8.)
+LLM agents never compute final tax or assert an unverified citation. The **deterministic engines compute and gate**; the **Citation Verifier gates** citations; the **human gates** filing/sending. This is the "deterministic agentic AI, policy-locked, audit-logged" pattern. (Agent topology in [../../cukaipandai-spec.md](../../cukaipandai-spec.md) §7.)
 
 ## 7. Model layer (pluggable; ILMU sovereign mode)
 Single OpenAI-compatible adapter. **Default:** strongest available model for deep reasoning (Claude Opus 4.8 or Gemini 2.5/3.x — per team stack choice). **Sovereign mode:** route to **ILMU Claw** (Malaysian-hosted, OpenAI-compatible, BM/Manglish) for in-country data residency (PDPA). Deterministic engines are model-independent. Evidence: [../research/2026-06-19-tax-obligation-determination.md], ILMU OpenAI-compat `/v1/chat/completions` (console.ilmu.ai).
@@ -73,5 +73,5 @@ YA2026 SME rate bands + SME qualifying thresholds; SST registration thresholds/s
 
 ## 12. References
 - Research: [../research/2026-06-19-tax-obligation-determination.md](../research/2026-06-19-tax-obligation-determination.md)
-- Inception: [../../project-idea.md](../../project-idea.md), [../../prd.md](../../prd.md), [../../trd.md](../../trd.md), [../../initial-analysis/](../../initial-analysis/)
+- Inception: [../../cukaipandai-spec.md](../../cukaipandai-spec.md), [../../prd.md](../../prd.md), [../../trd.md](../../trd.md), [../../initial-analysis/](../../initial-analysis/)
 - Sources: LHDN https://www.hasil.gov.my/en/ · MyInvois SDK https://sdk.myinvois.hasil.gov.my/ · SSM https://www.ssm-einfo.my/ · MySST https://mysst.customs.gov.my/ · data.gov.my https://developer.data.gov.my/ · ILMU https://console.ilmu.ai/
