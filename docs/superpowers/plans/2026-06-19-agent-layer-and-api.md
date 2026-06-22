@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use `- [ ]` checkboxes.
 
-**Goal:** Wrap the deterministic core (`cukaipandai_core`, Plan 1) in an agentic layer + FastAPI so an entity can be onboarded, obligations derived, a cited Form C produced, audit-risk flagged, and an LHDN audit-defense pack generated — all model-agnostic and TDD-tested.
+**Goal:** Wrap the deterministic core (`core`, Plan 1) in an agentic layer + FastAPI so an entity can be onboarded, obligations derived, a cited Form C produced, audit-risk flagged, and an LHDN audit-defense pack generated — all model-agnostic and TDD-tested.
 
 **Architecture:** FastAPI gateway → LangGraph orchestrator → five LLM agents that call a deterministic core for all math + a pluggable `LLMClient`. A `FakeLLMClient` (scriptable, deterministic) makes every agent unit-testable with no network. Human-approval interrupt before any commit.
 
-**Tech Stack (locked):** Python 3.11 · FastAPI · LangGraph · `openai` SDK (OpenAI-compatible → ILMU Claw / Gemini) + `anthropic` SDK (Claude) behind an `LLMClient` adapter (provider via env) · `cukaipandai_core` · pytest + FastAPI TestClient.
+**Tech Stack (locked):** Python 3.11 · FastAPI · LangGraph · `openai` SDK (OpenAI-compatible → ILMU Claw / Gemini) + `anthropic` SDK (Claude) behind an `LLMClient` adapter (provider via env) · `core` · pytest + FastAPI TestClient.
 
 ## Global Constraints
 - **Owner:** Chaos. **Interface contract for Tuna (Plan 3):** the FastAPI routes in Task 9 — exact request/response Pydantic schemas are the boundary; do not change them without telling Tuna.
-- **Determinism preserved:** agents NEVER compute tax or assert an unverified citation. Math = `cukaipandai_core`; citation existence = core gate; this plan adds the *LLM critic* on top.
+- **Determinism preserved:** agents NEVER compute tax or assert an unverified citation. Math = `core`; citation existence = core gate; this plan adds the *LLM critic* on top.
 - **No network in tests:** all tests inject `FakeLLMClient` and fixture data; no real ILMU/Claude/MyInvois calls.
 - **Provider via env:** `LLM_PROVIDER` ∈ {`anthropic`,`openai`}, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (ILMU sovereign mode = `openai` + ILMU base_url).
 - **Human-in-the-loop:** every mutating route returns an approval step before commit.
@@ -18,7 +18,7 @@
 
 ## File Structure
 ```
-cukaipandai_api/
+api/
   __init__.py
   llm.py                 # LLMClient protocol, FakeLLMClient, provider factory (T2)
   connectors/myinvois.py # MyInvois client (fixture mode) (T4)
@@ -39,7 +39,7 @@ tests/api/               # mirrors the above
 
 ### Task 1: API package + FastAPI health endpoint
 
-**Files:** Create `cukaipandai_api/__init__.py`, `cukaipandai_api/main.py`, `tests/api/test_health.py`; Modify `pyproject.toml` (add deps + package).
+**Files:** Create `api/__init__.py`, `api/main.py`, `tests/api/test_health.py`; Modify `pyproject.toml` (add deps + package).
 
 **Interfaces:** Produces FastAPI `app` with `GET /health -> {"status":"ok"}`.
 
@@ -47,26 +47,26 @@ tests/api/               # mirrors the above
 ```python
 # tests/api/test_health.py
 from fastapi.testclient import TestClient
-from cukaipandai_api.main import app
+from api.main import app
 
 def test_health():
     r = TestClient(app).get("/health")
     assert r.status_code == 200 and r.json() == {"status": "ok"}
 ```
-- [ ] **Step 2: Run → FAIL** `pytest tests/api/test_health.py -q` → `ModuleNotFoundError: cukaipandai_api`
+- [ ] **Step 2: Run → FAIL** `pytest tests/api/test_health.py -q` → `ModuleNotFoundError: api`
 - [ ] **Step 3: Implement**
 ```toml
 # pyproject.toml — add to [project].dependencies:
 #   "fastapi>=0.115", "uvicorn>=0.30", "httpx>=0.27", "langgraph>=0.2",
 #   "openai>=1.40", "anthropic>=0.34"
-# and under [tool.setuptools] packages add: "cukaipandai_api", "cukaipandai_api.agents", "cukaipandai_api.connectors"
+# and under [tool.setuptools] packages add: "api", "api.agents", "api.connectors"
 ```
 ```python
-# cukaipandai_api/__init__.py
+# api/__init__.py
 __version__ = "0.1.0"
 ```
 ```python
-# cukaipandai_api/main.py
+# api/main.py
 from fastapi import FastAPI
 
 app = FastAPI(title="CukaiPandai API")
@@ -82,7 +82,7 @@ def health() -> dict:
 
 ### Task 2: LLMClient adapter + FakeLLMClient + provider factory
 
-**Files:** Create `cukaipandai_api/llm.py`, `tests/api/test_llm.py`.
+**Files:** Create `api/llm.py`, `tests/api/test_llm.py`.
 
 **Interfaces:** Produces
 - `class LLMClient(Protocol): def complete(self, system: str, user: str, *, json_schema: dict | None = None) -> str: ...`
@@ -93,7 +93,7 @@ def health() -> dict:
 ```python
 # tests/api/test_llm.py
 import pytest
-from cukaipandai_api.llm import FakeLLMClient
+from api.llm import FakeLLMClient
 
 def test_fake_returns_scripted_in_order():
     llm = FakeLLMClient(["a", "b"])
@@ -106,10 +106,10 @@ def test_fake_exhausted_raises():
     with pytest.raises(IndexError):
         llm.complete("s", "u")
 ```
-- [ ] **Step 2: Run → FAIL** `ModuleNotFoundError: cukaipandai_api.llm`
+- [ ] **Step 2: Run → FAIL** `ModuleNotFoundError: api.llm`
 - [ ] **Step 3: Implement**
 ```python
-# cukaipandai_api/llm.py
+# api/llm.py
 from __future__ import annotations
 import os
 from typing import Protocol
@@ -156,24 +156,24 @@ def make_llm() -> LLMClient:
 
 ### Task 3: MyInvois connector (fixture mode) → transactions + turnover
 
-**Files:** Create `cukaipandai_api/connectors/__init__.py`, `cukaipandai_api/connectors/myinvois.py`, `tests/api/test_myinvois.py`.
+**Files:** Create `api/connectors/__init__.py`, `api/connectors/myinvois.py`, `tests/api/test_myinvois.py`.
 
 **Interfaces:** Produces `class MyInvoisClient(fixtures_path: str | None)`; `search_documents(tin) -> list[dict]` (reads UBL-2.1 JSON fixtures when `fixtures_path` set); `derive_turnover(docs) -> float` (sum of `total_excl_tax` where `supplier_tin == tin`).
 
 - [ ] **Step 1: Failing test**
 ```python
 # tests/api/test_myinvois.py
-from cukaipandai_api.connectors.myinvois import MyInvoisClient
+from api.connectors.myinvois import MyInvoisClient
 
 def test_turnover_from_fixtures():
-    c = MyInvoisClient(fixtures_path="cukaipandai_core/fixtures/myinvois_acme.json")
+    c = MyInvoisClient(fixtures_path="core/fixtures/myinvois_acme.json")
     docs = c.search_documents("C2581234509")
     assert c.derive_turnover(docs, "C2581234509") == 120000
 ```
 - [ ] **Step 2: Run → FAIL** `ModuleNotFoundError`
 - [ ] **Step 3: Implement**
 ```python
-# cukaipandai_api/connectors/myinvois.py
+# api/connectors/myinvois.py
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -194,7 +194,7 @@ class MyInvoisClient:
 
 ### Task 4: Profiler agent → EntityTaxProfile
 
-**Files:** Create `cukaipandai_api/agents/__init__.py`, `cukaipandai_api/agents/profiler.py`, `tests/api/test_profiler.py`.
+**Files:** Create `api/agents/__init__.py`, `api/agents/profiler.py`, `tests/api/test_profiler.py`.
 
 **Interfaces:** Consumes `MyInvoisClient` (T3), `EntityTaxProfile` (core). Produces `build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile` (turnover/gross_income from MyInvois; rest from the SSM dict).
 
@@ -202,21 +202,21 @@ class MyInvoisClient:
 ```python
 # tests/api/test_profiler.py
 import json
-from cukaipandai_api.agents.profiler import build_profile
-from cukaipandai_api.connectors.myinvois import MyInvoisClient
+from api.agents.profiler import build_profile
+from api.connectors.myinvois import MyInvoisClient
 
 def test_profile_pulls_turnover():
-    ssm = json.loads(open("cukaipandai_core/fixtures/entity_acme.json").read())
-    p = build_profile(ssm, MyInvoisClient("cukaipandai_core/fixtures/myinvois_acme.json"))
+    ssm = json.loads(open("core/fixtures/entity_acme.json").read())
+    p = build_profile(ssm, MyInvoisClient("core/fixtures/myinvois_acme.json"))
     assert p.tin == "C2581234509"
     assert p.gross_income == 120000  # overridden from MyInvois turnover
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/agents/profiler.py
+# api/agents/profiler.py
 from __future__ import annotations
-from cukaipandai_core.models import EntityTaxProfile
-from cukaipandai_api.connectors.myinvois import MyInvoisClient
+from core.models import EntityTaxProfile
+from api.connectors.myinvois import MyInvoisClient
 
 def build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile:
     docs = myinvois.search_documents(ssm["tin"])
@@ -230,15 +230,15 @@ def build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile:
 
 ### Task 5: Document-understanding agent → LineItem[]
 
-**Files:** Create `cukaipandai_api/agents/documents.py`, `tests/api/test_documents.py`.
+**Files:** Create `api/agents/documents.py`, `tests/api/test_documents.py`.
 
 **Interfaces:** Produces `classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]`. The LLM returns a JSON array of `{code,description,amount,category}`; we parse + validate into `LineItem`.
 
 - [ ] **Step 1: Failing test**
 ```python
 # tests/api/test_documents.py
-from cukaipandai_api.agents.documents import classify_line_items
-from cukaipandai_api.llm import FakeLLMClient
+from api.agents.documents import classify_line_items
+from api.llm import FakeLLMClient
 
 def test_classify_parses_llm_json():
     scripted = ['[{"code":"4000","description":"Revenue","amount":500000,"category":"income"},'
@@ -248,11 +248,11 @@ def test_classify_parses_llm_json():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/agents/documents.py
+# api/agents/documents.py
 from __future__ import annotations
 import json
-from cukaipandai_core.models import LineItem
-from cukaipandai_api.llm import LLMClient
+from core.models import LineItem
+from api.llm import LLMClient
 
 _SYS = ("You classify accounting line items for Malaysian corporate tax. "
         "Return ONLY a JSON array of {code,description,amount,category}; "
@@ -268,7 +268,7 @@ def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
 
 ### Task 6: Deductibility reasoner → treatment + citations
 
-**Files:** Create `cukaipandai_api/agents/deductibility.py`, `tests/api/test_deductibility.py`.
+**Files:** Create `api/agents/deductibility.py`, `tests/api/test_deductibility.py`.
 
 **Interfaces:** Consumes `LawCorpus`, `ground_citation` (core). Produces `cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citation` — LLM proposes `{claim, clause_ids}`, then core `ground_citation` sets `verified`.
 
@@ -276,12 +276,12 @@ def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
 ```python
 # tests/api/test_deductibility.py
 from pathlib import Path
-from cukaipandai_api.agents.deductibility import cite_treatment
-from cukaipandai_api.llm import FakeLLMClient
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import LineItem
+from api.agents.deductibility import cite_treatment
+from api.llm import FakeLLMClient
+from core.lawcorpus import LawCorpus
+from core.models import LineItem
 
-C = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+C = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 def test_treatment_grounded_true_for_real_clause():
     item = LineItem(code="5000", description="Repairs", amount=4800, category="deductible")
@@ -291,13 +291,13 @@ def test_treatment_grounded_true_for_real_clause():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/agents/deductibility.py
+# api/agents/deductibility.py
 from __future__ import annotations
 import json
-from cukaipandai_core.citations import ground_citation
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation, LineItem
-from cukaipandai_api.llm import LLMClient
+from core.citations import ground_citation
+from core.lawcorpus import LawCorpus
+from core.models import Citation, LineItem
+from api.llm import LLMClient
 
 _SYS = ("Given a Malaysian company line item, state its tax treatment and cite the "
         "Income Tax Act / Public Ruling clause IDs. Return ONLY JSON {claim, clause_ids}.")
@@ -312,7 +312,7 @@ def cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citatio
 
 ### Task 7: Citation critic (LLM) over the core gate
 
-**Files:** Create `cukaipandai_api/agents/citation_critic.py`, `tests/api/test_citation_critic.py`.
+**Files:** Create `api/agents/citation_critic.py`, `tests/api/test_citation_critic.py`.
 
 **Interfaces:** Produces `verify_claim(citation: Citation, corpus: LawCorpus, llm: LLMClient) -> Citation` — returns `verified=False` if the core gate fails (missing clause) OR the LLM critic answers `NO` to "does this clause support the claim?". Belt-and-suspenders over Task 6.
 
@@ -320,12 +320,12 @@ def cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citatio
 ```python
 # tests/api/test_citation_critic.py
 from pathlib import Path
-from cukaipandai_api.agents.citation_critic import verify_claim
-from cukaipandai_api.llm import FakeLLMClient
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation
+from api.agents.citation_critic import verify_claim
+from api.llm import FakeLLMClient
+from core.lawcorpus import LawCorpus
+from core.models import Citation
 
-C = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+C = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 def test_real_clause_llm_yes_passes():
     cit = verify_claim(Citation(claim="deductible under s.33(1)", clause_ids=["ITA-1967-s33(1)"]), C, FakeLLMClient(["YES"]))
@@ -341,12 +341,12 @@ def test_missing_clause_blocks_without_calling_llm():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/agents/citation_critic.py
+# api/agents/citation_critic.py
 from __future__ import annotations
-from cukaipandai_core.citations import ground_citation
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation
-from cukaipandai_api.llm import LLMClient
+from core.citations import ground_citation
+from core.lawcorpus import LawCorpus
+from core.models import Citation
+from api.llm import LLMClient
 
 _SYS = "Answer ONLY YES or NO: does the cited clause text support the claim?"
 
@@ -365,15 +365,15 @@ def verify_claim(citation: Citation, corpus: LawCorpus, llm: LLMClient) -> Citat
 
 ### Task 8: Audit-Risk agent → RiskFlag[]
 
-**Files:** Create `cukaipandai_api/agents/audit_risk.py`, `tests/api/test_audit_risk.py`. Modify `cukaipandai_core/models.py` (add `RiskFlag{code:str, message:str, severity:str}`) — *test the model addition here.*
+**Files:** Create `api/agents/audit_risk.py`, `tests/api/test_audit_risk.py`. Modify `core/models.py` (add `RiskFlag{code:str, message:str, severity:str}`) — *test the model addition here.*
 
 **Interfaces:** Produces `assess_risk(computation: FormComputation, profile, myinvois_turnover: float) -> list[RiskFlag]`. Deterministic checks: (a) declared income vs MyInvois turnover mismatch > 10% → flag; (b) deductible/income ratio > 0.9 → flag; (c) negative chargeable income → flag.
 
 - [ ] **Step 1: Failing test**
 ```python
 # tests/api/test_audit_risk.py
-from cukaipandai_api.agents.audit_risk import assess_risk
-from cukaipandai_core.models import FigureTrace, FormComputation
+from api.agents.audit_risk import assess_risk
+from core.models import FigureTrace, FormComputation
 
 def _fc(ci):
     return FormComputation(form="C", fields={"chargeable_income": FigureTrace(
@@ -389,16 +389,16 @@ def test_clean_case_no_flags():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# add to cukaipandai_core/models.py
+# add to core/models.py
 class RiskFlag(BaseModel):
     code: str
     message: str
     severity: str = "medium"
 ```
 ```python
-# cukaipandai_api/agents/audit_risk.py
+# api/agents/audit_risk.py
 from __future__ import annotations
-from cukaipandai_core.models import FormComputation, RiskFlag
+from core.models import FormComputation, RiskFlag
 
 def assess_risk(computation: FormComputation, profile, declared_income: float,
                 myinvois_turnover: float) -> list[RiskFlag]:
@@ -417,7 +417,7 @@ def assess_risk(computation: FormComputation, profile, declared_income: float,
 
 ### Task 9: Audit-Defense agent → DefensePack
 
-**Files:** Create `cukaipandai_api/agents/audit_defense.py`, `tests/api/test_audit_defense.py`. Modify `cukaipandai_core/models.py` (add `DefensePack{query:str, items:list[dict], citations:list[Citation], exposure_note:str}`).
+**Files:** Create `api/agents/audit_defense.py`, `tests/api/test_audit_defense.py`. Modify `core/models.py` (add `DefensePack{query:str, items:list[dict], citations:list[Citation], exposure_note:str}`).
 
 **Interfaces:** Produces `build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: LawCorpus) -> DefensePack`. LLM interprets the query → `{contested_item, claim, clause_ids}`; we ground+critic the citation; pack includes the evidence links and an exposure note (s.112/113).
 
@@ -425,11 +425,11 @@ def assess_risk(computation: FormComputation, profile, declared_income: float,
 ```python
 # tests/api/test_audit_defense.py
 from pathlib import Path
-from cukaipandai_api.agents.audit_defense import build_defense
-from cukaipandai_api.llm import FakeLLMClient
-from cukaipandai_core.lawcorpus import LawCorpus
+from api.agents.audit_defense import build_defense
+from api.llm import FakeLLMClient
+from core.lawcorpus import LawCorpus
 
-C = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+C = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 def test_defense_pack_is_cited():
     scripted = ['{"contested_item":"Repairs RM4,800","claim":"deductible under s.33(1)","clause_ids":["ITA-1967-s33(1)"]}', "YES"]
@@ -441,7 +441,7 @@ def test_defense_pack_is_cited():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# add to cukaipandai_core/models.py
+# add to core/models.py
 class DefensePack(BaseModel):
     query: str
     items: list[dict]
@@ -449,13 +449,13 @@ class DefensePack(BaseModel):
     exposure_note: str
 ```
 ```python
-# cukaipandai_api/agents/audit_defense.py
+# api/agents/audit_defense.py
 from __future__ import annotations
 import json
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation, DefensePack
-from cukaipandai_api.agents.citation_critic import verify_claim
-from cukaipandai_api.llm import LLMClient
+from core.lawcorpus import LawCorpus
+from core.models import Citation, DefensePack
+from api.agents.citation_critic import verify_claim
+from api.llm import LLMClient
 
 _SYS = ("You are an LHDN audit-defense assistant. Interpret the auditor's query and return ONLY JSON "
         "{contested_item, claim, clause_ids}. Cite Income Tax Act / Public Ruling clause IDs.")
@@ -474,7 +474,7 @@ def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: Law
 
 ### Task 10: FastAPI endpoints + approval gate (the Chaos↔Tuna contract)
 
-**Files:** Create `cukaipandai_api/schemas.py`; Modify `cukaipandai_api/main.py`; Create `tests/api/test_endpoints.py`.
+**Files:** Create `api/schemas.py`; Modify `api/main.py`; Create `tests/api/test_endpoints.py`.
 
 **Interfaces (the contract Tuna builds against):**
 - `POST /entities/{tin}/obligations` body `{ssm: dict}` → `ObligationCalendar` JSON.
@@ -487,10 +487,10 @@ def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: Law
 # tests/api/test_endpoints.py
 import json
 from fastapi.testclient import TestClient
-from cukaipandai_api.main import app, get_llm
-from cukaipandai_api.llm import FakeLLMClient
+from api.main import app, get_llm
+from api.llm import FakeLLMClient
 
-SSM = json.loads(open("cukaipandai_core/fixtures/entity_acme.json").read())
+SSM = json.loads(open("core/fixtures/entity_acme.json").read())
 
 def test_obligations_endpoint():
     c = TestClient(app)
@@ -518,7 +518,7 @@ def test_audit_defense_endpoint():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/schemas.py
+# api/schemas.py
 from __future__ import annotations
 from pydantic import BaseModel
 
@@ -534,20 +534,20 @@ class AuditDefenseReq(BaseModel):
     evidence: list[list[str]]
 ```
 ```python
-# cukaipandai_api/main.py  (replace prior content)
+# api/main.py  (replace prior content)
 from __future__ import annotations
 from pathlib import Path
 from fastapi import Depends, FastAPI
-from cukaipandai_core.computation import compute_form_c
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import EntityTaxProfile, LineItem
-from cukaipandai_core.obligations import derive_obligations
-from cukaipandai_api.agents.audit_defense import build_defense
-from cukaipandai_api.llm import LLMClient, make_llm
-from cukaipandai_api.schemas import AuditDefenseReq, FormCReq, ObligationsReq
+from core.computation import compute_form_c
+from core.lawcorpus import LawCorpus
+from core.models import EntityTaxProfile, LineItem
+from core.obligations import derive_obligations
+from api.agents.audit_defense import build_defense
+from api.llm import LLMClient, make_llm
+from api.schemas import AuditDefenseReq, FormCReq, ObligationsReq
 
 app = FastAPI(title="CukaiPandai API")
-_CORPUS = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+_CORPUS = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 def get_llm() -> LLMClient:
     return make_llm()
@@ -580,20 +580,20 @@ def audit_defense(tin: str, req: AuditDefenseReq, llm: LLMClient = Depends(get_l
 
 ### Task 11: LangGraph orchestrator with human-approval interrupt
 
-**Files:** Create `cukaipandai_api/graph.py`, `tests/api/test_graph.py`.
+**Files:** Create `api/graph.py`, `tests/api/test_graph.py`.
 
 **Interfaces:** Produces `build_filing_graph(llm)` → a LangGraph `StateGraph` that runs classify → compute → audit-risk → **interrupt(approval)** → finalize, with a checkpointer so it pauses at the interrupt and resumes on approval. (Wraps the same core functions; gives the credible "agentic, human-gated" story for the demo.)
 
 - [ ] **Step 1: Failing test**
 ```python
 # tests/api/test_graph.py
-from cukaipandai_api.graph import build_filing_graph
-from cukaipandai_api.llm import FakeLLMClient
+from api.graph import build_filing_graph
+from api.llm import FakeLLMClient
 
 def test_graph_pauses_for_approval_then_finalizes():
     app = build_filing_graph(FakeLLMClient([]))  # compute path uses core, no LLM needed here
     cfg = {"configurable": {"thread_id": "t1"}}
-    state = app.invoke({"profile_ssm": __import__("json").load(open("cukaipandai_core/fixtures/entity_acme.json")),
+    state = app.invoke({"profile_ssm": __import__("json").load(open("core/fixtures/entity_acme.json")),
                         "line_items": [{"code":"4000","description":"Rev","amount":500000,"category":"income"},
                                        {"code":"5000","description":"Exp","amount":300000,"category":"deductible"}]}, cfg)
     assert state["__interrupt__"]  # paused awaiting approval
@@ -602,14 +602,14 @@ def test_graph_pauses_for_approval_then_finalizes():
 ```
 - [ ] **Step 2: Run → FAIL** · **Step 3: Implement**
 ```python
-# cukaipandai_api/graph.py
+# api/graph.py
 from __future__ import annotations
 from typing import TypedDict
 from langgraph.graph import START, END, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
-from cukaipandai_core.computation import compute_form_c
-from cukaipandai_core.models import EntityTaxProfile, LineItem
+from core.computation import compute_form_c
+from core.models import EntityTaxProfile, LineItem
 
 class S(TypedDict, total=False):
     profile_ssm: dict

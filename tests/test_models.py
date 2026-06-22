@@ -1,6 +1,6 @@
 from datetime import date
 
-from cukaipandai_core.models import EntityTaxProfile, FigureTrace, FormComputation
+from core.models import EntityTaxProfile, FigureTrace, FormComputation
 
 
 def test_entity_profile_roundtrip():

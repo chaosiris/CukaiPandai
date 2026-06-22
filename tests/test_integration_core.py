@@ -1,14 +1,14 @@
 import json
 from pathlib import Path
 
-from cukaipandai_core.citations import ground_citation
-from cukaipandai_core.computation import compute_form_c
-from cukaipandai_core.evidence import EvidenceVault
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation, EntityTaxProfile, LineItem
-from cukaipandai_core.obligations import derive_obligations
+from core.citations import ground_citation
+from core.computation import compute_form_c
+from core.evidence import EvidenceVault
+from core.lawcorpus import LawCorpus
+from core.models import Citation, EntityTaxProfile, LineItem
+from core.obligations import derive_obligations
 
-FIX = Path("cukaipandai_core/fixtures")
+FIX = Path("core/fixtures")
 
 
 def test_core_end_to_end_golden():

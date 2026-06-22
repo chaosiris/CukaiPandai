@@ -1,6 +1,6 @@
 from datetime import date
 
-from cukaipandai_core.deadlines import cp204_deadline, form_c_deadline, shift_for_holidays
+from core.deadlines import cp204_deadline, form_c_deadline, shift_for_holidays
 
 
 def test_form_c_seven_months_after_fye():

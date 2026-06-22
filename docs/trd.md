@@ -5,7 +5,7 @@
 ---
 
 ## 1. Architecture overview
-Three planes: **(1) Deterministic Core** (rules + computation + citation gate — source of truth, `cukaipandai_core`, already built), **(2) Agentic Reasoning** (LLM agents that classify/reason/draft/plan), **(3) Integrations & Data**. Humans approve before anything leaves the system.
+Three planes: **(1) Deterministic Core** (rules + computation + citation gate — source of truth, `core`, already built), **(2) Agentic Reasoning** (LLM agents that classify/reason/draft/plan), **(3) Integrations & Data**. Humans approve before anything leaves the system.
 
 ```
  Next.js UI ── Obligation Calendar · Cited Filing Studio · Audit-Defense console        [Tuna / Plan 3]
@@ -18,9 +18,9 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
    ├─ Deductibility reasoner ─────► RAG over Law Corpus (§6)
    ├─ Audit-Risk agent ───────────► rules + anomaly checks + MyInvois cross-match
    ├─ Audit-Defense agent ────────► Evidence Vault + Law Corpus
-   └─ Citation Verifier (LLM critic) ─► layered on the deterministic gate in `cukaipandai_core`
+   └─ Citation Verifier (LLM critic) ─► layered on the deterministic gate in `core`
         │                                    │
- DETERMINISTIC CORE  cukaipandai_core: Obligation Rules Engine · Tax Computation Engine · Citation gate · Evidence Vault   [Chaos / Plan 1 ✅]
+ DETERMINISTIC CORE  core: Obligation Rules Engine · Tax Computation Engine · Citation gate · Evidence Vault   [Chaos / Plan 1 ✅]
         │
  Data: SQLite (MVP) → Postgres+pgvector (prod) · local object store (docs)
  Model layer: LLMClient adapter ── OpenAI-compatible (ILMU Claw / Gemini)  ⇄  Anthropic (Claude)
@@ -30,7 +30,7 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
 
 | Component | Type | Responsibility | Plan |
 |---|---|---|---|
-| **`cukaipandai_core`** | Deterministic Py | Obligation Rules + Tax Computation engines, law corpus, citation grounding gate, Evidence Vault | 1 ✅ |
+| **`core`** | Deterministic Py | Obligation Rules + Tax Computation engines, law corpus, citation grounding gate, Evidence Vault | 1 ✅ |
 | **Orchestrator** | LangGraph graph | Decompose goal; route agents; enforce human-approval interrupts | 2 |
 | **Profiler agent** | LLM + tools | Assemble Entity Tax Profile from SSM + MyInvois + MySST + uploads | 2 |
 | **Document-understanding agent** | LLM (vision) + Docling | Parse/classify trial balance, receipts, invoices, EA forms, LHDN letters (BM/EN) | 2 |
@@ -43,7 +43,7 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
 | **Frontend** | Next.js | Three consoles; built against the API contract | 3 |
 
 ### 2.1 Component ownership (Chaos / Tuna)
-- **Chaos** — everything Python/agentic: `cukaipandai_core` (done), Plan 2 (FastAPI, LangGraph, `LLMClient` adapter incl. ILMU sovereign mode, the 5 agents, RAG + LLM citation-critic, MyInvois sandbox connector, Audit-Defense).
+- **Chaos** — everything Python/agentic: `core` (done), Plan 2 (FastAPI, LangGraph, `LLMClient` adapter incl. ILMU sovereign mode, the 5 agents, RAG + LLM citation-critic, MyInvois sandbox connector, Audit-Defense).
 - **Tuna** — Plan 3 (Next.js consoles), API wiring, UX, demo polish, the 7-min video + pitch-deck README.
 - **Interface contract:** the **FastAPI endpoints (§7a)** are the boundary. Tuna develops against mocked responses matching those schemas so the two streams never block each other.
 
@@ -57,7 +57,7 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
 - sst_registered → SST-02. · employee_count>0 → MTD/PCB + Form E/EA + EPF/SOCSO/EIS.
 - foreign payments → WHT (CP37). · unlisted share disposals (from 2024) → CGT ⚠verify. · related-party > threshold → TP docs ⚠verify.
 
-**Output — Obligation Calendar:** `[{obligation, form, due_date (holiday-shifted), est_amount, status, rule_id, config_version}]`. *(Implemented in `cukaipandai_core/obligations.py`, `computation.py`, `deadlines.py`.)*
+**Output — Obligation Calendar:** `[{obligation, form, due_date (holiday-shifted), est_amount, status, rule_id, config_version}]`. *(Implemented in `core/obligations.py`, `computation.py`, `deadlines.py`.)*
 
 ## 4. Integrations (data sources)
 ### 4.1 LHDN MyInvois API (primary transactional source)
@@ -68,10 +68,10 @@ Docs [sdk.myinvois.hasil.gov.my/api](https://sdk.myinvois.hasil.gov.my/) (SDK v1
 > Per-company obligations are **derived** from §4.1–4.3 + uploads (see [research](superpowers/research/2026-06-19-tax-obligation-determination.md)).
 
 ## 5. Tax Computation Engine
-Pure deterministic Python (`cukaipandai_core/computation.py`); inputs = treated line items + profile; output = form fields + per-figure trace `{value, inputs[], rule_id, config_version}`. Rates/bands/thresholds = versioned YA config. **LLM never computes a final figure** — the "deterministic agentic AI" guarantee.
+Pure deterministic Python (`core/computation.py`); inputs = treated line items + profile; output = form fields + per-figure trace `{value, inputs[], rule_id, config_version}`. Rates/bands/thresholds = versioned YA config. **LLM never computes a final figure** — the "deterministic agentic AI" guarantee.
 
 ## 6. Law corpus, RAG & Citation Verifier
-Corpus: ITA 1967, Public Rulings, DGIR guidelines, SST orders → stable clause IDs (`ITA-1967-s33(1)`). **MVP store:** SQLite + lightweight hybrid (keyword + embedding) retrieval over the curated subset; **prod:** pgvector. **Deductibility reasoner** cites clause IDs; **Citation Verifier** = the deterministic existence gate in `cukaipandai_core/citations.py` **plus** an LLM critic (Plan 2) that confirms the clause supports the claim → unsupported is blocked (the demo's "rejects a fake citation" beat).
+Corpus: ITA 1967, Public Rulings, DGIR guidelines, SST orders → stable clause IDs (`ITA-1967-s33(1)`). **MVP store:** SQLite + lightweight hybrid (keyword + embedding) retrieval over the curated subset; **prod:** pgvector. **Deductibility reasoner** cites clause IDs; **Citation Verifier** = the deterministic existence gate in `core/citations.py` **plus** an LLM critic (Plan 2) that confirms the clause supports the claim → unsupported is blocked (the demo's "rejects a fake citation" beat).
 
 ## 7. AI / model layer (locked)
 - **Adapter `LLMClient`:** one interface `chat(messages, tools) -> ToolCalls|text`. Two implementations: **OpenAI-compatible** (via the `openai` SDK, configurable `base_url`/`api_key`/`model`) for **ILMU Claw (sovereign mode)** and **Gemini** (OpenAI-compat endpoint); and **Anthropic** for **Claude**. Provider chosen by env (`LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`).
@@ -82,7 +82,7 @@ Corpus: ITA 1967, Public Rulings, DGIR guidelines, SST orders → stable clause 
 `POST /entities` (onboard → profile) · `GET /entities/{tin}/obligations` (calendar) · `POST /entities/{tin}/filings/form-c` (compute → cited FormComputation) · `POST /entities/{tin}/audit-risk` (flags) · `POST /entities/{tin}/audit-defense` (query → DefensePack) · `GET /entities/{tin}/evidence` · all mutating routes return a `requires_approval` step before commit. SSE `/runs/{id}/stream` for live agent steps.
 
 ## 8. Data model (core tables)
-`entities` · `obligation_profiles` · `obligations` · `documents` · `transactions` · `computations` (per-figure trace) · `citations` (clause_id + verified) · `audit_cases` · `audit_log` (append-only) · `evidence_links` (figure↔doc↔clause). **MVP:** SQLite (Evidence Vault already SQLite in `cukaipandai_core/evidence.py`). **Prod:** Postgres + pgvector.
+`entities` · `obligation_profiles` · `obligations` · `documents` · `transactions` · `computations` (per-figure trace) · `citations` (clause_id + verified) · `audit_cases` · `audit_log` (append-only) · `evidence_links` (figure↔doc↔clause). **MVP:** SQLite (Evidence Vault already SQLite in `core/evidence.py`). **Prod:** Postgres + pgvector.
 
 ## 9. Security, privacy & compliance
 PDPA: encrypt PII at rest + TLS; least-privilege; retention policy. **Residency:** sovereign mode keeps inference + data in Malaysia (ILMU + MY region). Secrets (MyInvois OAuth, model keys) in env/secrets manager, never in code. Immutable `audit_log` (payload hashes). **Human-in-the-loop hard gate** before any submit/export; no auto-filing of statutory returns.

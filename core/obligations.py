@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from cukaipandai_core.config_loader import load_ya_config
-from cukaipandai_core.deadlines import cp204_deadline, form_c_deadline
-from cukaipandai_core.models import EntityTaxProfile, Obligation, ObligationCalendar
+from core.config_loader import load_ya_config
+from core.deadlines import cp204_deadline, form_c_deadline
+from core.models import EntityTaxProfile, Obligation, ObligationCalendar
 
 
 def derive_obligations(profile: EntityTaxProfile, ya: int) -> ObligationCalendar:

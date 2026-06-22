@@ -1,5 +1,5 @@
-import cukaipandai_core
+import core
 
 
 def test_package_version():
-    assert isinstance(cukaipandai_core.__version__, str)
+    assert isinstance(core.__version__, str)

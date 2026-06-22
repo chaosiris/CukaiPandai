@@ -1,6 +1,6 @@
 import pytest
 
-from cukaipandai_api.llm import FakeLLMClient
+from api.llm import FakeLLMClient
 
 
 def test_fake_returns_scripted_in_order():

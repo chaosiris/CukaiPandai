@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation
+from core.lawcorpus import LawCorpus
+from core.models import Citation
 
 
 def ground_citation(citation: Citation, corpus: LawCorpus) -> Citation:

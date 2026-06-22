@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from cukaipandai_core.models import Clause
+from core.models import Clause
 
 
 class LawCorpus:

@@ -4,7 +4,7 @@
 
 **Goal:** Build the stack-independent, deterministic Python core of CukaiPandai — the obligation rules engine, tax computation engine, law/citation store, evidence vault, and seeded data — with every tax figure traceable and TDD-verified.
 
-**Architecture:** A pure-Python package `cukaipandai_core` (no web framework, no LLM, no cloud) that any backend (FastAPI/ADK/etc.) can import. Tax rules/rates/deadlines are versioned config keyed to Year of Assessment (YA); engines are deterministic and emit a full computation trace; the LLM/agent layer (Plan 2) calls into this core but never replaces its math.
+**Architecture:** A pure-Python package `core` (no web framework, no LLM, no cloud) that any backend (FastAPI/ADK/etc.) can import. Tax rules/rates/deadlines are versioned config keyed to Year of Assessment (YA); engines are deterministic and emit a full computation trace; the LLM/agent layer (Plan 2) calls into this core but never replaces its math.
 
 **Tech Stack:** Python 3.12, Pydantic v2, PyYAML, pytest. (Stack-independent core — Plans 2/3 add FastAPI + model adapter + Next.js once the team confirms the stack.)
 
@@ -18,7 +18,7 @@
 
 ## File Structure
 ```
-cukaipandai_core/
+core/
   __init__.py
   models.py            # Pydantic models (T2)
   config/
@@ -47,22 +47,22 @@ tests/
 ### Task 1: Package scaffold
 
 **Files:**
-- Create: `pyproject.toml`, `cukaipandai_core/__init__.py`, `tests/test_smoke.py`
+- Create: `pyproject.toml`, `core/__init__.py`, `tests/test_smoke.py`
 
 **Interfaces:**
-- Produces: importable package `cukaipandai_core` with `__version__: str`.
+- Produces: importable package `core` with `__version__: str`.
 
 - [ ] **Step 1: Write the failing test**
 ```python
 # tests/test_smoke.py
-import cukaipandai_core
+import core
 
 def test_package_version():
-    assert isinstance(cukaipandai_core.__version__, str)
+    assert isinstance(core.__version__, str)
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_smoke.py -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'cukaipandai_core'`
+Expected: FAIL — `ModuleNotFoundError: No module named 'core'`
 - [ ] **Step 3: Write minimal implementation**
 ```toml
 # pyproject.toml
@@ -75,7 +75,7 @@ dependencies = ["pydantic>=2.7", "pyyaml>=6.0"]
 pythonpath = ["."]
 ```
 ```python
-# cukaipandai_core/__init__.py
+# core/__init__.py
 __version__ = "0.1.0"
 ```
 - [ ] **Step 4: Run test to verify it passes**
@@ -83,8 +83,8 @@ Run: `pip install -e . && pytest tests/test_smoke.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add pyproject.toml cukaipandai_core/__init__.py tests/test_smoke.py
-git commit -m "chore: scaffold cukaipandai_core package"
+git add pyproject.toml core/__init__.py tests/test_smoke.py
+git commit -m "chore: scaffold core package"
 ```
 
 ---
@@ -92,7 +92,7 @@ git commit -m "chore: scaffold cukaipandai_core package"
 ### Task 2: Core domain models
 
 **Files:**
-- Create: `cukaipandai_core/models.py`
+- Create: `core/models.py`
 - Test: `tests/test_models.py`
 
 **Interfaces:**
@@ -110,7 +110,7 @@ git commit -m "chore: scaffold cukaipandai_core package"
 ```python
 # tests/test_models.py
 from datetime import date
-from cukaipandai_core.models import EntityTaxProfile, FigureTrace, FormComputation
+from core.models import EntityTaxProfile, FigureTrace, FormComputation
 
 def test_entity_profile_roundtrip():
     p = EntityTaxProfile(tin="C123", entity_type="sdn_bhd", msic_codes=["46900"],
@@ -126,10 +126,10 @@ def test_form_computation_holds_traces():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_models.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.models`
+Expected: FAIL — `ModuleNotFoundError: core.models`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/models.py
+# core/models.py
 from __future__ import annotations
 from datetime import date
 from pydantic import BaseModel
@@ -189,7 +189,7 @@ Run: `pytest tests/test_models.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/models.py tests/test_models.py
+git add core/models.py tests/test_models.py
 git commit -m "feat: add core domain models"
 ```
 
@@ -198,7 +198,7 @@ git commit -m "feat: add core domain models"
 ### Task 3: YA config + loader
 
 **Files:**
-- Create: `cukaipandai_core/config/ya_2026.yaml`, `cukaipandai_core/config_loader.py`
+- Create: `core/config/ya_2026.yaml`, `core/config_loader.py`
 - Test: `tests/test_config_loader.py`
 
 **Interfaces:**
@@ -208,7 +208,7 @@ git commit -m "feat: add core domain models"
 ```python
 # tests/test_config_loader.py
 import pytest
-from cukaipandai_core.config_loader import load_ya_config
+from core.config_loader import load_ya_config
 
 def test_loads_ya2026():
     cfg = load_ya_config(2026)
@@ -221,10 +221,10 @@ def test_unknown_ya_raises():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_config_loader.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.config_loader`
+Expected: FAIL — `ModuleNotFoundError: core.config_loader`
 - [ ] **Step 3: Write minimal implementation**
 ```yaml
-# cukaipandai_core/config/ya_2026.yaml   (⚠verify all figures vs LHDN)
+# core/config/ya_2026.yaml   (⚠verify all figures vs LHDN)
 version: "YA2026.1"
 income_tax:
   sme_paidup_max: 2500000
@@ -243,7 +243,7 @@ sst:
   registration_threshold: 500000
 ```
 ```python
-# cukaipandai_core/config_loader.py
+# core/config_loader.py
 from __future__ import annotations
 from pathlib import Path
 import yaml
@@ -261,7 +261,7 @@ Run: `pytest tests/test_config_loader.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/config/ya_2026.yaml cukaipandai_core/config_loader.py tests/test_config_loader.py
+git add core/config/ya_2026.yaml core/config_loader.py tests/test_config_loader.py
 git commit -m "feat: add YA2026 tax config and loader"
 ```
 
@@ -270,7 +270,7 @@ git commit -m "feat: add YA2026 tax config and loader"
 ### Task 4: Obligation Rules Engine
 
 **Files:**
-- Create: `cukaipandai_core/obligations.py`
+- Create: `core/obligations.py`
 - Test: `tests/test_obligations.py`
 
 **Interfaces:**
@@ -281,8 +281,8 @@ git commit -m "feat: add YA2026 tax config and loader"
 ```python
 # tests/test_obligations.py
 from datetime import date
-from cukaipandai_core.models import EntityTaxProfile
-from cukaipandai_core.obligations import derive_obligations
+from core.models import EntityTaxProfile
+from core.obligations import derive_obligations
 
 def _profile(**kw):
     base = dict(tin="C1", entity_type="sdn_bhd", msic_codes=["46900"],
@@ -304,14 +304,14 @@ def test_no_employees_no_sst():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_obligations.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.obligations`
+Expected: FAIL — `ModuleNotFoundError: core.obligations`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/obligations.py
+# core/obligations.py
 from __future__ import annotations
-from cukaipandai_core.models import EntityTaxProfile, Obligation, ObligationCalendar
-from cukaipandai_core.config_loader import load_ya_config
-from cukaipandai_core.deadlines import form_c_deadline, cp204_deadline
+from core.models import EntityTaxProfile, Obligation, ObligationCalendar
+from core.config_loader import load_ya_config
+from core.deadlines import form_c_deadline, cp204_deadline
 
 def derive_obligations(profile: EntityTaxProfile, ya: int) -> ObligationCalendar:
     cfg = load_ya_config(ya); ver = cfg["version"]; obs: list[Obligation] = []
@@ -336,7 +336,7 @@ Run: `pytest tests/test_obligations.py -v`
 Expected: PASS (requires Task 5's `deadlines.py`; implement T5 first or stub `form_c_deadline`/`cp204_deadline` then replace)
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/obligations.py tests/test_obligations.py
+git add core/obligations.py tests/test_obligations.py
 git commit -m "feat: add obligation rules engine"
 ```
 
@@ -345,7 +345,7 @@ git commit -m "feat: add obligation rules engine"
 ### Task 5: Deadline calculator
 
 **Files:**
-- Create: `cukaipandai_core/deadlines.py`
+- Create: `core/deadlines.py`
 - Test: `tests/test_deadlines.py`
 
 **Interfaces:**
@@ -358,7 +358,7 @@ git commit -m "feat: add obligation rules engine"
 ```python
 # tests/test_deadlines.py
 from datetime import date
-from cukaipandai_core.deadlines import form_c_deadline, cp204_deadline, shift_for_holidays
+from core.deadlines import form_c_deadline, cp204_deadline, shift_for_holidays
 
 def test_form_c_seven_months_after_fye():
     assert form_c_deadline(date(2025,12,31)) == date(2026,7,31)
@@ -373,10 +373,10 @@ def test_shift_skips_weekend_and_holiday():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_deadlines.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.deadlines`
+Expected: FAIL — `ModuleNotFoundError: core.deadlines`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/deadlines.py
+# core/deadlines.py
 from __future__ import annotations
 from datetime import date, timedelta
 import calendar
@@ -404,7 +404,7 @@ Run: `pytest tests/test_deadlines.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/deadlines.py tests/test_deadlines.py
+git add core/deadlines.py tests/test_deadlines.py
 git commit -m "feat: add deadline calculator with holiday shift"
 ```
 
@@ -413,7 +413,7 @@ git commit -m "feat: add deadline calculator with holiday shift"
 ### Task 6: Tax Computation Engine (Form C)
 
 **Files:**
-- Create: `cukaipandai_core/computation.py`
+- Create: `core/computation.py`
 - Test: `tests/test_computation.py`
 
 **Interfaces:**
@@ -428,8 +428,8 @@ git commit -m "feat: add deadline calculator with holiday shift"
 ```python
 # tests/test_computation.py
 from datetime import date
-from cukaipandai_core.models import EntityTaxProfile, LineItem
-from cukaipandai_core.computation import compute_form_c
+from core.models import EntityTaxProfile, LineItem
+from core.computation import compute_form_c
 
 def _p(**kw):
     b=dict(tin="C1",entity_type="sdn_bhd",msic_codes=["46900"],paid_up_capital=1_000_000,
@@ -453,13 +453,13 @@ def test_non_sme_flat_rate():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_computation.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.computation`
+Expected: FAIL — `ModuleNotFoundError: core.computation`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/computation.py
+# core/computation.py
 from __future__ import annotations
-from cukaipandai_core.models import EntityTaxProfile, LineItem, FigureTrace, FormComputation
-from cukaipandai_core.config_loader import load_ya_config
+from core.models import EntityTaxProfile, LineItem, FigureTrace, FormComputation
+from core.config_loader import load_ya_config
 
 def is_sme(profile: EntityTaxProfile, cfg: dict) -> bool:
     it = cfg["income_tax"]
@@ -497,7 +497,7 @@ Run: `pytest tests/test_computation.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/computation.py tests/test_computation.py
+git add core/computation.py tests/test_computation.py
 git commit -m "feat: add Form C tax computation engine with traces"
 ```
 
@@ -506,7 +506,7 @@ git commit -m "feat: add Form C tax computation engine with traces"
 ### Task 7: Law corpus + clause store
 
 **Files:**
-- Create: `cukaipandai_core/lawcorpus.py`, `cukaipandai_core/fixtures/lawcorpus_seed.json`
+- Create: `core/lawcorpus.py`, `core/fixtures/lawcorpus_seed.json`
 - Test: `tests/test_lawcorpus.py`
 
 **Interfaces:**
@@ -516,9 +516,9 @@ git commit -m "feat: add Form C tax computation engine with traces"
 ```python
 # tests/test_lawcorpus.py
 from pathlib import Path
-from cukaipandai_core.lawcorpus import LawCorpus
+from core.lawcorpus import LawCorpus
 
-CORPUS = Path("cukaipandai_core/fixtures/lawcorpus_seed.json")
+CORPUS = Path("core/fixtures/lawcorpus_seed.json")
 
 def test_known_clause_exists():
     c = LawCorpus.load(CORPUS)
@@ -532,10 +532,10 @@ def test_unknown_clause_absent():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_lawcorpus.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.lawcorpus`
+Expected: FAIL — `ModuleNotFoundError: core.lawcorpus`
 - [ ] **Step 3: Write minimal implementation**
 ```json
-// cukaipandai_core/fixtures/lawcorpus_seed.json   (⚠verify wording vs ITA 1967)
+// core/fixtures/lawcorpus_seed.json   (⚠verify wording vs ITA 1967)
 [
   {"clause_id":"ITA-1967-s33(1)","source":"Income Tax Act 1967 s.33(1)","text":"Adjusted income: deductions wholly and exclusively incurred in the production of gross income are allowable."},
   {"clause_id":"ITA-1967-s39","source":"Income Tax Act 1967 s.39","text":"Deductions not allowed, including certain private and capital expenditure and a portion of entertainment expenditure."},
@@ -545,11 +545,11 @@ Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.lawcorpus`
 ]
 ```
 ```python
-# cukaipandai_core/lawcorpus.py
+# core/lawcorpus.py
 from __future__ import annotations
 from pathlib import Path
 import json
-from cukaipandai_core.models import Clause
+from core.models import Clause
 
 class LawCorpus:
     def __init__(self, clauses: dict[str, Clause]): self._c = clauses
@@ -565,7 +565,7 @@ Run: `pytest tests/test_lawcorpus.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/lawcorpus.py cukaipandai_core/fixtures/lawcorpus_seed.json tests/test_lawcorpus.py
+git add core/lawcorpus.py core/fixtures/lawcorpus_seed.json tests/test_lawcorpus.py
 git commit -m "feat: add law corpus clause store with ITA seed"
 ```
 
@@ -574,7 +574,7 @@ git commit -m "feat: add law corpus clause store with ITA seed"
 ### Task 8: Deterministic citation grounding
 
 **Files:**
-- Create: `cukaipandai_core/citations.py`
+- Create: `core/citations.py`
 - Test: `tests/test_citations.py`
 
 **Interfaces:**
@@ -585,11 +585,11 @@ git commit -m "feat: add law corpus clause store with ITA seed"
 ```python
 # tests/test_citations.py
 from pathlib import Path
-from cukaipandai_core.models import Citation
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.citations import ground_citation
+from core.models import Citation
+from core.lawcorpus import LawCorpus
+from core.citations import ground_citation
 
-C = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+C = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 def test_real_clauses_verified():
     cit = ground_citation(Citation(claim="Repairs deductible under s.33(1)", clause_ids=["ITA-1967-s33(1)"]), C)
@@ -601,13 +601,13 @@ def test_planted_fake_citation_rejected():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_citations.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.citations`
+Expected: FAIL — `ModuleNotFoundError: core.citations`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/citations.py
+# core/citations.py
 from __future__ import annotations
-from cukaipandai_core.models import Citation
-from cukaipandai_core.lawcorpus import LawCorpus
+from core.models import Citation
+from core.lawcorpus import LawCorpus
 
 def ground_citation(citation: Citation, corpus: LawCorpus) -> Citation:
     citation.verified = bool(citation.clause_ids) and all(corpus.exists(cid) for cid in citation.clause_ids)
@@ -618,7 +618,7 @@ Run: `pytest tests/test_citations.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/citations.py tests/test_citations.py
+git add core/citations.py tests/test_citations.py
 git commit -m "feat: add deterministic citation grounding gate"
 ```
 
@@ -627,7 +627,7 @@ git commit -m "feat: add deterministic citation grounding gate"
 ### Task 9: Evidence Vault + audit log
 
 **Files:**
-- Create: `cukaipandai_core/evidence.py`
+- Create: `core/evidence.py`
 - Test: `tests/test_evidence.py`
 
 **Interfaces:**
@@ -636,7 +636,7 @@ git commit -m "feat: add deterministic citation grounding gate"
 - [ ] **Step 1: Write the failing test**
 ```python
 # tests/test_evidence.py
-from cukaipandai_core.evidence import EvidenceVault
+from core.evidence import EvidenceVault
 
 def test_link_and_retrieve():
     v = EvidenceVault()
@@ -652,10 +652,10 @@ def test_audit_log_appends_in_order():
 ```
 - [ ] **Step 2: Run test to verify it fails**
 Run: `pytest tests/test_evidence.py -v`
-Expected: FAIL — `ModuleNotFoundError: cukaipandai_core.evidence`
+Expected: FAIL — `ModuleNotFoundError: core.evidence`
 - [ ] **Step 3: Write minimal implementation**
 ```python
-# cukaipandai_core/evidence.py
+# core/evidence.py
 from __future__ import annotations
 import sqlite3
 
@@ -680,7 +680,7 @@ Run: `pytest tests/test_evidence.py -v`
 Expected: PASS
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/evidence.py tests/test_evidence.py
+git add core/evidence.py tests/test_evidence.py
 git commit -m "feat: add evidence vault and append-only audit log"
 ```
 
@@ -689,7 +689,7 @@ git commit -m "feat: add evidence vault and append-only audit log"
 ### Task 10: Seeded entity + end-to-end core integration
 
 **Files:**
-- Create: `cukaipandai_core/fixtures/entity_acme.json`, `trial_balance_acme.json`, `myinvois_acme.json`
+- Create: `core/fixtures/entity_acme.json`, `trial_balance_acme.json`, `myinvois_acme.json`
 - Test: `tests/test_integration_core.py`
 
 **Interfaces:**
@@ -701,23 +701,23 @@ git commit -m "feat: add evidence vault and append-only audit log"
 # tests/test_integration_core.py
 import json
 from pathlib import Path
-from cukaipandai_core.models import EntityTaxProfile, LineItem, Citation
-from cukaipandai_core.obligations import derive_obligations
-from cukaipandai_core.computation import compute_form_c
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.citations import ground_citation
-from cukaipandai_core.evidence import EvidenceVault
+from core.models import EntityTaxProfile, LineItem, Citation
+from core.obligations import derive_obligations
+from core.computation import compute_form_c
+from core.lawcorpus import LawCorpus
+from core.citations import ground_citation
+from core.evidence import EvidenceVault
 
 def test_core_end_to_end_golden():
-    entity = json.loads(Path("cukaipandai_core/fixtures/entity_acme.json").read_text())
-    tb = json.loads(Path("cukaipandai_core/fixtures/trial_balance_acme.json").read_text())
+    entity = json.loads(Path("core/fixtures/entity_acme.json").read_text())
+    tb = json.loads(Path("core/fixtures/trial_balance_acme.json").read_text())
     profile = EntityTaxProfile(**entity)
     items = [LineItem(**li) for li in tb]
     cal = derive_obligations(profile, 2026)
     assert any(o.form == "C" for o in cal.obligations)
     fc = compute_form_c(profile, items, 2026)
     assert fc.fields["tax_payable"].value == 31_000  # golden (Acme: chargeable 200k SME)
-    corpus = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+    corpus = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
     cit = ground_citation(Citation(claim="expenses deductible under s.33(1)", clause_ids=["ITA-1967-s33(1)"]), corpus)
     assert cit.verified
     v = EvidenceVault(); v.link("tax_payable","trial_balance_acme","ITA-1967-s33(1)")
@@ -728,18 +728,18 @@ Run: `pytest tests/test_integration_core.py -v`
 Expected: FAIL — fixtures missing → `FileNotFoundError`
 - [ ] **Step 3: Write minimal implementation**
 ```json
-// cukaipandai_core/fixtures/entity_acme.json
+// core/fixtures/entity_acme.json
 {"tin":"C2581234509","entity_type":"sdn_bhd","msic_codes":["46900"],
  "paid_up_capital":1000000,"gross_income":500000,"employee_count":12,"sst_registered":true,
  "basis_period_start":"2025-01-01","basis_period_end":"2025-12-31","commencement_date":"2018-03-01"}
 ```
 ```json
-// cukaipandai_core/fixtures/trial_balance_acme.json
+// core/fixtures/trial_balance_acme.json
 [{"code":"4000","description":"Revenue","amount":500000,"category":"income"},
  {"code":"5000","description":"Allowable operating expenses","amount":300000,"category":"deductible"}]
 ```
 ```json
-// cukaipandai_core/fixtures/myinvois_acme.json
+// core/fixtures/myinvois_acme.json
 [{"uuid":"INV-0001","supplier_tin":"C2581234509","buyer_tin":"C9990001112",
   "classification":"022","tax_type":"01","tax_amount":0,"total_excl_tax":120000,"total_incl_tax":120000}]
 ```
@@ -748,7 +748,7 @@ Run: `pytest -v`
 Expected: PASS (all suites green)
 - [ ] **Step 5: Commit**
 ```bash
-git add cukaipandai_core/fixtures/*.json tests/test_integration_core.py
+git add core/fixtures/*.json tests/test_integration_core.py
 git commit -m "test: add seeded entity and core end-to-end integration test"
 ```
 

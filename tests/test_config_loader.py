@@ -1,6 +1,6 @@
 import pytest
 
-from cukaipandai_core.config_loader import load_ya_config
+from core.config_loader import load_ya_config
 
 
 def test_loads_ya2026():

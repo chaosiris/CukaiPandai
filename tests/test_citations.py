@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from cukaipandai_core.citations import ground_citation
-from cukaipandai_core.lawcorpus import LawCorpus
-from cukaipandai_core.models import Citation
+from core.citations import ground_citation
+from core.lawcorpus import LawCorpus
+from core.models import Citation
 
-C = LawCorpus.load(Path("cukaipandai_core/fixtures/lawcorpus_seed.json"))
+C = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 
 def test_real_clauses_verified():

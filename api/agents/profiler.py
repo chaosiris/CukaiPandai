@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from cukaipandai_core.models import EntityTaxProfile
+from core.models import EntityTaxProfile
 
-from cukaipandai_api.connectors.myinvois import MyInvoisClient
+from api.connectors.myinvois import MyInvoisClient
 
 
 def build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile:

@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from cukaipandai_core.lawcorpus import LawCorpus
+from core.lawcorpus import LawCorpus
 
-CORPUS = Path("cukaipandai_core/fixtures/lawcorpus_seed.json")
+CORPUS = Path("core/fixtures/lawcorpus_seed.json")
 
 
 def test_known_clause_exists():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cukaipandai_core.config_loader import load_ya_config
-from cukaipandai_core.models import EntityTaxProfile, FigureTrace, FormComputation, LineItem
+from core.config_loader import load_ya_config
+from core.models import EntityTaxProfile, FigureTrace, FormComputation, LineItem
 
 
 def is_sme(profile: EntityTaxProfile, cfg: dict) -> bool:

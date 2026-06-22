@@ -1,7 +1,7 @@
 from datetime import date
 
-from cukaipandai_core.computation import compute_form_c
-from cukaipandai_core.models import EntityTaxProfile, LineItem
+from core.computation import compute_form_c
+from core.models import EntityTaxProfile, LineItem
 
 
 def _p(**kw):

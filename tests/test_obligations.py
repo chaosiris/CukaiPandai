@@ -1,7 +1,7 @@
 from datetime import date
 
-from cukaipandai_core.models import EntityTaxProfile
-from cukaipandai_core.obligations import derive_obligations
+from core.models import EntityTaxProfile
+from core.obligations import derive_obligations
 
 
 def _profile(**kw):

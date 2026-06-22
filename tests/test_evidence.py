@@ -1,4 +1,4 @@
-from cukaipandai_core.evidence import EvidenceVault
+from core.evidence import EvidenceVault
 
 
 def test_link_and_retrieve():
