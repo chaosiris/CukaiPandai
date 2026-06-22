@@ -67,3 +67,10 @@ class RiskFlag(BaseModel):
     code: str
     message: str
     severity: str = "medium"
+
+
+class DefensePack(BaseModel):
+    query: str
+    items: list[dict]
+    citations: list[Citation]
+    exposure_note: str
