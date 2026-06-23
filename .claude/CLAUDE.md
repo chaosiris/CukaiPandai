@@ -18,17 +18,6 @@ See `docs/trd.md` (canonical) and `docs/cukaipandai-spec.md` (design). Do not cr
 
 Two layers: a **deterministic core** (`core/`) that owns all tax math, deadlines, citations and law-corpus lookups, and an **agentic API** (`api/`) that wraps it — 6 agents + a LangGraph filing graph with a HITL `interrupt`, exposed over FastAPI. The LLM is routed **ILMU-first** (sovereign `nemo-super`) with **Claude** as failover/escalation.
 
-### Repo layout
-
-```
-core/        # deterministic engines: obligations, computation, deadlines, citations, lawcorpus, config_loader, models
-api/         # graph.py (LangGraph + HITL), main.py (FastAPI), schemas.py, llm.py (LLMClient adapter)
-tests/       # pytest suite (incl. offline e2e pipeline)
-docs/        # roles, plan, progress, test, prd, trd, cukaipandai-spec, runbook
-frontend/    # [planned] Vite + React + TS console (FE lane)
-pyproject.toml · Dockerfile · docker-compose.yml · .env.example
-```
-
 ---
 
 ## Tech Stack
@@ -40,7 +29,7 @@ pyproject.toml · Dockerfile · docker-compose.yml · .env.example
 
 ---
 
-## Commands
+## Common Commands
 
 Run backend commands from the `backend/` directory (CWD-relative fixture paths).
 
@@ -186,8 +175,6 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
----
-
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 <!-- andrej-karpathy-skills -->
@@ -198,9 +185,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## RTK — Rust Token Killer
 
-## Golden Rule
+### Golden Rule
 
-**Only if `rtk` is installed** (`which rtk`) — not all teammates have it. If it's missing, run commands directly and ignore this entire RTK section.
+**Only if `rtk` is installed** (`which rtk`) — not all teammates have it. If it's missing, visit the [source repository](https://github.com/rtk-ai/rtk) to install for the agent type or environment.
 
 **Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
 
@@ -214,9 +201,9 @@ git add . && git commit -m "msg" && git push
 rtk git add . && rtk git commit -m "msg" && rtk git push
 ```
 
-## RTK Commands by Workflow
+### RTK Commands by Workflow
 
-### Build & Compile (80-90% savings)
+#### Build & Compile (80-90% savings)
 
 ```bash
 rtk cargo build         # Cargo build output
@@ -228,7 +215,7 @@ rtk prettier --check    # Files needing format only (70%)
 rtk next build          # Next.js build with route metrics (87%)
 ```
 
-### Test (60-99% savings)
+#### Test (60-99% savings)
 
 ```bash
 rtk cargo test          # Cargo test failures only (90%)
@@ -242,7 +229,7 @@ rtk rspec               # RSpec test failures only (60%)
 rtk test <cmd>          # Generic test wrapper - failures only
 ```
 
-### Git (59-80% savings)
+#### Git (59-80% savings)
 
 ```bash
 rtk git status          # Compact status
@@ -261,7 +248,7 @@ rtk git worktree        # Compact worktree
 
 Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
 
-### GitHub (26-87% savings)
+#### GitHub (26-87% savings)
 
 ```bash
 rtk gh pr view <num>    # Compact PR view (87%)
@@ -271,7 +258,7 @@ rtk gh issue list       # Compact issue list (80%)
 rtk gh api              # Compact API responses (26%)
 ```
 
-### JavaScript/TypeScript Tooling (70-90% savings)
+#### JavaScript/TypeScript Tooling (70-90% savings)
 
 ```bash
 rtk pnpm list           # Compact dependency tree (70%)
@@ -282,7 +269,7 @@ rtk npx <cmd>           # Compact npx command output
 rtk prisma              # Prisma without ASCII art (88%)
 ```
 
-### Files & Search (60-75% savings)
+#### Files & Search (60-75% savings)
 
 ```bash
 rtk ls <path>           # Tree format, compact (65%)
@@ -291,7 +278,7 @@ rtk grep <pattern>      # Search grouped by file (75%). Format flags (-c, -l, -L
 rtk find <pattern>      # Find grouped by directory (70%)
 ```
 
-### Analysis & Debug (70-90% savings)
+#### Analysis & Debug (70-90% savings)
 
 ```bash
 rtk err <cmd>           # Filter errors only from any command
@@ -303,7 +290,7 @@ rtk summary <cmd>       # Smart summary of command output
 rtk diff                # Ultra-compact diffs
 ```
 
-### Infrastructure (85% savings)
+#### Infrastructure (85% savings)
 
 ```bash
 rtk docker ps           # Compact container list
@@ -313,14 +300,14 @@ rtk kubectl get         # Compact resource list
 rtk kubectl logs        # Deduplicated pod logs
 ```
 
-### Network (65-70% savings)
+#### Network (65-70% savings)
 
 ```bash
 rtk curl <url>          # Compact HTTP responses (70%)
 rtk wget <url>          # Compact download output (65%)
 ```
 
-### Meta Commands
+#### Meta Commands
 
 ```bash
 rtk gain                # View token savings statistics
@@ -331,7 +318,7 @@ rtk init                # Add RTK instructions to CLAUDE.md
 rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 ```
 
-## Token Savings Overview
+### Token Savings Overview
 
 | Category         | Commands                       | Typical Savings |
 | ---------------- | ------------------------------ | --------------- |
@@ -347,3 +334,5 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 Overall average: **60-90% token reduction** on common development operations.
 
 <!-- /rtk-instructions -->
+
+---
