@@ -21,7 +21,7 @@ Defines every participant's role, responsibilities, and boundaries in this proje
 | Item     | Detail                                       |
 | -------- | -------------------------------------------- |
 | Owns     | `docs/`, all final decisions                 |
-| Approves | Gate 1 (plan) and Gate 2 (commit/push)       |
+| Approves | Gate 1 (plan) and Gate 2 (ship — see modes)  |
 | Commits  | Human authorizes; no agent pushes unprompted |
 
 ## PM — Orchestrator
@@ -69,11 +69,12 @@ PO gives task
         ╚══════════╝               ▼
       → PM dispatches PG → implements approved tasks
           → PM dispatches QA → writes verdict to docs/test.md
-              → ╔═ GATE 2 ═╗ PM relays verdict to PO
+              → ╔═ GATE 2 ═╗ PM relays verdict to PO, ships per Gate 2 mode
                 ║ Reject   ║── back to PG with QA findings → QA again
-                ║ Approve  ║── PM proposes Conventional Commit msg,
-                ╚══════════╝   asks PO to authorize commit + push
-                  → PO authorizes → PM commits/pushes → next task
+                ║ Approve  ║── direct: commit+push · pr-manual: PR→PO merges
+                ╚══════════╝   · pr-auto: PR→PM self-merges → next task
 ```
 
-**Hard rules:** One agent per task at a time. Handoffs go through the `docs/` files. The human reads the diff before any commit. No agent pushes to origin without explicit human authorization at Gate 2.
+**Gate 2 ship modes** (set per project in `.claude/CLAUDE.md`): **direct** — commit + push to the working branch · **pr-manual** — PM opens a PR into the target branch and the human merges · **pr-auto** — PM opens a PR and self-merges. In the PR modes a PR is opened **only for substantial changes / the end of an iteration**; small hotfixes commit + push straight to the target branch, and merged PR branches are deleted (`--delete-branch`). The human owns the choice; agents never deviate from it.
+
+**Hard rules:** One agent per task at a time. Handoffs go through the `docs/` files. The human reads the diff before any commit/merge. No agent pushes or merges without honoring the Gate 2 mode (and human authorization where the mode requires it).
