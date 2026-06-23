@@ -185,3 +185,44 @@ CukaiPandai/
 - **BE:** `git mv` `api/`, `core/`, `tests/`, `pyproject.toml`, `Dockerfile`, `docker-compose.yml` (+ `.env*`) into `backend/`; fix package paths (`pyproject` packages, `pythonpath`, Docker build context, compose, CI `ci.yml`) so `pytest` stays green (40 tests).
 - **FE:** delete the Next.js `frontend/`; scaffold the Vite+RR7+token-CSS console (3 consoles) wired to the 3 live FastAPI endpoints.
 - **Note:** `.claude/CLAUDE.md` (the agent-onboarding doc) stays; the new **root** `CLAUDE.md` is the separate conventions doc (reference keeps both).
+
+---
+
+## [23/06/26] — uv as backend primary PM + runbook update `[DO/TD]`
+
+**Branch:** `chore/uv-backend-and-runbook` (staged, uncommitted — awaiting Gate 2).
+
+### `[DO]` — uv integration (backend)
+
+- **uv version:** 0.10.10 (pre-installed).
+- Generated `backend/uv.lock` via `uv lock` (51 packages resolved). `git check-ignore backend/uv.lock` → not ignored (correct — file will be committed for reproducible installs). `backend/.venv/` remains gitignored and is not staged.
+- `backend/pyproject.toml`: no changes required — `[project]`, `[project.optional-dependencies] dev`, and `[build-system]` (setuptools) are already uv-compatible.
+- **pytest via uv:** `cd backend && uv run pytest -q` → **40 passed, 1 warning in 3.10s** `[VERIFIED 23/06/26]`.
+- pip still works as a documented fallback (standard pyproject — no uv-specific formats introduced).
+
+### `[DO]` — CI updated to uv
+
+- `.github/workflows/ci.yml`: replaced `actions/setup-python@v5 cache: pip` + `pip install -e ".[dev]"` + `pytest -q` with `astral-sh/setup-uv@v6` + `uv sync --extra dev` + `uv run pytest -q` (working-directory: `backend` unchanged). Docker-build job unchanged.
+
+### `[DO]` — Dockerfile updated to uv
+
+- `backend/Dockerfile`: replaced `FROM python:3.11-slim` + `RUN pip install --no-cache-dir -e .` with `COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv` + `COPY pyproject.toml uv.lock ./` + `RUN uv pip install --system --no-cache -e .`. `WORKDIR /app`, fixture CWD discipline, and `CMD` unchanged.
+- **Docker build result:** `docker build -t cukaipandai-be ./backend` → **succeeded** (sha256:0375ae46…) `[VERIFIED 23/06/26]`.
+
+### `[TD]` — docs/runbook.md fixed for post-restructure + uv
+
+- §1 backend: commands now run from `backend/`; switched to `uv venv && uv sync --extra dev` / `uv run pytest -q` / `uv run uvicorn api.main:app --reload`; pip fallback documented; removed incorrect `pip install -e . pytest` (pytest is in `[dev]` extra).
+- §2 frontend: removed "In progress" note (3 consoles exist); corrected env var to `VITE_API_BASE_URL` (from `client.ts`); fixed `cp` path to `../.env.example .env` (file is at repo root).
+- §4 deploy: noted build context `backend/` for Render + CI now uses uv.
+- §5 demo flow: fixture paths updated from `core/fixtures/...` → `backend/core/fixtures/...`.
+
+### `[TD]` — .claude/CLAUDE.md Commands block updated
+
+- Tech Stack line: added `uv` as backend package manager; removed "(planned)" from Frontend.
+- Commands block: switched to `cd backend && uv sync --extra dev`, `uv run uvicorn ...`, `uv run pytest -q`; noted `cd backend` CWD requirement; kept pip as one-line fallback.
+
+### `[TD]` — docs/plan.md Done/Decisions section
+
+- Added `[DECISION] Backend package manager: uv (primary)` line.
+
+- **Files touched:** `backend/uv.lock` (new), `backend/Dockerfile`, `.github/workflows/ci.yml`, `docs/runbook.md`, `.claude/CLAUDE.md`, `docs/plan.md`, `docs/progress.md`.
