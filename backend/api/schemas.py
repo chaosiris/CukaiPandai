@@ -15,3 +15,8 @@ class FormCReq(BaseModel):
 class AuditDefenseReq(BaseModel):
     query: str
     evidence: list[list[str]]
+
+
+class FilingResumeReq(BaseModel):
+    thread_id: str
+    approved: bool
