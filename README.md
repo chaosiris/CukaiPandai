@@ -32,7 +32,7 @@ Malaysia's tax system is digitalising fast (mandatory **MyInvois** e-invoicing, 
 ## How it works — deterministic core + agents + human-in-the-loop
 
 ```
- Next.js consoles  ──►  FastAPI  ──►  LangGraph agents (profiler · documents · deductibility ·
+ Vite + React consoles ─►  FastAPI  ──►  LangGraph agents (profiler · documents · deductibility ·
                                        audit-risk · audit-defense · citation-critic)
                                             │
         DETERMINISTIC CORE (no LLM): Obligation Rules Engine · Tax Computation Engine ·
@@ -53,7 +53,7 @@ Deterministic tax math (never model-guessed) · every output cited to source + l
 
 ## Tech stack
 
-Python 3.11 · **FastAPI** · **LangGraph** (human-in-the-loop interrupts) · `LLMClient` adapter — `openai` SDK (→ **ILMU Claw** / Gemini) + `anthropic` (Claude), provider via env · **SQLite → Postgres/pgvector** · Docling · **Next.js + Tailwind + shadcn/ui** · Docker. _(Tax figures are versioned config keyed to Year of Assessment.)_
+Python 3.11 (**uv**) · **FastAPI** · **LangGraph** (human-in-the-loop interrupts) · `LLMClient` adapter — `openai` SDK (→ **ILMU** / Gemini) + `anthropic` (Claude), provider via env · **SQLite → Postgres/pgvector** · Docling · **Vite 5 + React 18 + React Router 7 + token-CSS (ProofRank devkit)** · Bun · Docker. Monorepo: `backend/` + `frontend/`. _(Tax figures are versioned config keyed to Year of Assessment.)_
 
 ## Business case
 
@@ -67,26 +67,26 @@ Python 3.11 · **FastAPI** · **LangGraph** (human-in-the-loop interrupts) · `L
 - ✅ **Deterministic core** (`core/`) — obligation + computation engines, law corpus, citation gate, evidence vault. **TDD.**
 - ✅ **Agentic API** (`api/`) — 5 agents + LLM citation-critic + FastAPI endpoints + LangGraph orchestrator (HITL). **TDD.**
 - ✅ **YA2026 tax figures verified** vs LHDN/RMCD (cited).
-- ✅ **Frontend** (`frontend/`) — Next.js landing + Entities, Obligations, Filing Studio (approval gate), Audit-Defense, Law Corpus, plus FAQ, Settings, Plans; retro/sepia themed with light/dark, **mock-by-default** so it demos with no backend. **TDD.**
-- **40 backend tests + 28 frontend tests passing**; `next build` clean (10 routes).
+- 🟡 **Frontend** (`frontend/`) — **Vite 5 + React 18 + React Router 7** on the ProofRank devkit `tokens.css`; the 3 consoles (Obligation Radar · Filing Studio w/ approval gate · Audit-Defense) are in progress (Phase 2).
+- **40 backend tests passing** (offline — `FakeLLMClient`, no key).
 
 ## Quickstart
 
 ```bash
-python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .
-pytest -q                                          # 40 passing
-uvicorn api.main:app --reload                      # http://localhost:8000/docs
-# Sovereign mode: set LLM_PROVIDER=openai, LLM_BASE_URL/key/model to ILMU Claw
+# Backend — run from backend/ (fixtures resolve relative to CWD)
+cd backend && uv sync --extra dev
+uv run pytest -q                                   # 40 passing (offline)
+uv run uvicorn api.main:app --reload               # http://localhost:8000/docs
+# Sovereign mode: set LLM_PROVIDER=openai, LLM_BASE_URL/key/model to ILMU
 ```
 
-Frontend (runs standalone in mock mode — no backend needed):
+Frontend (Vite + Bun):
 
 ```bash
-cd frontend && npm install && npm run dev        # http://localhost:3000
+cd frontend && bun install && bun run dev          # http://localhost:5173
 ```
 
-Or backend via `docker compose up` (see [`docs/runbook.md`](docs/runbook.md)).
+Backend in Docker: `cd backend && docker compose up` (see [`docs/runbook.md`](docs/runbook.md)).
 
 ## Docs
 
