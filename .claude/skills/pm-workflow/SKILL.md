@@ -23,7 +23,7 @@ Do this when the workflow isn't set up yet (no `docs/roles.md`). Skip to Phase B
    - Project name + one-line purpose
    - Primary stack (if ambiguous)
    - Whether agents may create commits, or human-only commits
-   Keep it short — prefer detection over asking.
+     Keep it short — prefer detection over asking.
 
 4. **Create directories:** `docs/` and `.claude/agents/`.
 

@@ -1,2 +1,12 @@
-[{"uuid": "INV-0001", "supplier_tin": "C2581234509", "buyer_tin": "C9990001112",
-  "classification": "022", "tax_type": "01", "tax_amount": 0, "total_excl_tax": 120000, "total_incl_tax": 120000}]
+[
+  {
+    "uuid": "INV-0001",
+    "supplier_tin": "C2581234509",
+    "buyer_tin": "C9990001112",
+    "classification": "022",
+    "tax_type": "01",
+    "tax_amount": 0,
+    "total_excl_tax": 120000,
+    "total_incl_tax": 120000
+  }
+]

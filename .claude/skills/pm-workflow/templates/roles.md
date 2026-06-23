@@ -4,13 +4,13 @@ Defines every participant's role, responsibilities, and boundaries in this proje
 
 ## Role Registry
 
-| Key | Role              | Model / Effort | Drives on skills                                             |
-| --- | ----------------- | -------------- | ------------------------------------------------------------ |
-| PO  | Project Owner     | HUMAN          | —                                                            |
-| PM  | Orchestrator      | Fable / medium | sequences PL→PG→QA, holds the gates                          |
-| PL  | Planner           | Opus / max     | `brainstorming`, `writing-plans`                             |
-| PG  | Programmer        | Sonnet / high  | `test-driven-development`, `executing-plans`, `react-doctor` |
-| QA  | QA Reviewer       | Opus / high    | `code-review`, `systematic-debugging`                        |
+| Key | Role          | Model / Effort | Drives on skills                                             |
+| --- | ------------- | -------------- | ------------------------------------------------------------ |
+| PO  | Project Owner | HUMAN          | —                                                            |
+| PM  | Orchestrator  | Fable / medium | sequences PL→PG→QA, holds the gates                          |
+| PL  | Planner       | Opus / max     | `brainstorming`, `writing-plans`                             |
+| PG  | Programmer    | Sonnet / high  | `test-driven-development`, `executing-plans`, `react-doctor` |
+| QA  | QA Reviewer   | Opus / high    | `code-review`, `systematic-debugging`                        |
 
 > Models/efforts are pinned in each `.claude/agents/*.md` frontmatter. The PM is whatever model you launch the session as (Fable recommended — it only routes).
 >

@@ -8,9 +8,15 @@
     "format": "biome format --write . && prettier --write ."
   },
   "lint-staged": {
-    "frontend/**/*.{ts,tsx,js,jsx}": ["biome check --write"],
-    "frontend/**/*.{css,json}": ["biome format --write"],
-    "*.{md,yaml,yml}": ["prettier --write"]
+    "frontend/**/*.{ts,tsx,js,jsx}": [
+      "biome check --write"
+    ],
+    "frontend/**/*.{css,json}": [
+      "biome format --write"
+    ],
+    "*.{md,yaml,yml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

@@ -11,14 +11,16 @@
 **Tech Stack (locked):** Python 3.11 · FastAPI · LangGraph · `openai` SDK (OpenAI-compatible → ILMU Claw / Gemini) + `anthropic` SDK (Claude) behind an `LLMClient` adapter (provider via env) · `core` · pytest + FastAPI TestClient.
 
 ## Global Constraints
+
 - **Owner:** Chaos. **Interface contract for Tuna (Plan 3):** the FastAPI routes in Task 9 — exact request/response Pydantic schemas are the boundary; do not change them without telling Tuna.
-- **Determinism preserved:** agents NEVER compute tax or assert an unverified citation. Math = `core`; citation existence = core gate; this plan adds the *LLM critic* on top.
+- **Determinism preserved:** agents NEVER compute tax or assert an unverified citation. Math = `core`; citation existence = core gate; this plan adds the _LLM critic_ on top.
 - **No network in tests:** all tests inject `FakeLLMClient` and fixture data; no real ILMU/Claude/MyInvois calls.
 - **Provider via env:** `LLM_PROVIDER` ∈ {`anthropic`,`openai`}, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (ILMU sovereign mode = `openai` + ILMU base_url).
 - **Human-in-the-loop:** every mutating route returns an approval step before commit.
 - **Execution:** in the existing repo; per-task `git commit`. Add API deps in Task 1.
 
 ## File Structure
+
 ```
 api/
   __init__.py
@@ -46,6 +48,7 @@ tests/api/               # mirrors the above
 **Interfaces:** Produces FastAPI `app` with `GET /health -> {"status":"ok"}`.
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_health.py
 from fastapi.testclient import TestClient
@@ -55,18 +58,22 @@ def test_health():
     r = TestClient(app).get("/health")
     assert r.status_code == 200 and r.json() == {"status": "ok"}
 ```
+
 - [x] **Step 2: Run → FAIL** `pytest tests/api/test_health.py -q` → `ModuleNotFoundError: api`
 - [x] **Step 3: Implement**
+
 ```toml
 # pyproject.toml — add to [project].dependencies:
 #   "fastapi>=0.115", "uvicorn>=0.30", "httpx>=0.27", "langgraph>=0.2",
 #   "openai>=1.40", "anthropic>=0.34"
 # and under [tool.setuptools] packages add: "api", "api.agents", "api.connectors"
 ```
+
 ```python
 # api/__init__.py
 __version__ = "0.1.0"
 ```
+
 ```python
 # api/main.py
 from fastapi import FastAPI
@@ -77,6 +84,7 @@ app = FastAPI(title="CukaiPandai API")
 def health() -> dict:
     return {"status": "ok"}
 ```
+
 - [x] **Step 4: Run → PASS** `pip install -e . && pytest tests/api/test_health.py -q`
 - [x] **Step 5: Commit** `git commit -am "feat(api): scaffold FastAPI app with health endpoint"`
 
@@ -87,11 +95,13 @@ def health() -> dict:
 **Files:** Create `api/llm.py`, `tests/api/test_llm.py`.
 
 **Interfaces:** Produces
+
 - `class LLMClient(Protocol): def complete(self, system: str, user: str, *, json_schema: dict | None = None) -> str: ...`
 - `class FakeLLMClient` with `__init__(self, scripted: list[str])` returning scripted responses in order (raises if exhausted).
 - `def make_llm() -> LLMClient` reading env (`LLM_PROVIDER`); returns Anthropic- or OpenAI-backed client. (Real clients constructed lazily; not exercised in tests.)
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_llm.py
 import pytest
@@ -108,8 +118,10 @@ def test_fake_exhausted_raises():
     with pytest.raises(IndexError):
         llm.complete("s", "u")
 ```
+
 - [x] **Step 2: Run → FAIL** `ModuleNotFoundError: api.llm`
 - [x] **Step 3: Implement**
+
 ```python
 # api/llm.py
 from __future__ import annotations
@@ -151,6 +163,7 @@ def make_llm() -> LLMClient:
         return _OpenAICompatClient(model, key, os.getenv("LLM_BASE_URL", ""))
     return _AnthropicClient(model, key)
 ```
+
 - [x] **Step 4: Run → PASS** `pytest tests/api/test_llm.py -q`
 - [x] **Step 5: Commit** `git commit -am "feat(api): add LLMClient adapter, FakeLLMClient, provider factory"`
 
@@ -163,6 +176,7 @@ def make_llm() -> LLMClient:
 **Interfaces:** Produces `class MyInvoisClient(fixtures_path: str | None)`; `search_documents(tin) -> list[dict]` (reads UBL-2.1 JSON fixtures when `fixtures_path` set); `derive_turnover(docs) -> float` (sum of `total_excl_tax` where `supplier_tin == tin`).
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_myinvois.py
 from api.connectors.myinvois import MyInvoisClient
@@ -172,8 +186,10 @@ def test_turnover_from_fixtures():
     docs = c.search_documents("C2581234509")
     assert c.derive_turnover(docs, "C2581234509") == 120000
 ```
+
 - [x] **Step 2: Run → FAIL** `ModuleNotFoundError`
 - [x] **Step 3: Implement**
+
 ```python
 # api/connectors/myinvois.py
 from __future__ import annotations
@@ -190,6 +206,7 @@ class MyInvoisClient:
     def derive_turnover(self, docs: list[dict], tin: str) -> float:
         return float(sum(d["total_excl_tax"] for d in docs if d.get("supplier_tin") == tin))
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add MyInvois fixture connector + turnover derivation"`
 
 ---
@@ -201,6 +218,7 @@ class MyInvoisClient:
 **Interfaces:** Consumes `MyInvoisClient` (T3), `EntityTaxProfile` (core). Produces `build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile` (turnover/gross_income from MyInvois; rest from the SSM dict).
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_profiler.py
 import json
@@ -213,7 +231,9 @@ def test_profile_pulls_turnover():
     assert p.tin == "C2581234509"
     assert p.gross_income == 120000  # overridden from MyInvois turnover
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/agents/profiler.py
 from __future__ import annotations
@@ -226,6 +246,7 @@ def build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile:
     data = {**ssm, "gross_income": turnover}
     return EntityTaxProfile(**data)
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add profiler agent assembling EntityTaxProfile"`
 
 ---
@@ -237,6 +258,7 @@ def build_profile(ssm: dict, myinvois: MyInvoisClient) -> EntityTaxProfile:
 **Interfaces:** Produces `classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]`. The LLM returns a JSON array of `{code,description,amount,category}`; we parse + validate into `LineItem`.
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_documents.py
 from api.agents.documents import classify_line_items
@@ -248,7 +270,9 @@ def test_classify_parses_llm_json():
     items = classify_line_items("...trial balance text...", FakeLLMClient(scripted))
     assert len(items) == 2 and items[0].category == "income"
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/agents/documents.py
 from __future__ import annotations
@@ -264,6 +288,7 @@ def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
     out = llm.complete(_SYS, raw_text)
     return [LineItem(**li) for li in json.loads(out)]
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add document-understanding agent (line-item classification)"`
 
 ---
@@ -275,6 +300,7 @@ def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
 **Interfaces:** Consumes `LawCorpus`, `ground_citation` (core). Produces `cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citation` — LLM proposes `{claim, clause_ids}`, then core `ground_citation` sets `verified`.
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_deductibility.py
 from pathlib import Path
@@ -291,7 +317,9 @@ def test_treatment_grounded_true_for_real_clause():
     cit = cite_treatment(item, llm, C)
     assert cit.verified is True
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/agents/deductibility.py
 from __future__ import annotations
@@ -308,6 +336,7 @@ def cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citatio
     raw = json.loads(llm.complete(_SYS, item.model_dump_json()))
     return ground_citation(Citation(claim=raw["claim"], clause_ids=raw["clause_ids"]), corpus)
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add deductibility reasoner with core-grounded citations"`
 
 ---
@@ -319,6 +348,7 @@ def cite_treatment(item: LineItem, llm: LLMClient, corpus: LawCorpus) -> Citatio
 **Interfaces:** Produces `verify_claim(citation: Citation, corpus: LawCorpus, llm: LLMClient) -> Citation` — returns `verified=False` if the core gate fails (missing clause) OR the LLM critic answers `NO` to "does this clause support the claim?". Belt-and-suspenders over Task 6.
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_citation_critic.py
 from pathlib import Path
@@ -341,7 +371,9 @@ def test_missing_clause_blocks_without_calling_llm():
     cit = verify_claim(Citation(claim="x", clause_ids=["ITA-1967-s999(fake)"]), C, FakeLLMClient([]))
     assert cit.verified is False
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/agents/citation_critic.py
 from __future__ import annotations
@@ -361,17 +393,19 @@ def verify_claim(citation: Citation, corpus: LawCorpus, llm: LLMClient) -> Citat
     grounded.verified = ans.startswith("YES")
     return grounded
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add LLM citation critic layered on the deterministic gate"`
 
 ---
 
 ### Task 8: Audit-Risk agent → RiskFlag[]
 
-**Files:** Create `api/agents/audit_risk.py`, `tests/api/test_audit_risk.py`. Modify `core/models.py` (add `RiskFlag{code:str, message:str, severity:str}`) — *test the model addition here.*
+**Files:** Create `api/agents/audit_risk.py`, `tests/api/test_audit_risk.py`. Modify `core/models.py` (add `RiskFlag{code:str, message:str, severity:str}`) — _test the model addition here._
 
 **Interfaces:** Produces `assess_risk(computation: FormComputation, profile, myinvois_turnover: float) -> list[RiskFlag]`. Deterministic checks: (a) declared income vs MyInvois turnover mismatch > 10% → flag; (b) deductible/income ratio > 0.9 → flag; (c) negative chargeable income → flag.
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_audit_risk.py
 from api.agents.audit_risk import assess_risk
@@ -389,7 +423,9 @@ def test_clean_case_no_flags():
     flags = assess_risk(_fc(200000), profile=None, declared_income=120000, myinvois_turnover=120000)
     assert flags == []
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # add to core/models.py
 class RiskFlag(BaseModel):
@@ -397,6 +433,7 @@ class RiskFlag(BaseModel):
     message: str
     severity: str = "medium"
 ```
+
 ```python
 # api/agents/audit_risk.py
 from __future__ import annotations
@@ -413,6 +450,7 @@ def assess_risk(computation: FormComputation, profile, declared_income: float,
         flags.append(RiskFlag(code="negative_chargeable", severity="high", message="Chargeable income is negative"))
     return flags
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add audit-risk agent + RiskFlag model"`
 
 ---
@@ -424,6 +462,7 @@ def assess_risk(computation: FormComputation, profile, declared_income: float,
 **Interfaces:** Produces `build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: LawCorpus) -> DefensePack`. LLM interprets the query → `{contested_item, claim, clause_ids}`; we ground+critic the citation; pack includes the evidence links and an exposure note (s.112/113).
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_audit_defense.py
 from pathlib import Path
@@ -441,7 +480,9 @@ def test_defense_pack_is_cited():
     assert pack.citations[0].verified is True
     assert "s.112" in pack.exposure_note or "s.113" in pack.exposure_note
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # add to core/models.py
 class DefensePack(BaseModel):
@@ -450,6 +491,7 @@ class DefensePack(BaseModel):
     citations: list[Citation]
     exposure_note: str
 ```
+
 ```python
 # api/agents/audit_defense.py
 from __future__ import annotations
@@ -470,6 +512,7 @@ def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: Law
     return DefensePack(query=query, items=[{"contested_item": raw["contested_item"], "evidence": evidence}],
                        citations=[cit], exposure_note=note)
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add audit-defense agent producing cited DefensePack"`
 
 ---
@@ -479,12 +522,14 @@ def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: Law
 **Files:** Create `api/schemas.py`; Modify `api/main.py`; Create `tests/api/test_endpoints.py`.
 
 **Interfaces (the contract Tuna builds against):**
+
 - `POST /entities/{tin}/obligations` body `{ssm: dict}` → `ObligationCalendar` JSON.
 - `POST /entities/{tin}/filings/form-c` body `{ssm: dict, line_items: list}` → `{computation: FormComputation, requires_approval: true}`.
 - `POST /entities/{tin}/audit-defense` body `{query, evidence}` → `DefensePack`.
 - LLM injected via dependency `get_llm` (overridden with `FakeLLMClient` in tests).
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_endpoints.py
 import json
@@ -518,7 +563,9 @@ def test_audit_defense_endpoint():
     assert r.json()["citations"][0]["verified"] is True
     app.dependency_overrides.clear()
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/schemas.py
 from __future__ import annotations
@@ -535,6 +582,7 @@ class AuditDefenseReq(BaseModel):
     query: str
     evidence: list[list[str]]
 ```
+
 ```python
 # api/main.py  (replace prior content)
 from __future__ import annotations
@@ -575,6 +623,7 @@ def audit_defense(tin: str, req: AuditDefenseReq, llm: LLMClient = Depends(get_l
     pack = build_defense(req.query, [tuple(e) for e in req.evidence], llm, _CORPUS)
     return pack.model_dump(mode="json")
 ```
+
 - [x] **Step 4: Run → PASS** `pytest tests/api -q`
 - [x] **Step 5: Commit** `git commit -am "feat(api): add obligations/form-c/audit-defense endpoints with approval gate + LLM DI"`
 
@@ -587,6 +636,7 @@ def audit_defense(tin: str, req: AuditDefenseReq, llm: LLMClient = Depends(get_l
 **Interfaces:** Produces `build_filing_graph(llm)` → a LangGraph `StateGraph` that runs classify → compute → audit-risk → **interrupt(approval)** → finalize, with a checkpointer so it pauses at the interrupt and resumes on approval. (Wraps the same core functions; gives the credible "agentic, human-gated" story for the demo.)
 
 - [x] **Step 1: Failing test**
+
 ```python
 # tests/api/test_graph.py
 from api.graph import build_filing_graph
@@ -602,7 +652,9 @@ def test_graph_pauses_for_approval_then_finalizes():
     final = app.invoke(__import__("langgraph.types", fromlist=["Command"]).Command(resume={"approved": True}), cfg)
     assert final["computation"]["fields"]["tax_payable"]["value"] == 31000
 ```
+
 - [x] **Step 2: Run → FAIL** · **Step 3: Implement**
+
 ```python
 # api/graph.py
 from __future__ import annotations
@@ -637,14 +689,17 @@ def build_filing_graph(llm):
     g.add_edge("approval", END)
     return g.compile(checkpointer=MemorySaver())
 ```
+
 - [x] **Step 4: Run → PASS** · **Step 5: Commit** `git commit -am "feat(api): add LangGraph filing orchestrator with human-approval interrupt"`
 
 ---
 
 ## Self-Review
+
 **1. Spec coverage:** profiler ✓(T4) · doc-understanding ✓(T5) · deductibility+citations ✓(T6) · LLM citation critic ✓(T7) · audit-risk ✓(T8) · audit-defense ✓(T9) · API contract + approval gate ✓(T10) · LangGraph + HITL interrupt ✓(T11) · model adapter incl. ILMU sovereign mode ✓(T2). Computation/obligations reused from Plan 1 (not re-implemented). MyInvois live OAuth deferred (fixture mode T3) — flagged. Frontend = Plan 3.
 **2. Placeholders:** none — every step has real code/tests; the only `NotImplementedError` (live MyInvois OAuth) is an explicit, tested boundary.
 **3. Type consistency:** `LLMClient.complete(system,user,*,json_schema)`, `FakeLLMClient(scripted)`, `build_profile`, `classify_line_items`, `cite_treatment`, `verify_claim`, `assess_risk`, `build_defense`, and the `RiskFlag`/`DefensePack` model additions are consistent across tasks; endpoints (T10) consume them. Core imports (`compute_form_c`, `derive_obligations`, `ground_citation`, `LawCorpus`) match Plan 1 signatures.
 
 ## Execution Handoff
+
 Two options: **(1) Subagent-driven (recommended)** — fresh subagent per task + two-stage review; **(2) Inline** via executing-plans, batched with checkpoints. (Chaos owns execution.)

@@ -62,7 +62,7 @@
 - **Do not** `git push --force`, rewrite published history, or delete branches.
 - **Do not** commit or push without explicit human authorization (Gate 2).
 - **Do not** create `docs/architecture.md` — architecture lives in `docs/trd.md` if present.
-{{PROJECT_SPECIFIC_DO_NOTS}}
+  {{PROJECT_SPECIFIC_DO_NOTS}}
 
 ---
 
