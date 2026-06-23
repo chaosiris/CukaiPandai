@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
-
 from core.models import LineItem
 
+from api.jsonio import loads_relaxed
 from api.llm import LLMClient
 
 _SYS = (
@@ -15,4 +14,4 @@ _SYS = (
 
 def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
     out = llm.complete(_SYS, raw_text)
-    return [LineItem(**li) for li in json.loads(out)]
+    return [LineItem(**li) for li in loads_relaxed(out)]

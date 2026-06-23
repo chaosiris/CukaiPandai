@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-import json
-
 from core.lawcorpus import LawCorpus
 from core.models import Citation, DefensePack
 
 from api.agents.citation_critic import verify_claim
+from api.jsonio import loads_relaxed
 from api.llm import LLMClient
-
-_SYS = (
-    "You are an LHDN audit-defense assistant. Interpret the auditor's query and return ONLY JSON "
-    "{contested_item, claim, clause_ids}. Cite Income Tax Act / Public Ruling clause IDs."
-)
 
 
 def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: LawCorpus) -> DefensePack:
-    raw = json.loads(llm.complete(_SYS, query))
+    allowed = ", ".join(corpus.ids())
+    system = (
+        "You are an LHDN audit-defense assistant. Interpret the auditor's query and identify the "
+        "contested item and its tax-treatment justification. Cite ONLY from these valid clause IDs, "
+        f"copied VERBATIM with their exact hyphens and punctuation: {allowed}. "
+        'Return ONLY a JSON object: '
+        '{"contested_item": "<text>", "claim": "<one sentence>", "clause_ids": ["<id>", ...]}.'
+    )
+    raw = loads_relaxed(llm.complete(system, query, json_schema={"type": "object"}))
     cit = verify_claim(Citation(claim=raw["claim"], clause_ids=raw["clause_ids"]), corpus, llm)
     note = (
         "If the position is not sustained, exposure may arise under ITA 1967 s.113 "

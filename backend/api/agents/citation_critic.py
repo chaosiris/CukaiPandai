@@ -14,6 +14,7 @@ def verify_claim(citation: Citation, corpus: LawCorpus, llm: LLMClient) -> Citat
     if not grounded.verified:
         return grounded  # missing clause -> blocked, no LLM call
     texts = "\n".join(corpus.get(cid).text for cid in grounded.clause_ids)
-    ans = llm.complete(_SYS, f"CLAIM: {grounded.claim}\nCLAUSES:\n{texts}").strip().upper()
+    # High-stakes gate: escalate to the failover model (Claude) when routing is active.
+    ans = llm.complete(_SYS, f"CLAIM: {grounded.claim}\nCLAUSES:\n{texts}", escalate=True).strip().upper()
     grounded.verified = ans.startswith("YES")
     return grounded

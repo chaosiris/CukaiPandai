@@ -232,3 +232,25 @@ CukaiPandai/
 ## [23/06/26] — DO lane taxonomy sync `[TD]`
 
 - Added **DO** (devops/infra — tooling · CI · deploy) to the lane enumeration in `.claude/CLAUDE.md` (line ~104) and `docs/progress.md` header; both previously listed only BE · FE · TD.
+
+---
+
+## [23/06/26] — BE-1 AI-layer stack: ILMU-first routing + live spike `[BE]`
+
+- **ILMU seat live + verified.** `nemo-super` via `https://api.ilmu.ai/v1` returns HTTP 200. `.env` (gitignored, repo root) is read via **python-dotenv** (`load_dotenv()` in `api/main.py`); `python-dotenv` added to `pyproject.toml`.
+- **`RoutingLLMClient`** (`api/llm.py`): ILMU-first → Claude **on error**, and `escalate=True` sends high-stakes calls straight to the fallback. `make_llm()` wraps the ILMU client in the router when `ANTHROPIC_API_KEY` is set (else bare ILMU). 6 unit tests cover primary / failover / escalate / no-fallback.
+- **JSON-object mode** in `_OpenAICompatClient` (`response_format={"type":"json_object"}` when a `json_schema` is passed); unit-tested.
+- **Citation critic escalates** (`escalate=True`) — the YES/NO gate routes to Claude when routing is active.
+- **Live spike** (`scripts/spike_ilmu.py`, ILMU side; Claude side pending a key) — resolves Q1:
+
+| Agent | nemo-super | Decision |
+|---|---|---|
+| documents (classify) | parses, correct categories | keep on ILMU |
+| deductibility (cite) | verifies after fix (was emitting `ITA 1967 s33(1)` without hyphens) | keep on ILMU; constrain to corpus IDs |
+| citation-critic (YES/NO) | answered NO on a clearly-supported claim | **escalate to Claude** (wired) |
+| audit-defense | grounds correctly; verdict gated by the weak critic | escalate the critic to Claude |
+
+- **Spike-driven fix:** the JSON agents (`deductibility`, `audit_defense`) now constrain the model to the corpus's exact clause IDs (`LawCorpus.ids()`) and use JSON mode; all JSON parsing goes through `api/jsonio.loads_relaxed` (tolerates code fences). Post-fix, `deductibility` verifies `ITA-1967-s33(1)` live.
+- **Tests:** 46 backend pass (40 → 46, +6 routing/JSON).
+- **Open (Q1/Q2):** the Claude-side spike + real failover need an `ANTHROPIC_API_KEY` (not yet provisioned); ILMU token metering unconfirmed.
+- **Files:** `api/llm.py`, `api/jsonio.py` (new), `api/agents/{documents,deductibility,audit_defense,citation_critic}.py`, `core/lawcorpus.py`, `scripts/spike_ilmu.py` (new), `tests/api/test_routing.py` (new), `api/main.py`, `pyproject.toml`, `.env.example`.

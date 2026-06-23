@@ -20,3 +20,6 @@ class LawCorpus:
 
     def exists(self, clause_id: str) -> bool:
         return clause_id in self._c
+
+    def ids(self) -> list[str]:
+        return list(self._c)
