@@ -18,11 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: pip
+      - uses: astral-sh/setup-uv@v6
       - name: Install
-        run: pip install -e ".[dev]"
+        run: uv sync --extra dev
       - name: Run tests
-        run: pytest -q
+        run: uv run pytest -q
 
   docker-build:
     runs-on: ubuntu-latest

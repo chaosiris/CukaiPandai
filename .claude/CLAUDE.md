@@ -33,8 +33,8 @@ pyproject.toml · Dockerfile · docker-compose.yml · .env.example
 
 ## Tech Stack
 
-- **Backend:** Python ≥3.11 · Pydantic 2 · FastAPI + Uvicorn · LangGraph · httpx · `openai`/`anthropic` SDKs. Deploy → **Render** (Docker image is deploy-ready).
-- **Frontend (planned):** Vite 5 + React 18 + TS + React Router 7 + token-CSS, reusing the ProofRank devkit design system; Bun. Deploy → **Vercel**.
+- **Backend:** Python ≥3.11 · Pydantic 2 · FastAPI + Uvicorn · LangGraph · httpx · `openai`/`anthropic` SDKs. Package manager: **uv** (primary). Deploy → **Render** (Docker image is deploy-ready).
+- **Frontend:** Vite 5 + React 18 + TS + React Router 7 + token-CSS, reusing the ProofRank devkit design system; Bun. Deploy → **Vercel**.
 - **LLM routing:** ILMU `nemo-super` primary (sovereign) → Claude failover/escalation.
 - **Connectors:** MyInvois → full fixture; data.gov.my MSIC is the only live external call (spec §10).
 
@@ -42,18 +42,22 @@ pyproject.toml · Dockerfile · docker-compose.yml · .env.example
 
 ## Commands
 
+Run backend commands from the `backend/` directory (CWD-relative fixture paths).
+
 ```bash
-# install (editable core + dev deps)
-pip install -e ".[dev]"
+# install (editable core + dev deps) — run from backend/
+cd backend && uv sync --extra dev
 
-# run the API (dev)
-uvicorn api.main:app --reload
+# run the API (dev) — run from backend/
+cd backend && uv run uvicorn api.main:app --reload
 
-# tests
-pytest
+# tests — run from backend/
+cd backend && uv run pytest -q
+
+# pip fallback (also works): pip install -e ".[dev]"
 
 # docker
-docker compose up --build
+cd backend && docker compose up --build
 ```
 
 ---

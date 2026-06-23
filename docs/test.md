@@ -98,3 +98,53 @@ All five fix items are confirmed resolved, both hard gates pass, and the pre-com
 - `.claude/CLAUDE.md:195` — [trivial] The appended RTK block introduces a second top-level markdown H1 `# RTK (Rust Token Killer)…`. This is a _different_ heading from the H1 finding that was fixed (the duplicate `# CLAUDE.md` is gone). It's a personal/local tooling section; harmless to agents and to tooling (no markdownlint gate in this repo). Optional follow-up: downgrade to `## RTK …` or drop the block from the committed file. Does not block the commit.
 
 **Smoke test:** `biome check .` → exit 0 (11 files) · `biome check frontend/` → exit 0 (10 files) · 3 lint-staged globs → all exit 0, no rewrites · `commitlint` accept/reject → correct · `pytest -q` → 40 passed · `bun run build` + `tsc --noEmit` → clean · `pip install -e ".[dev]" --dry-run` → resolves pytest via extra.
+
+---
+
+## [23/06/26] — uv backend + runbook de-stale + plan cleanup `[DO/TD]`
+
+**Branch:** `chore/uv-backend-and-runbook` (staged, uncommitted). 7 files: `backend/uv.lock` (new), `backend/Dockerfile`, `.github/workflows/ci.yml`, `docs/runbook.md`, `.claude/CLAUDE.md`, `docs/plan.md`, `docs/progress.md`.
+
+**Verdict:** Approve
+
+All hard gates pass on both interpreters, the lock is CI-safe on Python 3.11, pip remains a working fallback, the Docker image builds **and runs** (health OK on 3.11.15), the runbook is accurate, and the plan cleanup preserved every task ID, sub-item, and the Open-Questions block. The PG-raised "3.14-local vs 3.11-CI" concern is **resolved — not a finding** (proof below). Only trivial, pre-existing doc nits remain. Recommend authorizing the commit.
+
+### Hard gates (all PASS)
+
+- **HG1 — uv path (local default 3.14):** `cd backend && uv sync --extra dev` → resolved 51 / checked 50, clean. `uv run python --version` → 3.14.3. `uv run pytest -q` → **40 passed, 1 warning in 2.11s**. (Warning = pre-existing Starlette/httpx deprecation, unrelated.)
+- **HG2 — uv path pinned to CI's Python 3.11:** fresh copy, `uv venv --python 3.11 && uv sync --extra dev && uv run pytest -q` → installs from the committed lock on **CPython 3.11.14** → **40 passed, 1 warning in 1.88s**. This is the conclusive CI-equivalence check.
+- **HG3 — Docker:** `docker build -t cukaipandai-be-qa ./backend` → success (`sha256:0375ae46…`, matches PG). Ran the image: container Python = **3.11.15**, `GET /health` → `{"status":"ok"}` (so the CWD-relative `core/fixtures/lawcorpus_seed.json` law-corpus loads at `/app`), logs show 0 errors / 0 warnings.
+- **HG4 — pip fallback intact:** `pip install -e ".[dev]" --dry-run` → `Would install cukaipandai-core-0.1.0 … pytest …`; the `[dev]` extra resolves (no "does not provide the extra" warning). `pyproject.toml` is unchanged and standard — no uv-specific formats introduced.
+
+### CI Python-version determination (the PG concern — RESOLVED)
+
+The lock was generated locally against CPython 3.14.3, but CI/Docker target 3.11. This does **not** red-line CI:
+
+- `backend/uv.lock:3` declares `requires-python = ">=3.11"` and the lock is **universal** (resolution markers like `python_full_version < '3.13'`, plus cp311 wheels are present, e.g. `websockets-15.0.1-cp311-…`).
+- `uv lock --python 3.11 --check` → "Using CPython 3.11.14 / Resolved 51 packages" with **no relock and no error** → the committed lock already satisfies 3.11.
+- Empirically, a clean `uv sync` on 3.11.14 (HG2) and the Docker image on 3.11.15 (HG3) both install from this lock and pass all 40 tests.
+- CI ordering: `actions/setup-python@v5` (3.11) runs before `astral-sh/setup-uv@v6`, so a 3.11 interpreter is on PATH; uv prefers a PATH interpreter satisfying `requires-python` → CI lands on 3.11. Even if uv picked any other `>=3.11`, the universal lock resolves for all of them.
+- `astral-sh/setup-uv@v6` is a real, current tag — plausible and correct.
+
+### Lock / staged-tree hygiene (PASS)
+
+- `git check-ignore backend/uv.lock` → exit 1 (not ignored → committed, correct). `git check-ignore backend/.venv` → ignored (exit 0); `git ls-files backend/.venv` → empty. No `.venv/`, `__pycache__`, `*.egg-info`, `node_modules`, or `dist` staged.
+
+### Docs accuracy (PASS)
+
+- **runbook.md** — all backend commands are under `cd backend` (no root-relative leftovers). Frontend env var `VITE_API_BASE_URL` + `VITE_API_MOCK` match `frontend/src/api/client.ts:5-6` and the root `.env.example`; there is no `frontend/.env.example`, so `cp ../.env.example .env` is correct. All five demo fixture paths exist at the stated `backend/core/fixtures/...` locations. Deploy notes (backend context `backend/`, CI uses uv) are accurate.
+- **.claude/CLAUDE.md** — Commands block correctly switched to `cd backend && uv sync --extra dev` / `uv run uvicorn` / `uv run pytest -q`, with the pip fallback noted; Tech-Stack line adds "Package manager: uv (primary)" and drops "(planned)" from Frontend. Root `CLAUDE.md` correctly **not** touched (it is reference-style and carries no command block).
+- **plan.md cleanup** — `[DO]` lane added; legend lists all four lanes (BE/FE/DO/TD). Every feature task ID preserved (BE-1…4, FE-1…7, TD-1…5) with acceptance criteria intact; DO-1/DO-2 added. The FE-6→DO-1 split (Vercel deploy) and TD-4→DO-2 split (Render deploy) each moved their sub-item + verify cleanly with no content dropped; TD-4 now references DO-1/DO-2 as deps. Open Questions block intact (RQ1–6 resolved, Q1–5 open). The verbose active Phase-0 section is condensed into a terse `## Done` entry; a `[DECISION]` block (uv + 4 pre-existing PO-locked decisions) was added — all reflect committed reality, none fabricated.
+- **progress.md** — dated `[DO/TD]` entry records the uv pytest (40 passed) and Docker (succeeded, sha256) results with `[VERIFIED 23/06/26]` tags.
+
+### Findings (all non-blocking)
+
+- `.claude/CLAUDE.md:60` — [trivial, pre-existing] `docker compose up --build` lacks a `cd backend &&` prefix that the other three commands carry, though `backend/docker-compose.yml` must run from `backend/`. The block header "Run backend commands from the `backend/` directory" covers it contextually; this diff did not introduce the inconsistency. Optional: prefix for symmetry.
+- `docs/runbook.md:9` — [trivial] `uv venv && uv sync --extra dev` — `uv sync` creates the venv itself, so `uv venv` is redundant (harmless, not wrong).
+- `docs/plan.md` — [informational] Two "Phase 0" headings exist: one in Open Questions (the RQ1–6 resolved-questions log) and one in `## Done` (the PR #1 summary). They serve distinct purposes; the verbose _active-work_ Phase 0 is correctly gone. Not a duplicate to fix.
+
+### Verified clean (no action)
+
+- **Surgical:** nothing outside the uv + docs + plan-cleanup scope changed. No backend source, no tax figures, no citations, no test assertions altered. Dockerfile keeps `WORKDIR /app`, the CWD-relative corpus load, and the `CMD` intact; only the install layer switched pip→uv (+ `uv.lock` copied for reproducibility).
+
+**Smoke test:** `uv sync --extra dev` (3.14) → `uv run pytest -q` → **40 passed** · `uv sync` pinned to 3.11.14 → `pytest -q` → **40 passed** · `docker build ./backend` → success, container on 3.11.15 `/health` → `{"status":"ok"}` · `pip install -e ".[dev]" --dry-run` → resolves pytest via extra · `uv lock --python 3.11 --check` → no relock (lock is 3.11-safe) · `git check-ignore` → uv.lock committed, .venv ignored.
