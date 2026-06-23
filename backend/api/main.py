@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI
+
+# Load .env (searches CWD upward, so it finds the repo-root .env when run from backend/).
+# No-op if absent; tests inject FakeLLMClient and never need a real key.
+load_dotenv()
 
 from core.computation import compute_form_c
 from core.lawcorpus import LawCorpus
