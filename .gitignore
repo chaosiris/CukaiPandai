@@ -1,14 +1,37 @@
+# https://github.com/github/gitignore
+
 # Python
-.venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.venv/
 
-# Local research scratch (intermediate workflow JSON; deliverables live in docs/)
-_research/
+# JS / Bun
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.vite/
+.next/
 
 # Env / secrets
 .env
 .env.local
+.env.*.local
+
+# Local research scratch (intermediate workflow JSON; deliverables live in docs/)
+_research/
+
+# OS / editor
+.DS_Store
+__MACOSX/
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+!*.code-workspace
