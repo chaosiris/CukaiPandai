@@ -1,0 +1,26 @@
+{
+  "name": "cukaipandai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "husky",
+    "lint": "biome check .",
+    "format": "biome format --write . && prettier --write ."
+  },
+  "lint-staged": {
+    "frontend/**/*.{ts,tsx,js,jsx}": ["biome check --write"],
+    "frontend/**/*.{css,json}": ["biome format --write"],
+    "*.{md,yaml,yml}": ["prettier --write"]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
+    "prettier": "^3.4.2"
+  },
+  "trustedDependencies": [
+    "@biomejs/biome"
+  ]
+}
