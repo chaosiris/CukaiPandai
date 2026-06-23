@@ -18,6 +18,7 @@ from core.obligations import derive_obligations
 
 from api.agents.audit_defense import build_defense
 from api.agents.audit_risk import assess_risk
+from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
 from api.schemas import AuditDefenseReq, FilingResumeReq, FormCReq, ObligationsReq
@@ -33,6 +34,10 @@ _FILING_GRAPH = build_filing_graph(None)
 
 def get_llm() -> LLMClient:
     return make_llm()
+
+
+def get_msic() -> MsicClient:
+    return MsicClient()  # live data.gov.my; overridden with a fixture client in tests
 
 
 @app.get("/health")
@@ -79,6 +84,15 @@ def filing_start(tin: str, req: FormCReq) -> dict:
         "computation": computation,
         "requires_approval": bool(state.get("__interrupt__")),
     }
+
+
+@app.get("/reference/msic/{code}")
+def msic(code: str, client: MsicClient = Depends(get_msic)) -> dict:
+    """Look up an MSIC activity code against the data.gov.my reference."""
+    entry = client.lookup(code)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"MSIC code {code} not found")
+    return entry
 
 
 @app.post("/entities/{tin}/filings/form-c/resume")

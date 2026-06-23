@@ -3,6 +3,8 @@ from __future__ import annotations
 import calendar
 from datetime import date, timedelta
 
+import holidays as _holidays
+
 
 def _add_months(d: date, months: int) -> date:
     m = d.month - 1 + months
@@ -26,3 +28,15 @@ def shift_for_holidays(d: date, holidays: set[date]) -> date:
     while d.weekday() >= 5 or d in holidays:
         d += timedelta(days=1)
     return d
+
+
+def malaysia_holidays(years, subdiv: str | None = None) -> set[date]:
+    """Malaysian public holidays for the given year(s) from the `holidays` package
+    (offline, no network). `subdiv` accepts a state code (e.g. 'SGR') for state holidays."""
+    return set(_holidays.Malaysia(years=list(years), subdiv=subdiv).keys())
+
+
+def shift_for_malaysian_holidays(d: date, subdiv: str | None = None) -> date:
+    """Shift a deadline past weekends and real Malaysian public holidays."""
+    hols = malaysia_holidays([d.year, d.year + 1], subdiv=subdiv)
+    return shift_for_holidays(d, hols)
