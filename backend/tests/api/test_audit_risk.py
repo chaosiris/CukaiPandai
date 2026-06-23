@@ -22,10 +22,21 @@ def test_negative_chargeable_flagged():
     assert any(f.code == "negative_chargeable" for f in flags)
 
 
-def test_high_deduction_ratio_flagged():
-    # declared 1,000,000 but only 50,000 chargeable → 95% deductions.
+def test_gross_chargeable_gap_flagged():
+    # declared gross 1,000,000 but only 50,000 chargeable → >90% gap.
     flags = assess_risk(_fc(50000), profile=None, declared_income=1_000_000, myinvois_turnover=None)
-    assert any(f.code == "high_deduction_ratio" for f in flags)
+    assert any(f.code == "gross_chargeable_gap" for f in flags)
+
+
+def test_zero_turnover_with_declared_income_flags_mismatch():
+    flags = assess_risk(_fc(200000), profile=None, declared_income=500000, myinvois_turnover=0)
+    assert any(f.code == "turnover_mismatch" for f in flags)
+
+
+def test_negative_declared_income_does_not_trip_gap():
+    # negative declared income must not invert the ratio into a spurious flag.
+    flags = assess_risk(_fc(50000), profile=None, declared_income=-100, myinvois_turnover=None)
+    assert not any(f.code == "gross_chargeable_gap" for f in flags)
 
 
 def test_zero_tax_with_positive_income_flagged():

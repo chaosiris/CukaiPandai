@@ -15,11 +15,18 @@ def assess_risk(
     tax_field = computation.fields.get("tax_payable")
     tax = tax_field.value if tax_field else None
 
-    # 1. Declared income diverges from the MyInvois e-invoice turnover (under-reporting signal).
-    if myinvois_turnover and abs(declared_income - myinvois_turnover) / myinvois_turnover > 0.10:
-        flags.append(RiskFlag(
-            code="turnover_mismatch", severity="high",
-            message=f"Declared income {declared_income} differs >10% from MyInvois turnover {myinvois_turnover}"))
+    # 1. Declared income vs MyInvois e-invoice turnover (under-reporting signal). Distinguish
+    #    "no MyInvois data" (None → skip) from "genuinely zero turnover" (0 with positive income → flag).
+    if myinvois_turnover is not None:
+        if myinvois_turnover == 0:
+            if declared_income > 0:
+                flags.append(RiskFlag(
+                    code="turnover_mismatch", severity="high",
+                    message=f"Declared income {declared_income} but MyInvois turnover is zero"))
+        elif abs(declared_income - myinvois_turnover) / myinvois_turnover > 0.10:
+            flags.append(RiskFlag(
+                code="turnover_mismatch", severity="high",
+                message=f"Declared income {declared_income} differs >10% from MyInvois turnover {myinvois_turnover}"))
 
     # 2. Negative chargeable income.
     if ci < 0:
@@ -27,11 +34,14 @@ def assess_risk(
             code="negative_chargeable", severity="high",
             message="Chargeable income is negative"))
 
-    # 3. Deductions exceed 90% of declared income (aggressive-deduction trigger).
-    if declared_income and (declared_income - ci) / declared_income > 0.90:
+    # 3. Chargeable income is a tiny fraction of declared gross income — a large cross-source gap
+    #    worth verifying (heavy deductions/allowances, or an SSM-gross vs filing reconciliation issue).
+    if declared_income > 0 and (declared_income - ci) / declared_income > 0.90:
         flags.append(RiskFlag(
-            code="high_deduction_ratio", severity="medium",
-            message=f"Deductions exceed 90% of declared income ({declared_income}) — verify allowability"))
+            code="gross_chargeable_gap", severity="medium",
+            message=(
+                f"Chargeable income ({ci:.0f}) is under 10% of declared gross income "
+                f"({declared_income:.0f}) — verify deductions/allowances and reconcile sources")))
 
     # 4. Positive chargeable income but zero tax payable (verify reliefs/rebates).
     if tax is not None and ci > 0 and tax == 0:

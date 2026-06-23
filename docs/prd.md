@@ -1,6 +1,6 @@
 # CukaiPandai — Product Requirements Document (PRD)
 
-> Derived from [cukaipandai-spec.md](cukaipandai-spec.md). Defines _what_ we build and _for whom_. Technical _how_ is in [trd.md](trd.md). Scope splits into **Hackathon MVP** (demo by 26 Jun 2026) and **Roadmap** (the business case judges reward). **Stack is locked** — see [trd.md §12](trd.md). **Team: 2 developers — Chaos & Tuna** (see §3).
+> Derived from [cukaipandai-spec.md](cukaipandai-spec.md). Defines _what_ we build and _for whom_. Technical _how_ is in [trd.md](trd.md). Scope splits into **Hackathon MVP** (demo by 28 Jun 2026) and **Roadmap** (the business case judges reward). **Stack is locked** — see [trd.md §12](trd.md). **Team of 3 — Chaos, Tuna & a product/tax-verify contributor** (see §3).
 
 ---
 
@@ -21,17 +21,17 @@
 
 **Primary buyer for GTM:** **tax-agent firms (Mei Ling)** — one sale → many entities — plus SME/group finance.
 
-## 3. Build team & responsibilities (Chaos & Tuna)
+## 3. Build team & responsibilities (team of 3)
 
-Two developers; ownership split to maximise parallelism after the shared core (Plan 1, done).
+Three contributors; ownership split to maximise parallelism after the shared core (Plan 1, done).
 
-| Owner                  | Surface                 | Plans / scope                                                                                                                                                                             |
-| ---------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Chaos** (repo owner) | **Backend & agents**    | Plan 1 ✅ (deterministic core) · **Plan 2** (FastAPI, LangGraph orchestrator, `LLMClient` adapter incl. ILMU, the 5 agents, RAG + LLM citation-critic, MyInvois connector, audit-defense) |
-| **Tuna**               | **Frontend & demo**     | **Plan 3** (Next.js: Obligation Calendar, Cited Filing Studio, Audit-Defense console), API wiring, UX, demo polish, **7-min video + pitch-deck README**                                   |
-| **Both**               | Integration & seed data | Shared seeded entity/fixtures, end-to-end demo rehearsal, ⚠verify of tax figures vs LHDN                                                                                                  |
+| Owner                       | Surface                         | Plans / scope                                                                                                                                                                                       |
+| --------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chaos** (repo owner)      | **Backend & agents**            | Plan 1 ✅ (deterministic core) · **Plan 2** (FastAPI, LangGraph orchestrator, `LLMClient` adapter incl. ILMU, the 5 agents, RAG + LLM citation-critic, MyInvois connector, audit-defense)           |
+| **Tuna**                    | **Frontend & demo**             | **Plan 3** (Vite + React + React Router frontend: Obligation Calendar, Cited Filing Studio, Audit-Defense console), API wiring, UX, demo polish, **7-min video + pitch-deck README**                |
+| **Product/tax contributor** | **Product · tax-verify · demo** | Product framing, **⚠verify of tax figures vs LHDN**, demo narration                                                                                                                                |
 
-> Interface contract between the two: the **FastAPI endpoints in Plan 2** are the boundary; Tuna builds against them with mock responses until Chaos's endpoints land, so the two streams don't block each other.
+> Interface contract across the team: the **FastAPI endpoints in Plan 2** are the boundary; Tuna builds against them with mock responses until Chaos's endpoints land, so the streams don't block each other.
 
 ## 4. Value proposition
 
@@ -39,7 +39,7 @@ Two developers; ownership split to maximise parallelism after the shared core (P
 
 ## 5. Scope
 
-### 5.1 Hackathon MVP (demo by 26 Jun 2026)
+### 5.1 Hackathon MVP (demo by 28 Jun 2026)
 
 A **general, config-driven engine** shown with **breadth + depth**: the Obligation Radar derives _multiple_ obligations; we go deep end-to-end on **corporate income tax (Form C/CP204)** + the **Audit-Defense hero**, on seeded + MyInvois-sandbox data.
 
@@ -86,12 +86,12 @@ Explainability (every output → source + law) · Determinism (rates/thresholds/
 - **Per-audit-defense** premium (high WTP — currently expensive billable work).
 - **GTM:** land via tax-agent firms (channel multiplier) + SME finance; wedge on the **audit-defense pain** (acute, budgeted), expand into the full compliance calendar. **Sovereign mode (ILMU)** unlocks regulated/GLC buyers. Aligns with Xenber's enterprise/fintech motion (hire/incubation prize).
 
-## 10. Milestones (3–4 wks → 26 Jun 2026; mapped to plans)
+## 10. Milestones (3–4 wks → 28 Jun 2026; mapped to plans)
 
 - **Plan 1 — Deterministic Core** ✅ _done_ (Chaos): obligation + computation engines, law corpus, citation gate, evidence vault, seeded data; 19 tests green.
 - **Plan 2 — Agent layer + API** (Chaos, Wk 2–3): FastAPI + LangGraph + `LLMClient` adapter (ILMU/Claude/Gemini) + the 5 agents + LLM citation-critic + MyInvois sandbox + **Audit-Defense**.
-- **Plan 3 — Frontend** (Tuna, Wk 2–4, parallel against mocked API): Obligation Calendar · Cited Filing Studio · Audit-Defense console.
-- **Wk 4 (both):** integration, deterministic demo scenarios, 7-min video, pitch-deck README, Docker deploy (localhost OK), ⚠verify tax figures.
+- **Plan 3 — Frontend** (Tuna, Wk 2–4, parallel against mocked API): Vite + React + React Router consoles — Obligation Calendar · Cited Filing Studio · Audit-Defense console.
+- **Wk 4 (team):** integration, deterministic demo scenarios, 7-min video, pitch-deck README, deploy (frontend → Vercel, backend → Render via the Render-ready Docker image; localhost still acceptable for the prelim), ⚠verify tax figures.
 
 ## 11. Risks (product) & mitigations
 
@@ -99,16 +99,16 @@ Explainability (every output → source + law) · Determinism (rates/thresholds/
 | -------------------------------------- | -------------------------------------------------------------------------------------- |
 | Wrong tax figures                      | Versioned config + ⚠verify + human sign-off; never LLM-computed                        |
 | "Isn't this TurboTax-MY?" (Innovation) | Lead with **audit-defense + cited audit-readiness**, the open lane                     |
-| Demo depends on real integrations      | Seed/synthetic data + MyInvois sandbox; mock SSM/MyTax                                 |
+| Demo depends on real integrations      | Seed/synthetic data + MyInvois full fixture (sandbox optional); live MSIC; mock SSM/MyTax |
 | Hallucinated law citations             | Citation-verifier (deterministic gate + LLM critic) + stable clause IDs + human review |
-| Two-dev coordination                   | FastAPI contract is the interface; Tuna builds on mocks; daily integration             |
+| Cross-team coordination                | FastAPI contract is the interface; Tuna builds on mocks; daily integration             |
 | Liability framing                      | Decision-support, human-approved; augments tax agents                                  |
 
 ## 12. Open items (confirm)
 
 - Exact current-year rates/thresholds/deadlines — ⚠verify vs LHDN/RMCD before the deck.
 - **MyInvois sandbox credentials** + **ILMU Claw seat** — to obtain (mock until then).
-- ~~Tech stack~~ ✅ locked ([trd.md §12](trd.md)). ~~Team~~ ✅ Chaos & Tuna (§3). MVP = single-entity (multi-entity is Should/roadmap).
+- ~~Tech stack~~ ✅ locked ([trd.md §12](trd.md)). ~~Team~~ ✅ team of 3 — Chaos, Tuna & a product/tax-verify contributor (§3). MVP = single-entity (multi-entity is Should/roadmap).
 
 ---
 

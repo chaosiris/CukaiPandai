@@ -53,6 +53,7 @@ bun run dev                      # http://localhost:5173
 
 - **Frontend → Vercel:** root directory `frontend/`; set `VITE_API_BASE_URL` to the Render backend URL; Vite build → static SPA.
 - **Backend → Render:** deploy `backend/Dockerfile` with build context `backend/`; set `LLM_*` (and optional `MYINVOIS_*`) as Render env vars; health check `/health`. CI now uses uv (`uv sync --extra dev` + `uv run pytest -q`).
+  - **Run a single Uvicorn worker.** The HITL filing graph (`/filings/form-c/start` → `/resume`) uses an in-process `MemorySaver`, so paused approvals are not shared across workers and do not survive a restart. For production beyond the demo, swap in a durable checkpointer (SQLite/Postgres).
 - Localhost is acceptable for the prelim submission.
 
 ## 5. Demo flow (matches the video script)

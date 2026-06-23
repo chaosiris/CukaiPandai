@@ -14,6 +14,8 @@ from api.jsonio import loads_relaxed
         ('```\n{"a": 1}\n```', {"a": 1}),
         ('```json {"a": 1} ```', {"a": 1}),          # single line, language tag
         ('  {"a": 1}  ', {"a": 1}),                    # surrounding whitespace
+        ('Here is the JSON:\n```json\n{"a": 1}\n```', {"a": 1}),  # fence embedded in prose
+        ('Sure!\n```\n[1, 2]\n```\nHope that helps', [1, 2]),     # prose before and after
     ],
 )
 def test_loads_relaxed_variants(raw, expected):

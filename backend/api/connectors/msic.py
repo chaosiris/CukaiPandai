@@ -50,8 +50,9 @@ class MsicClient:
         def _match(field: str, digits: int) -> dict | None:
             return next((r for r in rows if r.get(field) == code and r.get("digits") == digits), None)
 
-        if len(code) == 1 and code.isalpha():  # section letter
-            return _match("section", 1)
+        if len(code) == 1 and code.isalpha():  # section letter (case-insensitive)
+            up = code.upper()
+            return next((r for r in rows if r.get("section") == up and r.get("digits") == 1), None)
         level = self._LEVELS.get(len(code))
         if level is None:
             return None

@@ -262,5 +262,24 @@ CukaiPandai/
 - **BE-2 — HITL filing graph over FastAPI.** `POST /entities/{tin}/filings/form-c/start` runs the LangGraph filing graph to the human-approval `interrupt` and returns `{thread_id, computation, requires_approval}`; `POST .../resume` resumes the same run via `Command(resume={approved})` → `{approved, computation}`. A single module-level graph + `MemorySaver` persists the paused state across the two calls (the compute node is deterministic, so no model client is built at import). Resume on an unknown/finalized `thread_id` returns 404. Golden `tax_payable` RM31,000 flows through both. Subagent-verified.
 - **BE-3 — `assess_risk` deepened + wired.** Now 4 deterministic checks: `turnover_mismatch` (>10% vs MyInvois), `negative_chargeable`, `high_deduction_ratio` (>90% of declared income), `zero_tax_positive_income`. Invoked in the live `form-c` endpoint (`risk_flags` in the response); on the seeded Acme demo (RM5m declared vs RM200k chargeable) the `high_deduction_ratio` flag fires. Subagent-verified.
 - **Tests:** 61 backend pass (53 → 61: +3 graph-API, +5 audit-risk/endpoint).
-- **Open:** real Claude failover + the Claude-side spike still need an `ANTHROPIC_API_KEY`. BE-4 (live MSIC + `holidays` package) is optional and not started.
+- **Open:** real Claude failover + the Claude-side spike still need an `ANTHROPIC_API_KEY`.
 - **Files:** `api/main.py`, `api/schemas.py`, `api/agents/audit_risk.py`, `tests/api/{test_graph_api,test_audit_risk,test_risk_endpoint}.py`.
+
+---
+
+## [23/06/26] — BE-4 + TD-1 + TD-2 + Phase-1 audit fixes → Phase 1 complete `[BE]` `[TD]`
+
+- **BE-4 — live MSIC + holidays.** `MsicClient` (`api/connectors/msic.py`) does a level-based lookup against **data.gov.my** (`?id=msic`, follow-redirects, cached) with a fixture mode for offline tests; exposed at `GET /reference/msic/{code}` (DI-overridable; 404 on unknown). Live verified: `46900 → class 4690 (Non-specialized wholesale trade)`, 1943 rows. `core/deadlines.py` gains `malaysia_holidays()` + `shift_for_malaysian_holidays()` from the offline `holidays` package.
+- **TD-1 — prd/trd reconciled** to the current decisions (Vite + React + RR7 frontend, Vercel + Render deploy, team of 3, MyInvois full fixture + MSIC live, ILMU-first routing, uv + `backend/`+`frontend/` monorepo). No stale Next.js/shadcn/two-dev/Default-Claude remnants; both stay checkbox-free.
+- **TD-2 — tests** for `RoutingLLMClient` + the new endpoints (routing, JSON-mode, graph start/resume, risk, MSIC, jsonio); suite green.
+- **Phase-1 adversarial audit (8-dimension workflow, 31 findings) — fixes applied:**
+  - `assess_risk` check #3 renamed `high_deduction_ratio` → **`gross_chargeable_gap`** with an honest message (it measures the gross-vs-chargeable gap, not deductions); zero-turnover (`0` vs `None`) now flags; negative declared income guarded.
+  - HITL `/start` now returns **`risk_flags`** so the human at the approval gate sees the audit-risk context (previously only the synchronous endpoint did).
+  - `/audit-defense` returns a controlled **502** on unparseable model output (was an uncaught 500); `loads_relaxed` now salvages a fenced JSON block embedded in prose.
+  - MSIC: **shared/cached client** (`get_msic` singleton) so the catalogue isn't re-downloaded per request (data.gov.my ~4 req/min); section lookup is **case-insensitive**.
+- **Deferred (explicitly out of scope this pass):**
+  - **Anthropic failover hardening** (per "ignore the Anthropic fallback first"): `_AnthropicClient` JSON-mode enforcement, escalate-path failover/forwarding, and the **Claude-side spike** (BE-1 `nemo-super`-vs-Claude head-to-head) all wait on an `ANTHROPIC_API_KEY`.
+  - Wiring `shift_for_malaysian_holidays` into `derive_obligations` (deferred to avoid disturbing the demo's golden due dates; capability lives in `deadlines.py`).
+  - `documents` JSON-object mode (it is not endpoint-wired; live spike parses it correctly today).
+- **Tests:** 79 backend pass (61 → 79). `MemorySaver` is in-process — run a single Uvicorn worker on Render (noted in code + runbook).
+- **Files:** `api/agents/audit_risk.py`, `api/connectors/msic.py`, `api/jsonio.py`, `api/main.py`, `core/deadlines.py`, `core/fixtures/msic_sample.json`, `pyproject.toml`, several `tests/`, `docs/{prd,trd,plan,progress,runbook}.md`.

@@ -1,6 +1,6 @@
 # CukaiPandai — Technical Requirements Document (TRD)
 
-> The _how_ for [cukaipandai-spec.md](cukaipandai-spec.md) + [prd.md](prd.md). Architecture, integrations, data model, AI/model layer, security, ownership, build plan. **⚠verify** = confirm against the cited official source before production. **Stack is LOCKED** (§12). **Team: Chaos (backend/agents) + Tuna (frontend/demo)** (§2.1).
+> The _how_ for [cukaipandai-spec.md](cukaipandai-spec.md) + [prd.md](prd.md). Architecture, integrations, data model, AI/model layer, security, ownership, build plan. **⚠verify** = confirm against the cited official source before production. **Stack is LOCKED** (§12). **Team of 3: Chaos (backend/agents) + Tuna (frontend/demo) + a product/tax-verify contributor** (§2.1).
 
 ---
 
@@ -9,12 +9,12 @@
 Three planes: **(1) Deterministic Core** (rules + computation + citation gate — source of truth, `core`, already built), **(2) Agentic Reasoning** (LLM agents that classify/reason/draft/plan), **(3) Integrations & Data**. Humans approve before anything leaves the system.
 
 ```
- Next.js UI ── Obligation Calendar · Cited Filing Studio · Audit-Defense console        [Tuna / Plan 3]
+ Vite/React UI ── Obligation Calendar · Cited Filing Studio · Audit-Defense console      [Tuna / Plan 3]
         │ (REST/SSE)
  FastAPI gateway ── auth, entity context, approval workflow, audit-log writer           [Chaos / Plan 2]
         │
  LangGraph Orchestrator (plan/act/decide, human-in-the-loop interrupts)                 [Chaos / Plan 2]
-   ├─ Profiler agent ──────────► Integrations: SSM(mock), MyInvois(sandbox), MySST(mock), data.gov.my
+   ├─ Profiler agent ──────────► Integrations: SSM(mock), MyInvois(full fixture; sandbox optional), MySST(mock), data.gov.my MSIC(live)
    ├─ Document-understanding agent ─► Docling + vision model (BM/EN)
    ├─ Deductibility reasoner ─────► RAG over Law Corpus (§6)
    ├─ Audit-Risk agent ───────────► rules + anomaly checks + MyInvois cross-match
@@ -24,7 +24,7 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
  DETERMINISTIC CORE  core: Obligation Rules Engine · Tax Computation Engine · Citation gate · Evidence Vault   [Chaos / Plan 1 ✅]
         │
  Data: SQLite (MVP) → Postgres+pgvector (prod) · local object store (docs)
- Model layer: LLMClient adapter ── OpenAI-compatible (ILMU Claw / Gemini)  ⇄  Anthropic (Claude)
+ Model layer: LLMClient adapter ── ILMU-first (sovereign nemo-super) → Claude failover/escalation; Gemini optional
 ```
 
 ## 2. Components
@@ -41,13 +41,14 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
 | **Citation Verifier (LLM critic)** | LLM + core gate        | Confirm each cited clause supports the claim; block unsupported                                      | 2    |
 | **`LLMClient` adapter**            | service                | `chat(messages, tools)` over OpenAI-compatible (ILMU/Gemini) or Anthropic (Claude); provider via env | 2    |
 | **FastAPI gateway**                | API                    | Endpoints wrapping core+agents; approval workflow; SSE for live agent steps                          | 2    |
-| **Frontend**                       | Next.js                | Three consoles; built against the API contract                                                       | 3    |
+| **Frontend**                       | Vite + React           | Three consoles; built against the API contract                                                       | 3    |
 
-### 2.1 Component ownership (Chaos / Tuna)
+### 2.1 Component ownership (team of 3)
 
-- **Chaos** — everything Python/agentic: `core` (done), Plan 2 (FastAPI, LangGraph, `LLMClient` adapter incl. ILMU sovereign mode, the 5 agents, RAG + LLM citation-critic, MyInvois sandbox connector, Audit-Defense).
-- **Tuna** — Plan 3 (Next.js consoles), API wiring, UX, demo polish, the 7-min video + pitch-deck README.
-- **Interface contract:** the **FastAPI endpoints (§7a)** are the boundary. Tuna develops against mocked responses matching those schemas so the two streams never block each other.
+- **Chaos** — everything Python/agentic: `core` (done), Plan 2 (FastAPI, LangGraph, `LLMClient` adapter incl. ILMU sovereign mode, the 5 agents, RAG + LLM citation-critic, MyInvois connector, Audit-Defense).
+- **Tuna** — Plan 3 (Vite + React consoles), API wiring, UX, demo polish, the 7-min video + pitch-deck README.
+- **Product/tax-verify contributor** — product framing, ⚠verify of tax figures vs LHDN, demo narration.
+- **Interface contract:** the **FastAPI endpoints (§7a)** are the boundary. Tuna develops against mocked responses matching those schemas so the streams never block each other.
 
 ## 3. Determining obligations (engine spec — the core)
 
@@ -67,13 +68,13 @@ Three planes: **(1) Deterministic Core** (rules + computation + citation gate �
 
 ### 4.1 LHDN MyInvois API (primary transactional source)
 
-Docs [sdk.myinvois.hasil.gov.my/api](https://sdk.myinvois.hasil.gov.my/) (SDK v1.0, 6 Apr 2024). **OAuth 2.0** (client credentials; TIN + NRIC/BRN); **sandbox (preprod) + prod**. Capabilities (⚠verify exact paths): submit documents, get document/details, document state/status, **search documents** (last 31 days — pull the ledger → turnover + evidence), validate TIN, reject/cancel. Payload ~55 fields incl. supplier/buyer TIN, classification codes, tax type & amount, totals. **Use:** derive turnover (→ phase/SME/SST thresholds), feed computation, seed Evidence Vault, cross-match for audit-risk. **Hackathon:** sandbox; mock with UBL-2.1 JSON fixtures if creds pending.
+Docs [sdk.myinvois.hasil.gov.my/api](https://sdk.myinvois.hasil.gov.my/) (SDK v1.0, 6 Apr 2024). **OAuth 2.0** (client credentials; TIN + NRIC/BRN); **sandbox (preprod) + prod**. Capabilities (⚠verify exact paths): submit documents, get document/details, document state/status, **search documents** (last 31 days — pull the ledger → turnover + evidence), validate TIN, reject/cancel. Payload ~55 fields incl. supplier/buyer TIN, classification codes, tax type & amount, totals. **Use:** derive turnover (→ phase/SME/SST thresholds), feed computation, seed Evidence Vault, cross-match for audit-risk. **Hackathon:** full UBL-2.1 JSON fixture (sandbox optional if creds land).
 
 ### 4.2 SSM ([e-Info](https://www.ssm-einfo.my/) / [MYDATA-SSM](https://mydata-ssm.my/)) — entity profile (type, MSIC, paid-up, status). Authorised CSD API; **mock/seed in MVP**.
 
 ### 4.3 RMCD [MySST](https://mysst.customs.gov.my/) — SST registration status (no rich API → customer-provided number / mock).
 
-### 4.4 [developer.data.gov.my](https://developer.data.gov.my/) (`api.data.gov.my`, no auth, 4 req/min) — **reference only**: public-holiday calendar (deadline shift), MSIC reference, DOSM ratios (audit-risk baselines). _Not_ a per-company obligation source.
+### 4.4 [developer.data.gov.my](https://developer.data.gov.my/) (`api.data.gov.my`, no auth, ~4 req/min) — **reference only**: public-holiday calendar (deadline shift), **MSIC reference (the one live/real external call — `api.data.gov.my?id=msic`)**, DOSM ratios (audit-risk baselines). _Not_ a per-company obligation source.
 
 > Per-company obligations are **derived** from §4.1–4.3 + uploads (see [research](superpowers/research/2026-06-19-tax-obligation-determination.md)).
 
@@ -87,13 +88,13 @@ Corpus: ITA 1967, Public Rulings, DGIR guidelines, SST orders → stable clause 
 
 ## 7. AI / model layer (locked)
 
-- **Adapter `LLMClient`:** one interface `chat(messages, tools) -> ToolCalls|text`. Two implementations: **OpenAI-compatible** (via the `openai` SDK, configurable `base_url`/`api_key`/`model`) for **ILMU Claw (sovereign mode)** and **Gemini** (OpenAI-compat endpoint); and **Anthropic** for **Claude**. Provider chosen by env (`LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`).
-- **Default (dev):** Claude (deep reasoning: deductibility, audit-query interpretation, defense drafting, citation critic). **Sovereign mode:** flip env to ILMU Claw → all inference in-country (PDPA). Gemini optional.
-- **Why:** clean abstraction (Technical), residency (Market Adoption), sovereignty-aware (Innovation), explainable/controllable (Responsible AI). **Caveat:** ILMU limited seats/smaller models → Claude is the capability backstop; the adapter makes the swap one env change.
+- **Adapter `LLMClient` / RoutingLLMClient:** one interface `chat(messages, tools) -> ToolCalls|text`. Two implementations: **OpenAI-compatible** (via the `openai` SDK, configurable `base_url`/`api_key`/`model`) for **ILMU Claw (sovereign primary, `nemo-super`)** and **Gemini** (OpenAI-compat endpoint); and **Anthropic** for **Claude**. Provider/route chosen by env (`LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`).
+- **Routing — ILMU-first:** ILMU Claw `nemo-super` is the **sovereign primary**, so all inference runs in-country by default (PDPA). **Claude is failover/escalation** — high-stakes work (e.g. the citation critic) escalates to Claude when ILMU is unavailable or below the confidence bar. Gemini optional.
+- **Why:** clean abstraction (Technical), residency (Market Adoption), sovereignty-aware (Innovation), explainable/controllable (Responsible AI). **Caveat:** ILMU limited seats/smaller models → Claude is the capability backstop on escalation; the adapter makes the route one env change.
 
 ### 7a. API contract (the Chaos↔Tuna boundary — exact shapes in Plan 2)
 
-`POST /entities` (onboard → profile) · `GET /entities/{tin}/obligations` (calendar) · `POST /entities/{tin}/filings/form-c` (compute → cited FormComputation) · `POST /entities/{tin}/audit-risk` (flags) · `POST /entities/{tin}/audit-defense` (query → DefensePack) · `GET /entities/{tin}/evidence` · all mutating routes return a `requires_approval` step before commit. SSE `/runs/{id}/stream` for live agent steps.
+`POST /entities` (onboard → profile) · `GET /entities/{tin}/obligations` (calendar) · `POST /entities/{tin}/filings/form-c` (compute → cited FormComputation + `risk_flags`) · `POST /entities/{tin}/filings/form-c/start` + `/resume` (HITL: pause at the human-approval interrupt → resume with the approval decision; **shipped, BE-2**) · `POST /entities/{tin}/audit-defense` (query → DefensePack) · `GET /reference/msic/{code}` (MSIC reference lookup; **shipped, BE-4**) · `GET /entities/{tin}/evidence` · all mutating routes return a `requires_approval` step before commit. SSE `/runs/{id}/stream` for live agent steps. _(Shipped routes: obligations, form-c, form-c/start+resume, audit-defense, reference/msic, health.)_
 
 ## 8. Data model (core tables)
 
@@ -111,21 +112,22 @@ Latency: audit-query → pack <15s; Form C <60s (seeded). Reliability: determini
 
 - **Plan 1 — Deterministic Core** ✅ _done_ (Chaos): 10 TDD tasks, 19 tests green, committed/pushed.
 - **Plan 2 — Agent layer + API** (Chaos, Wk 2–3): `LLMClient` adapter → agents (profiler, doc-understanding, deductibility, audit-risk, **audit-defense**) on LangGraph → LLM citation-critic on the core gate → FastAPI endpoints (§7a) → MyInvois sandbox connector. TDD: mock the model in tests; assert agent decisions + endpoint contracts.
-- **Plan 3 — Frontend** (Tuna, Wk 2–4, parallel on mocked API): Obligation Calendar, Cited Filing Studio (approval inbox), Audit-Defense console; styling absorbs the user's visual reference images when provided.
-- **Wk 4 (both):** integration, deterministic demo scenarios, 7-min video + pitch-deck README, Docker deploy. Buffer for **⚠verify** of tax figures.
+- **Plan 3 — Frontend** (Tuna, Wk 2–4, parallel on mocked API): Vite + React + React Router consoles — Obligation Calendar, Cited Filing Studio (approval inbox), Audit-Defense console; styling absorbs the user's visual reference images when provided.
+- **Wk 4 (team):** integration, deterministic demo scenarios, 7-min video + pitch-deck README, deploy (frontend → Vercel, backend → Render via the Render-ready Docker image; localhost still acceptable for the prelim). Buffer for **⚠verify** of tax figures.
 - **Discipline:** corporate income tax + audit-defense first; SST/MTD/WHT are config extensions, not new architecture.
 
 ## 12. Tech stack (LOCKED)
 
 - **Core:** Python 3.11 · Pydantic v2 · PyYAML · pytest (built).
 - **Backend/API:** **FastAPI** (Py 3.11) · **LangGraph** (orchestration + human-in-the-loop interrupts) · SSE for live steps.
-- **Model layer:** **`openai` SDK** (OpenAI-compatible → ILMU Claw sovereign mode / Gemini) **+ `anthropic` SDK** (Claude), behind the `LLMClient` adapter; provider via env.
+- **Model layer:** **`openai` SDK** (OpenAI-compatible → ILMU Claw sovereign primary `nemo-super` / Gemini) **+ `anthropic` SDK** (Claude failover/escalation), behind the `LLMClient`/RoutingLLMClient adapter; ILMU-first, route via env.
 - **RAG:** SQLite + lightweight hybrid retrieval (MVP) → **pgvector** (prod).
 - **Data:** **SQLite** (MVP) → **Postgres + pgvector** (prod); local object store for docs.
 - **Docs/OCR:** **Docling** (structured PDFs) + a vision model via the adapter (receipts/letters).
-- **Frontend:** **Next.js** (App Router) + React + **Tailwind** + **shadcn/ui** + Lucide.
-- **Infra/tooling:** **Docker** (deployable to a Malaysian region / ILMU for sovereignty; localhost OK for the hackathon) · venv/pip · ruff (optional) · tracing (LangSmith optional).
-  > Rationale: ILMU Claw is OpenAI-compatible, so the adapter makes ILMU/Claude/Gemini swappable by env — maximises the sovereignty story and avoids GCP/ADK lock-in; lean for a 2-dev team; the deterministic core stays model/stack-independent.
+- **Frontend:** **Vite 5** + **React 18** + **React Router 7** + **token-CSS** (the ProofRank devkit design system) + Lucide; **Bun**.
+- **Layout:** **`backend/` + `frontend/` monorepo** (root Bun tooling); backend is an editable package managed with **uv**.
+- **Infra/tooling:** **Docker** (Render-ready backend image) · deploy → **frontend to Vercel, backend to Render** (localhost still acceptable for the prelim; a Malaysian region / ILMU for sovereignty in prod) · backend deps via **uv** · ruff (optional) · tracing (LangSmith optional).
+  > Rationale: ILMU Claw is OpenAI-compatible, so the adapter makes ILMU/Claude/Gemini swappable by env — maximises the sovereignty story and avoids GCP/ADK lock-in; lean for a small team; the deterministic core stays model/stack-independent.
 
 ## 13. Limitations & verification checklist
 

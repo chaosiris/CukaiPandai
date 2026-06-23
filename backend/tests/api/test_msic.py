@@ -35,3 +35,8 @@ def test_lookup_division_and_section_by_level():
 def test_coarse_code_does_not_spuriously_match_an_item():
     # division "62" has no division-level row here; must NOT return the 62010 item row.
     assert C.lookup("62") is None
+
+
+def test_section_lookup_is_case_insensitive():
+    lower = C.lookup("g")
+    assert lower is not None and lower["digits"] == 1 and lower["section"] == "G"

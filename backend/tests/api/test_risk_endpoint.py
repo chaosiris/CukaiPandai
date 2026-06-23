@@ -22,6 +22,6 @@ def test_form_c_returns_risk_flags_on_seeded_demo():
     body = r.json()
     assert body["computation"]["fields"]["tax_payable"]["value"] == 31000
     flags = body["risk_flags"]
-    # Acme declares RM5m gross but only RM200k chargeable → high-deduction trigger fires.
+    # Acme declares RM5m gross but only RM200k chargeable → gross-vs-chargeable gap fires.
     assert len(flags) >= 1
-    assert any(f["code"] == "high_deduction_ratio" for f in flags)
+    assert any(f["code"] == "gross_chargeable_gap" for f in flags)
