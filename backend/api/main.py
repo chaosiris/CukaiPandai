@@ -17,6 +17,7 @@ from core.models import EntityTaxProfile, LineItem
 from core.obligations import derive_obligations
 
 from api.agents.audit_defense import build_defense
+from api.agents.audit_risk import assess_risk
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
 from api.schemas import AuditDefenseReq, FilingResumeReq, FormCReq, ObligationsReq
@@ -50,7 +51,12 @@ def form_c(tin: str, req: FormCReq) -> dict:
     profile = EntityTaxProfile(**req.ssm)
     items = [LineItem(**li) for li in req.line_items]
     fc = compute_form_c(profile, items, 2026)
-    return {"computation": fc.model_dump(mode="json"), "requires_approval": True}
+    flags = assess_risk(fc, profile, declared_income=profile.gross_income, myinvois_turnover=None)
+    return {
+        "computation": fc.model_dump(mode="json"),
+        "requires_approval": True,
+        "risk_flags": [f.model_dump() for f in flags],
+    }
 
 
 @app.post("/entities/{tin}/audit-defense")

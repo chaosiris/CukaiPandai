@@ -254,3 +254,13 @@ CukaiPandai/
 - **Tests:** 46 backend pass (40 → 46, +6 routing/JSON).
 - **Open (Q1/Q2):** the Claude-side spike + real failover need an `ANTHROPIC_API_KEY` (not yet provisioned); ILMU token metering unconfirmed.
 - **Files:** `api/llm.py`, `api/jsonio.py` (new), `api/agents/{documents,deductibility,audit_defense,citation_critic}.py`, `core/lawcorpus.py`, `scripts/spike_ilmu.py` (new), `tests/api/test_routing.py` (new), `api/main.py`, `pyproject.toml`, `.env.example`.
+
+---
+
+## [23/06/26] — BE-2 + BE-3: HITL endpoint + audit-risk pre-flight `[BE]`
+
+- **BE-2 — HITL filing graph over FastAPI.** `POST /entities/{tin}/filings/form-c/start` runs the LangGraph filing graph to the human-approval `interrupt` and returns `{thread_id, computation, requires_approval}`; `POST .../resume` resumes the same run via `Command(resume={approved})` → `{approved, computation}`. A single module-level graph + `MemorySaver` persists the paused state across the two calls (the compute node is deterministic, so no model client is built at import). Resume on an unknown/finalized `thread_id` returns 404. Golden `tax_payable` RM31,000 flows through both. Subagent-verified.
+- **BE-3 — `assess_risk` deepened + wired.** Now 4 deterministic checks: `turnover_mismatch` (>10% vs MyInvois), `negative_chargeable`, `high_deduction_ratio` (>90% of declared income), `zero_tax_positive_income`. Invoked in the live `form-c` endpoint (`risk_flags` in the response); on the seeded Acme demo (RM5m declared vs RM200k chargeable) the `high_deduction_ratio` flag fires. Subagent-verified.
+- **Tests:** 61 backend pass (53 → 61: +3 graph-API, +5 audit-risk/endpoint).
+- **Open:** real Claude failover + the Claude-side spike still need an `ANTHROPIC_API_KEY`. BE-4 (live MSIC + `holidays` package) is optional and not started.
+- **Files:** `api/main.py`, `api/schemas.py`, `api/agents/audit_risk.py`, `tests/api/{test_graph_api,test_audit_risk,test_risk_endpoint}.py`.

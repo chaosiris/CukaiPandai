@@ -43,10 +43,10 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Buy ILMU Claw Starter (RM27) → verify: seat active, `sk-` key issued.
+- [x] Buy ILMU Claw Starter (RM27) → verify: seat active, `sk-` key issued.
 - [ ] Run the 4-prompt spike (`nemo-super` vs Claude across profiler / documents / deductibility / audit-defense / citation-critic) → verify: per-task quality table captured, escalation points decided (resolves Q1).
-- [ ] Build `RoutingLLMClient` (ILMU-first → Claude on error + on the high-stakes citation-critic step) → verify: unit test exercises both the primary path and the failover path.
-- [ ] Add `response_format={"type":"json_object"}` to `_OpenAICompatClient` → verify: JSON-mode response parses.
+- [x] Build `RoutingLLMClient` (ILMU-first → Claude on error + on the high-stakes citation-critic step) → verify: unit test exercises both the primary path and the failover path.
+- [x] Add `response_format={"type":"json_object"}` to `_OpenAICompatClient` → verify: JSON-mode response parses.
 
 **Acceptance criteria:** `RoutingLLMClient` routes ILMU-first with Claude failover, JSON mode works, and the spike decides per-task escalation.
 
@@ -56,7 +56,7 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Expose the LangGraph filing graph (with HITL `interrupt`) over a FastAPI endpoint → verify: a request reaches the interrupt and resumes on approval.
+- [x] Expose the LangGraph filing graph (with HITL `interrupt`) over a FastAPI endpoint → verify: a request reaches the interrupt and resumes on approval.
 
 **Acceptance criteria:** Human-approval gate is reachable over HTTP, not just in tests.
 
@@ -66,8 +66,8 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Extend `assess_risk` to ≥3 checks → verify: tests cover each check.
-- [ ] Import/wire it into `main.py` → verify: at least one audit-risk flag fires on the seeded demo.
+- [x] Extend `assess_risk` to ≥3 checks → verify: tests cover each check.
+- [x] Import/wire it into `main.py` → verify: at least one audit-risk flag fires on the seeded demo.
 
 **Acceptance criteria:** `assess_risk` runs ≥3 checks and is invoked by the live API path.
 
