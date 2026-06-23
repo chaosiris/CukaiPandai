@@ -2,7 +2,7 @@
 
 > Append-only log. **PG** adds a dated entry after each task; **QA** records test/build results. Newest at the bottom.
 >
-> Shared across the team; tag each entry with its lane — **BE** · **FE** · **TD**. Design & decisions → [`cukaipandai-spec.md`](cukaipandai-spec.md); the plan → [`plan.md`](plan.md).
+> Shared across the team; tag each entry with its lane — **BE** · **FE** · **DO** · **TD**. Design & decisions → [`cukaipandai-spec.md`](cukaipandai-spec.md); the plan → [`plan.md`](plan.md).
 
 Format:
 
@@ -226,3 +226,9 @@ CukaiPandai/
 - Added `[DECISION] Backend package manager: uv (primary)` line.
 
 - **Files touched:** `backend/uv.lock` (new), `backend/Dockerfile`, `.github/workflows/ci.yml`, `docs/runbook.md`, `.claude/CLAUDE.md`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [23/06/26] — DO lane taxonomy sync `[TD]`
+
+- Added **DO** (devops/infra — tooling · CI · deploy) to the lane enumeration in `.claude/CLAUDE.md` (line ~104) and `docs/progress.md` header; both previously listed only BE · FE · TD.

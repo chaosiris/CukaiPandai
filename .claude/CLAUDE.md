@@ -101,7 +101,7 @@ This project runs the **PM → PL → PG → QA** pipeline defined in `docs/role
 4. **QA** reviews the diff into `docs/test.md` with a verdict.
 5. **Gate 2** — PM relays the verdict. Reject → back to PG. Approve → PM proposes a Conventional Commit message and asks the human to authorize commit + push.
 
-Reference `docs/prd.md` (requirements) and `docs/trd.md` (architecture/contracts) when they exist. `plan.md`/`progress.md` are shared across the team and organized by the three lanes — **BE** (backend) · **FE** (frontend) · **TD** (testing & docs).
+Reference `docs/prd.md` (requirements) and `docs/trd.md` (architecture/contracts) when they exist. `plan.md`/`progress.md` are shared across the team and organized by the four lanes — **BE** (backend) · **FE** (frontend) · **DO** (devops/infra — tooling · CI · deploy) · **TD** (testing & docs).
 
 ---
 
