@@ -160,7 +160,7 @@ function FigureTraceRow({
           </div>
           <div>
             <strong style={{ color: 'var(--ink)' }}>inputs:</strong>{' '}
-            {trace.inputs.length > 0 ? trace.inputs.join(', ') : '—'}
+            {trace.inputs.length > 0 ? trace.inputs.join(', ') : 'none'}
           </div>
         </div>
       </details>
@@ -179,7 +179,7 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
     <div className="window" style={{ marginTop: 16 }}>
       <div className="titlebar">
         <span className="titlebar-title">
-          {title} — {computation.form}
+          {title}: {computation.form}
         </span>
       </div>
 
@@ -202,7 +202,7 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
               letterSpacing: '0.08em'
             }}
           >
-            Tax Payable — YA2026
+            Tax Payable, YA2026
           </div>
           <div
             style={{
@@ -378,12 +378,12 @@ export default function FilingStudio() {
 
   const loadingLabel =
     phase.tag === 'classifying'
-      ? 'Classifying trial balance…'
+      ? 'Classifying Trial Balance…'
       : phase.tag === 'starting'
-        ? 'Starting filing (HITL)…'
+        ? 'Starting Filing (HITL)…'
         : phase.tag === 'resuming'
-          ? 'Resuming after approval…'
-          : 'Loading entity…'
+          ? 'Resuming After Approval…'
+          : 'Loading Entity…'
 
   return (
     <div className="app-shell">
@@ -416,7 +416,7 @@ export default function FilingStudio() {
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar">
-            <span className="titlebar-title">Step 1 — Trial Balance</span>
+            <span className="titlebar-title">Step 1: Trial Balance</span>
             <span className="titlebar-meta">paste raw text</span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
@@ -467,7 +467,7 @@ export default function FilingStudio() {
         classifyResult && (
           <div className="window" style={{ marginTop: 16 }}>
             <div className="titlebar">
-              <span className="titlebar-title">Step 1 — Classified Line Items</span>
+              <span className="titlebar-title">Step 1: Classified Line Items</span>
               {classifyResult && (
                 <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
               )}
@@ -532,7 +532,7 @@ export default function FilingStudio() {
       {/* Step 3 — HITL pending approval */}
       {phase.tag === 'pending_approval' && (
         <>
-          <ComputationPanel computation={phase.start.computation} title="Step 2 — Computed (pending approval)" />
+          <ComputationPanel computation={phase.start.computation} title="Step 2: Computed (Pending Approval)" />
 
           {/* Risk flags — prominently before the approve gate */}
           {phase.start.risk_flags.length > 0 && (
@@ -552,12 +552,12 @@ export default function FilingStudio() {
           {/* Human-approval gate */}
           <div className="window" style={{ marginTop: 16 }}>
             <div className="titlebar">
-              <span className="titlebar-title">Step 3 — Human Approval Gate</span>
+              <span className="titlebar-title">Step 3: Human Approval Gate</span>
               {phase.start.requires_approval && <span className="titlebar-meta">PENDING APPROVAL</span>}
             </div>
             <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
               <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6 }}>
-                Review the computed figures and risk flags above before approving this filing. This gate is enforced —
+                Review the computed figures and risk flags above before approving this filing. This gate is enforced:
                 the filing graph pauses here for human sign-off.
               </p>
               <div style={{ display: 'flex', gap: 10 }}>
