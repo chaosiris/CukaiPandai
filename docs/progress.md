@@ -329,3 +329,16 @@ CukaiPandai/
 - **BE-6 — route_info:** every `LLMClient` reports `{sovereign, active_model}`; `RoutingLLMClient` tracks the last route; `/audit-defense` + `/classify` carry the field (live source of truth for FE-5). Pure-ILMU → `sovereign=true`.
 - **Tests:** 89 backend pass (79 → 89; +CORS, entity, classify, 422, route-field). Live spike 4/4. Subagent-audited: all 5 RESOLVED, no regressions, no 500/security defects.
 - **Files:** `api/main.py`, `api/llm.py`, `api/agents/documents.py`, `api/schemas.py`, `.env.example`, `tests/api/{test_entity_endpoint,test_classify_endpoint,test_cors,test_validation_envelope}.py` (new) + `test_audit_defense_endpoint.py`.
+
+---
+
+## [24/06/26] — Phase 2 ② sovereign RAG (BE-12/13/14) `[BE]`
+
+- **BE-12 — corpus + offline index:** `Clause` gains optional `section`/`page_ref`/`url`; `lawcorpus_seed.json` expanded 5 → 15 ITA/PR clauses (incl. **PR-6/2019** repairs ruling) with provenance; `scripts/build_rag_index.py` embeds via local static **model2vec** (`potion-base-8M`), L2-normalizes, writes the COMMITTED `core/fixtures/rag/{vectors.npz, chunks.json}`. ⚠verify of clause text/section/page is the TD-6/Q5 gate (tax-verify contributor).
+- **BE-13 — retriever + wiring:** `core/rag.py` — `lru_cache` embedder + index, cosine top-k, **fail-open** (any error → `[]`). `deductibility`/`audit_defense` replace the full-ID dump with retrieved candidate IDs (fall back to the full corpus when retrieval is `[]`); `thread_provenance` threads section/page_ref/url/passage into the `Citation` additively. The deterministic gate (`ground_citation` → `corpus.exists`) is **unchanged and authoritative**.
+- **BE-14 — tests:** golden retrieval (PR-6/2019 for repairs), fail-open, agent-fallback-when-RAG-off, and the **gate-still-rejects-fabrication invariant with RAG ON**.
+- **Honest limitation (Q6):** static-embedding precision on a 15-clause corpus is coarse and `nemo-super`'s clause *choice* among valid candidates is imperfect — accepted per Q6: the deterministic clause-ID gate + the fabricated-citation rejection (RAG-independent) carry the trust demo; the rich audit-defense query retrieves cleanly (PR-6/2019 top-1). `bge-m3`/pgvector = documented scale path.
+- **Sovereign:** in-process, no foreign API; sized for the Render 256MB tier. Local model copy `backend/.hf_models/` is gitignored; CI/Render download the ~30MB model (or set `RAG_MODEL_PATH`) — RAG fails open to the gate if it can't load.
+- **Tests:** 93 backend pass (89 → 93). Live spike 4/4. Subagent-audited: BE-12/13/14 RESOLVED; fabrication invariant holds.
+- **⚠ uv.lock:** `model2vec` + `numpy` added to `pyproject.toml` → run `cd backend && uv lock` (uv unavailable in this session; mirrors the BE-4 `holidays` lock fix).
+- **Files:** `core/models.py`, `core/rag.py` (new), `core/fixtures/lawcorpus_seed.json`, `core/fixtures/rag/{vectors.npz,chunks.json}` (new), `scripts/build_rag_index.py` (new), `api/agents/{deductibility,audit_defense}.py`, `pyproject.toml`, `.gitignore`, `tests/api/test_rag.py` (new).

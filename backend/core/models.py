@@ -55,12 +55,20 @@ class Clause(BaseModel):
     clause_id: str
     text: str
     source: str
+    section: str | None = None
+    page_ref: str | None = None
+    url: str | None = None
 
 
 class Citation(BaseModel):
     claim: str
     clause_ids: list[str]
     verified: bool = False
+    # Provenance threaded from RAG retrieval (BE-13); None when retrieval is unavailable.
+    section: str | None = None
+    page_ref: str | None = None
+    url: str | None = None
+    passage: str | None = None
 
 
 class RiskFlag(BaseModel):

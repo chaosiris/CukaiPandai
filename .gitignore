@@ -24,6 +24,9 @@ build/
 # Local research scratch (intermediate workflow JSON; deliverables live in docs/)
 _research/
 
+# Local Hugging Face model copy for RAG (downloaded; the committed numpy index is what ships)
+backend/.hf_models/
+
 # OS / editor
 .DS_Store
 __MACOSX/
