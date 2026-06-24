@@ -243,12 +243,12 @@ CukaiPandai/
 - **Citation critic escalates** (`escalate=True`) — the YES/NO gate routes to Claude when routing is active.
 - **Live spike** (`scripts/spike_ilmu.py`, ILMU side; Claude side pending a key) — resolves Q1:
 
-| Agent | nemo-super | Decision |
-|---|---|---|
-| documents (classify) | parses, correct categories | keep on ILMU |
-| deductibility (cite) | verifies after fix (was emitting `ITA 1967 s33(1)` without hyphens) | keep on ILMU; constrain to corpus IDs |
-| citation-critic (YES/NO) | answered NO on a clearly-supported claim | **escalate to Claude** (wired) |
-| audit-defense | grounds correctly; verdict gated by the weak critic | escalate the critic to Claude |
+| Agent                    | nemo-super                                                          | Decision                              |
+| ------------------------ | ------------------------------------------------------------------- | ------------------------------------- |
+| documents (classify)     | parses, correct categories                                          | keep on ILMU                          |
+| deductibility (cite)     | verifies after fix (was emitting `ITA 1967 s33(1)` without hyphens) | keep on ILMU; constrain to corpus IDs |
+| citation-critic (YES/NO) | answered NO on a clearly-supported claim                            | **escalate to Claude** (wired)        |
+| audit-defense            | grounds correctly; verdict gated by the weak critic                 | escalate the critic to Claude         |
 
 - **Spike-driven fix:** the JSON agents (`deductibility`, `audit_defense`) now constrain the model to the corpus's exact clause IDs (`LawCorpus.ids()`) and use JSON mode; all JSON parsing goes through `api/jsonio.loads_relaxed` (tolerates code fences). Post-fix, `deductibility` verifies `ITA-1967-s33(1)` live.
 - **Tests:** 46 backend pass (40 → 46, +6 routing/JSON).
@@ -283,3 +283,37 @@ CukaiPandai/
   - `documents` JSON-object mode (it is not endpoint-wired; live spike parses it correctly today).
 - **Tests:** 79 backend pass (61 → 79). `MemorySaver` is in-process — run a single Uvicorn worker on Render (noted in code + runbook).
 - **Files:** `api/agents/audit_risk.py`, `api/connectors/msic.py`, `api/jsonio.py`, `api/main.py`, `core/deadlines.py`, `core/fixtures/msic_sample.json`, `pyproject.toml`, several `tests/`, `docs/{prd,trd,plan,progress,runbook}.md`.
+
+---
+
+## [24/06/26] — TD-docs: documentation-alignment pass (Phase-2 decisions → cukaipandai-spec / trd / prd) `[TD]`
+
+**Scope:** docs-only pass; no code changed. Reflects the Gate-1 decisions (Q6–Q9) and Phase-1 completion into the three design docs.
+
+**`docs/cukaipandai-spec.md`:**
+
+- §7.1 system diagram — removed stale "STATUS: PLANNED — NOT built" / "NOT YET mounted" notes; updated to reflect Phase-1 complete (HITL endpoints live, RoutingLLMClient live, MsicClient live); added new endpoint surface (BE-6 through BE-10); added sovereign RAG layer block (numpy index, model2vec, fail-open); updated ILMU ↔ Claude line to note pure-ILMU for prelim (Q6).
+- §7.3 stack table — "Law corpus / RAG" row updated to local static embeddings + committed numpy index (model2vec/potion, fit for Render 256MB) + scale-path note (bge-m3 = ILMU PAYG, not Claw tier); "Data" row updated to managed Neon SG + sovereignty caveat (no MY region; hashes-not-payloads; prod = self-hosted MY identical schema; RAG stays on numpy, not pgvector).
+- §3.3 plan-access table — added paragraph noting `bge-m3`/embeddings require PAYG, so prelim RAG uses local static model2vec (sovereign, in-process); ILMU bge-m3 is the scale path.
+- §3.4 routing decision — replaced the "code gaps / planned spike" table with Phase-1 status (RoutingLLMClient built + verified, 79 tests); added pure-ILMU prelim constraint (Q6, ILMU Claw Starter 403 on Claude); `[ROADMAP]` note for post-prelim BE-5.
+- §2.1 mechanism table — updated "Cited reasoning" row (committed numpy RAG in progress, BE-12/13/14); updated "Human-in-the-loop" row (HITL endpoints live, BE-2); updated "Sovereign mode" row (RoutingLLMClient live; added honest Neon SG persistence caveat).
+- §2.2 stress-test table — closed H2 (RoutingLLMClient live, 79 tests) and H4 (assess_risk → 4 checks + wired); updated H5 (sovereign RAG committed, numpy index approach described).
+- §6.1 usage walkthrough — beat 8: removed "not yet endpoint-mounted"; noted BE-2 live.
+- §6.2 demoable beats — updated strong-beats list to include Layak UX patterns (96px hero, per-figure details panel, two-tier trace, verified/unverified badge, live sovereign indicator, HITL gate, seed personas/DEMO MODE); updated "Verdict" test count 40 → 79.
+- §8.1 Pydantic table — `Clause` model updated to include `section`, `page_ref`, `url` provenance fields (BE-12).
+- §11 Responsible AI table — HITL row updated (endpoints live, BE-2); Sovereignty row updated with honest residency statement (in-country inference + SG persistence now / MY in prod; do not claim unqualified "all data stays in Malaysia").
+
+**`docs/trd.md`:**
+
+- §6 Law corpus — rewritten to describe committed numpy index + model2vec prelim approach + fail-open; bge-m3/pgvector as scale path; provenance fields on `Clause`; RAG-gate relationship stated.
+- §7a API contract — expanded with all new endpoints: `GET /entities/{tin}` (BE-8), `POST …/documents/classify` (BE-9), CORS (BE-7), 422 envelope (BE-10), `sovereign`/`active_model` field (BE-6); shipped route list updated.
+- §8 Data model — updated from SQLite MVP → Postgres prod to Neon SG prelim + hashes-not-payloads + fixtures fallback + MY prod path; RAG stays on numpy (not pgvector) for prelim.
+- §9 Security/residency — updated with honest Neon SG statement; in-country inference + in-country computation + SG persistence now / MY in prod; do not claim unqualified "all data stays in Malaysia".
+- §12 Tech stack — RAG line updated (model2vec + committed numpy index → pgvector scale path); Data line updated (Neon SG prelim + full caveat + self-hosted MY prod path).
+
+**`docs/prd.md`:**
+
+- §7 NFR — "Data residency/PDPA" line updated: inference in-country (pure-ILMU); RAG in-process; Neon SG prelim with hashes-not-payloads mitigation; prod = self-hosted MY (deploy-config swap); explicit "do not claim unqualified" note; added Demo reliability / DB-down note.
+- §12 Open items — credentials obtained (MyInvois sandbox + ILMU seat); Neon residency item added.
+
+**Sovereignty wording: NOW HONEST.** No doc claims unqualified "all data stays in Malaysia" for the prelim. The accurate framing — in-country inference (ILMU) + in-country computation + SG persistence now / MY persistence in prod — is stated in spec §11, trd §9, and prd §7. TD-3's Q9 sub-task is the deck/README equivalent gate.

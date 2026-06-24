@@ -25,11 +25,11 @@
 
 Three contributors; ownership split to maximise parallelism after the shared core (Plan 1, done).
 
-| Owner                       | Surface                         | Plans / scope                                                                                                                                                                                       |
-| --------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Chaos** (repo owner)      | **Backend & agents**            | Plan 1 ✅ (deterministic core) · **Plan 2** (FastAPI, LangGraph orchestrator, `LLMClient` adapter incl. ILMU, the 5 agents, RAG + LLM citation-critic, MyInvois connector, audit-defense)           |
-| **Tuna**                    | **Frontend & demo**             | **Plan 3** (Vite + React + React Router frontend: Obligation Calendar, Cited Filing Studio, Audit-Defense console), API wiring, UX, demo polish, **7-min video + pitch-deck README**                |
-| **Product/tax contributor** | **Product · tax-verify · demo** | Product framing, **⚠verify of tax figures vs LHDN**, demo narration                                                                                                                                |
+| Owner                       | Surface                         | Plans / scope                                                                                                                                                                             |
+| --------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chaos** (repo owner)      | **Backend & agents**            | Plan 1 ✅ (deterministic core) · **Plan 2** (FastAPI, LangGraph orchestrator, `LLMClient` adapter incl. ILMU, the 5 agents, RAG + LLM citation-critic, MyInvois connector, audit-defense) |
+| **Tuna**                    | **Frontend & demo**             | **Plan 3** (Vite + React + React Router frontend: Obligation Calendar, Cited Filing Studio, Audit-Defense console), API wiring, UX, demo polish, **7-min video + pitch-deck README**      |
+| **Product/tax contributor** | **Product · tax-verify · demo** | Product framing, **⚠verify of tax figures vs LHDN**, demo narration                                                                                                                       |
 
 > Interface contract across the team: the **FastAPI endpoints in Plan 2** are the boundary; Tuna builds against them with mock responses until Chaos's endpoints land, so the streams don't block each other.
 
@@ -66,7 +66,7 @@ Live SSM CSD API, live MyTax submission, full SST/MTD/WHT/CGT/TP _computation_, 
 
 ## 7. Non-functional requirements (detail in [trd.md](trd.md))
 
-Explainability (every output → source + law) · Determinism (rates/thresholds/computations are config, never LLM-generated) · Data residency/PDPA (ILMU sovereign mode; encrypt PII) · Auditability (immutable, exportable log) · Latency (audit-query → pack <15s; filing <60s on seeded data) · Demo reliability (deterministic seeded scenarios).
+Explainability (every output → source + law) · Determinism (rates/thresholds/computations are config, never LLM-generated) · **Data residency/PDPA:** inference is 100% in-country via ILMU (pure-ILMU for the prelim, Q6); RAG retrieval is in-process (local static embeddings, no foreign API). Prelim persistence is on Neon Postgres in AWS Singapore — no Malaysian region available; EvidenceVault stores **payload hashes, not raw payloads** as a residency mitigation. Prod path is self-hosted / MY-region plain Postgres, identical schema (a deploy-config swap). Do not claim unqualified "all data stays in Malaysia" for the prelim. · Auditability (immutable, exportable audit log) · Latency (audit-query → pack <15s; filing <60s on seeded data) · Demo reliability (deterministic seeded scenarios; fixtures/in-memory fallback — DB-down ≠ demo-down).
 
 ## 8. Success metrics / KPIs
 
@@ -95,20 +95,21 @@ Explainability (every output → source + law) · Determinism (rates/thresholds/
 
 ## 11. Risks (product) & mitigations
 
-| Risk                                   | Mitigation                                                                             |
-| -------------------------------------- | -------------------------------------------------------------------------------------- |
-| Wrong tax figures                      | Versioned config + ⚠verify + human sign-off; never LLM-computed                        |
-| "Isn't this TurboTax-MY?" (Innovation) | Lead with **audit-defense + cited audit-readiness**, the open lane                     |
+| Risk                                   | Mitigation                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Wrong tax figures                      | Versioned config + ⚠verify + human sign-off; never LLM-computed                           |
+| "Isn't this TurboTax-MY?" (Innovation) | Lead with **audit-defense + cited audit-readiness**, the open lane                        |
 | Demo depends on real integrations      | Seed/synthetic data + MyInvois full fixture (sandbox optional); live MSIC; mock SSM/MyTax |
-| Hallucinated law citations             | Citation-verifier (deterministic gate + LLM critic) + stable clause IDs + human review |
-| Cross-team coordination                | FastAPI contract is the interface; Tuna builds on mocks; daily integration             |
-| Liability framing                      | Decision-support, human-approved; augments tax agents                                  |
+| Hallucinated law citations             | Citation-verifier (deterministic gate + LLM critic) + stable clause IDs + human review    |
+| Cross-team coordination                | FastAPI contract is the interface; Tuna builds on mocks; daily integration                |
+| Liability framing                      | Decision-support, human-approved; augments tax agents                                     |
 
 ## 12. Open items (confirm)
 
-- Exact current-year rates/thresholds/deadlines — ⚠verify vs LHDN/RMCD before the deck.
-- **MyInvois sandbox credentials** + **ILMU Claw seat** — to obtain (mock until then).
+- Exact current-year rates/thresholds/deadlines — ⚠verify vs LHDN/RMCD before the deck (TD-6).
+- ~~MyInvois sandbox credentials~~ ✅ obtained (OAuth verified live 2026-06-23). ~~ILMU Claw seat~~ ✅ obtained (RM27 Claw Starter, `sk-` key live, `nemo-super` verified).
 - ~~Tech stack~~ ✅ locked ([trd.md §12](trd.md)). ~~Team~~ ✅ team of 3 — Chaos, Tuna & a product/tax-verify contributor (§3). MVP = single-entity (multi-entity is Should/roadmap).
+- **Neon Postgres residency** — prelim persistence is on AWS Singapore (no MY region); stated honestly per trd.md §9 + TD-3 Q9 sub-task; prod path is self-hosted MY (deploy-config swap).
 
 ---
 
