@@ -1,46 +1,49 @@
 import { useEffect, useState } from 'react'
 import { type ObligationCalendar, getObligations } from '../api/client'
-
-const DEMO_TIN = 'C2581234509'
-const DEMO_SSM = {
-  tin: DEMO_TIN,
-  entity_type: 'Sdn Bhd',
-  msic_codes: ['62010'],
-  paid_up_capital: 500000,
-  gross_income: 500000,
-  employee_count: 12,
-  sst_registered: false,
-  basis_period_start: '2025-01-01',
-  basis_period_end: '2025-12-31'
-}
+import { useEntity } from '../hooks/useEntity'
 
 export default function ObligationRadar() {
+  const { entity, error: entityError, loading: entityLoading } = useEntity()
   const [data, setData] = useState<ObligationCalendar | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getObligations(DEMO_TIN, DEMO_SSM)
+    if (!entity) return
+    getObligations(entity.tin, {
+      tin: entity.tin,
+      entity_type: entity.entity_type,
+      msic_codes: entity.msic_codes,
+      paid_up_capital: entity.paid_up_capital,
+      gross_income: entity.gross_income,
+      employee_count: entity.employee_count,
+      sst_registered: entity.sst_registered,
+      basis_period_start: entity.basis_period_start,
+      basis_period_end: entity.basis_period_end,
+      commencement_date: entity.commencement_date
+    })
       .then(setData)
       .catch((e: Error) => setError(e.message))
-  }, [])
+  }, [entity])
+
+  const displayError = entityError ?? error
 
   return (
     <div className="app-shell">
       <div className="page-head">
         <h1>Obligation Radar</h1>
-        <p className="page-kicker">YA2026 · {DEMO_TIN}</p>
+        <p className="page-kicker">YA2026 · {entity?.tin ?? '…'}</p>
       </div>
 
-      {error && (
+      {displayError && (
         <div className="window error-window">
           <div className="titlebar">
             <span className="titlebar-title">Error</span>
           </div>
-          <div className="error-body">{error}</div>
+          <div className="error-body">{displayError}</div>
         </div>
       )}
 
-      {!data && !error && (
+      {(entityLoading || (!data && !displayError)) && !displayError && (
         <div className="window loading-window">
           <div className="titlebar">
             <span className="titlebar-title">Loading obligations…</span>
@@ -48,6 +51,55 @@ export default function ObligationRadar() {
           <div className="loading-body">
             <div className="barber" />
           </div>
+        </div>
+      )}
+
+      {entity && (
+        <div className="window">
+          <div className="titlebar">
+            <span className="titlebar-title">Entity</span>
+            <span className="titlebar-meta" style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+              {entity.tin}
+            </span>
+          </div>
+          <ul className="req-list">
+            <li className="requirement-row">
+              <div className="requirement-topline">
+                <span className="requirement-label">
+                  <span className="requirement-label-text">Type</span>
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{entity.entity_type}</span>
+              </div>
+            </li>
+            <li className="requirement-row">
+              <div className="requirement-topline">
+                <span className="requirement-label">
+                  <span className="requirement-label-text">MSIC codes</span>
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{entity.msic_codes.join(', ')}</span>
+              </div>
+            </li>
+            <li className="requirement-row">
+              <div className="requirement-topline">
+                <span className="requirement-label">
+                  <span className="requirement-label-text">Gross income</span>
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                  RM {entity.gross_income.toLocaleString()}
+                </span>
+              </div>
+            </li>
+            <li className="requirement-row">
+              <div className="requirement-topline">
+                <span className="requirement-label">
+                  <span className="requirement-label-text">Basis period</span>
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                  {entity.basis_period_start} — {entity.basis_period_end}
+                </span>
+              </div>
+            </li>
+          </ul>
         </div>
       )}
 
@@ -69,7 +121,7 @@ export default function ObligationRadar() {
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{ob.due_date}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                    {ob.rule_id}
+                    {ob.rule_id} · {ob.config_version}
                   </span>
                 </div>
               </li>
