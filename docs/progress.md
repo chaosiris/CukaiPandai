@@ -358,3 +358,17 @@ CukaiPandai/
 - **⚠ uv.lock:** now also needs `psycopg` + `langgraph-checkpoint-postgres` → run `cd backend && uv lock`.
 - **Next (needs creds):** provide `DATABASE_URL` → tick DO-4, wire + live-verify BE-15 restart-survival, BE-16/17 round-trips.
 - **Files:** `api/persistence.py` (new), `api/graph.py`, `api/main.py`, `pyproject.toml`, `.env.example`, `migrations/neon_schema.sql` (new), `tests/api/test_persistence.py` (new).
+
+---
+
+## [24/06/26] — Escalation reframed sovereign-by-default; direct-Claude demoted to flagged opt-in `[BE]` `[TD]`
+
+> **Sovereignty fix.** The docs/code framed the RoutingLLMClient secondary as "Claude failover/escalation" as if it were free of residency cost — but a direct Anthropic call leaves Malaysia and breaks the PDPA/sovereignty pitch. Supersedes the [23/06/26] BE-1 note: `make_llm()` no longer wraps the router on a bare `ANTHROPIC_API_KEY`.
+
+- **`make_llm()` rewired (`api/llm.py`):** new `_escalation_fallback()` builds the secondary in priority order — (1) **sovereign:** `LLM_ESCALATION_MODEL` → another `_OpenAICompatClient` on the SAME ILMU gateway (in-country); (2) **non-sovereign opt-in:** `LLM_ALLOW_DIRECT_ANTHROPIC=1` **and** `ANTHROPIC_API_KEY` → `_AnthropicClient` (leaves Malaysia); (3) else **None** → bare sovereign ILMU client, no router. A bare `ANTHROPIC_API_KEY` no longer enables a fallback.
+- **`route_info()` honesty:** `_OpenAICompatClient` → `sovereign = "ilmu.ai" in base_url`; `_AnthropicClient` → `sovereign=False`. The FE indicator stays evidence-backed.
+- **`.env.example`:** model-layer block reframed — ILMU primary, then commented **sovereign** `LLM_ESCALATION_MODEL`/`_BASE_URL`/`_API_KEY`, then the commented **non-sovereign** `LLM_ALLOW_DIRECT_ANTHROPIC=1`/`ANTHROPIC_API_KEY`/`LLM_FALLBACK_MODEL` with a "leaves Malaysia" warning.
+- **Docs reframed (all "Claude failover/escalation as if free"):** `trd.md` (§7 routing rationale + §12 stack + top diagram), `cukaipandai-spec.md` (§3.4 status/prelim/roadmap, §9.1/9.2 status + env examples, the audit-defense table, A2 assumption, both diagrams), `plan.md` (Q6 decision, BE-5 title/bullet, the routing `[DECISION]`, Phase-1 retrospective, README task), `.claude/CLAUDE.md` (Architecture + Tech Stack lines). Honest carry-over: Claw Starter has **no Claude-class model on the gateway** (verified 403) → a sovereign escalation needs ILMU PAYG/larger; direct-Claude is the only Claude path today and it breaks residency.
+- **Prelim unchanged:** still **PURE-ILMU (Q6)** — no secondary configured, escalate path dormant; the deterministic `ground_citation` gate carries the trust demo.
+- **Tests:** new `tests/api/test_make_llm.py` (4 — pure-ILMU bare client, sovereign-escalation router, direct-Anthropic opt-in flagged non-sovereign, bare-key-does-not-enable). **100 backend pass** (96 → 100). Subagent-audited.
+- **Files:** `api/llm.py`, `.env.example`, `tests/api/test_make_llm.py` (new), `docs/{trd,cukaipandai-spec,plan,progress}.md`, `.claude/CLAUDE.md`.

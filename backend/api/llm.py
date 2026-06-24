@@ -85,8 +85,9 @@ class _OpenAICompatClient:
 
 class RoutingLLMClient:
     """ILMU-first router: uses the primary (sovereign) client, falls back to the secondary
-    (Claude) on any error, and escalates high-stakes calls (e.g. the citation critic) straight
-    to the secondary when ``escalate=True``."""
+    (escalation) client on any error, and escalates high-stakes calls (e.g. the citation critic)
+    straight to the secondary when ``escalate=True``. The secondary is sovereign by default —
+    a stronger model on the SAME ILMU gateway (see make_llm)."""
 
     def __init__(self, primary: LLMClient, fallback: LLMClient | None = None):
         self._primary = primary
@@ -113,17 +114,42 @@ class RoutingLLMClient:
         return (self._last or self._primary).route_info()
 
 
+def _escalation_fallback(primary_key: str, primary_base_url: str) -> LLMClient | None:
+    """The secondary client a RoutingLLMClient escalates/fails over to. Sovereignty order:
+
+    1. **Sovereign (preferred):** a STRONGER model on the SAME ILMU gateway — set
+       ``LLM_ESCALATION_MODEL`` (optionally ``LLM_ESCALATION_BASE_URL``/``LLM_ESCALATION_API_KEY``);
+       inference stays 100% in-country (one ILMU key).
+    2. **Non-sovereign opt-in:** a DIRECT Anthropic call — only when ``LLM_ALLOW_DIRECT_ANTHROPIC=1``
+       AND ``ANTHROPIC_API_KEY`` are set. This sends data to Anthropic (US) and **breaks the
+       data-residency story** — off by default; choose this only deliberately.
+    3. Otherwise ``None`` → no fallback (pure-sovereign single ILMU client; the prelim default, Q6).
+    """
+    esc_model = os.getenv("LLM_ESCALATION_MODEL")
+    if esc_model:
+        return _OpenAICompatClient(
+            esc_model,
+            os.getenv("LLM_ESCALATION_API_KEY", primary_key),
+            os.getenv("LLM_ESCALATION_BASE_URL", primary_base_url),
+        )
+    if os.getenv("LLM_ALLOW_DIRECT_ANTHROPIC") == "1" and os.getenv("ANTHROPIC_API_KEY"):
+        return _AnthropicClient(
+            os.getenv("LLM_FALLBACK_MODEL", "claude-opus-4-8"), os.getenv("ANTHROPIC_API_KEY", "")
+        )
+    return None
+
+
 def make_llm() -> LLMClient:
-    """Build the active client from env. ILMU-first (LLM_PROVIDER=openai); if ANTHROPIC_API_KEY
-    is also set, wrap it in a RoutingLLMClient with a Claude failover/escalation path."""
+    """Build the active client from env. ILMU-first (LLM_PROVIDER=openai); wrap in a
+    RoutingLLMClient only when an escalation fallback is configured (sovereign by default —
+    see _escalation_fallback). With none configured it returns the bare ILMU client (pure
+    sovereign — the 28 Jun prelim default, Q6)."""
     provider = os.getenv("LLM_PROVIDER", "anthropic")
     model = os.getenv("LLM_MODEL", "claude-opus-4-8")
     key = os.getenv("LLM_API_KEY", "")
-    if provider == "openai":  # ILMU / Gemini (OpenAI-compatible)
-        primary = _OpenAICompatClient(model, key, os.getenv("LLM_BASE_URL", ""))
-        fallback_key = os.getenv("ANTHROPIC_API_KEY", "")
-        if fallback_key:
-            fallback = _AnthropicClient(os.getenv("LLM_FALLBACK_MODEL", "claude-opus-4-8"), fallback_key)
-            return RoutingLLMClient(primary, fallback)
-        return primary
-    return _AnthropicClient(model, key)
+    if provider != "openai":
+        return _AnthropicClient(model, key)
+    base_url = os.getenv("LLM_BASE_URL", "")
+    primary = _OpenAICompatClient(model, key, base_url)
+    fallback = _escalation_fallback(key, base_url)
+    return RoutingLLMClient(primary, fallback) if fallback else primary

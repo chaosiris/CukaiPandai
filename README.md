@@ -38,7 +38,7 @@ Malaysia's tax system is digitalising fast (mandatory **MyInvois** e-invoicing, 
         DETERMINISTIC CORE (no LLM): Obligation Rules Engine · Tax Computation Engine ·
         Citation gate · Evidence Vault          ← tax math/obligations are versioned config
                                             │
-        Model adapter: ILMU Claw (sovereign) ⇄ Claude ⇄ Gemini   ·   human approves before any submit
+        Model adapter: ILMU Claw (sovereign primary + in-country escalation) · direct Claude = flagged opt-in   ·   human approves before any submit
 ```
 
 **The guarantee (JurisTech's "deterministic agentic AI"):** the LLM never computes a tax figure or asserts an unverified citation — the deterministic core computes & gates, the critic verifies citations, and a human approves before anything is filed/sent.

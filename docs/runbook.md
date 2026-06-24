@@ -31,16 +31,19 @@ bun run dev                      # http://localhost:5173
 
 ## 3. Environment (`.env` — copy from `.env.example` at repo root; never commit real secrets)
 
-**Model layer (`api/llm.py`) — ILMU-first (sovereign primary), Claude as fallback:**
+**Model layer (`api/llm.py`) — ILMU-first; escalation stays sovereign by default:**
 
-| Var            | Sovereign (ILMU — primary) | Claude (fallback) |
-| -------------- | -------------------------- | ----------------- |
-| `LLM_PROVIDER` | `openai`                   | `anthropic`       |
-| `LLM_BASE_URL` | `https://api.ilmu.ai/v1`   | —                 |
-| `LLM_MODEL`    | `nemo-super`               | `claude-opus-4-8` |
-| `LLM_API_KEY`  | ILMU `sk-…`                | Anthropic key     |
+| Var                          | Sovereign (ILMU — primary)             | Sovereign escalation (same gateway) | Direct Claude (flagged opt-in) |
+| ---------------------------- | -------------------------------------- | ----------------------------------- | ------------------------------ |
+| `LLM_PROVIDER`               | `openai`                               | —                                   | —                              |
+| `LLM_BASE_URL`               | `https://api.ilmu.ai/v1`               | —                                   | —                              |
+| `LLM_MODEL`                  | `nemo-super`                           | —                                   | —                              |
+| `LLM_API_KEY`                | ILMU `sk-…`                            | —                                   | —                              |
+| `LLM_ESCALATION_MODEL`       | (blank = pure-ILMU, the prelim default)| larger ILMU model (in-country)      | —                              |
+| `LLM_ALLOW_DIRECT_ANTHROPIC` | —                                      | —                                   | `1` (off by default)           |
+| `ANTHROPIC_API_KEY`          | —                                      | —                                   | Anthropic key                  |
 
-`pytest` uses `FakeLLMClient` → no key needed; a live key is only required for real agent runs.
+Prelim is **pure-ILMU (Q6)** — leave the escalation vars blank and `make_llm()` returns a bare sovereign ILMU client (no router). A **direct Claude route leaves Malaysia** (breaks data residency) — enable only deliberately and state it in the deck. `pytest` uses `FakeLLMClient` → no key needed; a live key is only required for real agent runs.
 
 **MyInvois (LHDN e-invoicing) sandbox — optional (the demo uses fixtures):**
 

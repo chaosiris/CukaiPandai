@@ -16,7 +16,7 @@ Every figure is traceable to a verified YA2026 source; fabricated citations are 
 
 See `docs/trd.md` (canonical) and `docs/cukaipandai-spec.md` (design). Do not create `docs/architecture.md`.
 
-Two layers: a **deterministic core** (`core/`) that owns all tax math, deadlines, citations and law-corpus lookups, and an **agentic API** (`api/`) that wraps it — 6 agents + a LangGraph filing graph with a HITL `interrupt`, exposed over FastAPI. The LLM is routed **ILMU-first** (sovereign `nemo-super`) with **Claude** as failover/escalation.
+Two layers: a **deterministic core** (`core/`) that owns all tax math, deadlines, citations and law-corpus lookups, and an **agentic API** (`api/`) that wraps it — 6 agents + a LangGraph filing graph with a HITL `interrupt`, exposed over FastAPI. The LLM is routed **ILMU-first** (sovereign `nemo-super`); escalation/failover **stays sovereign by default** (a stronger model on the same ILMU gateway, in-country). A **direct Claude call is a flagged non-sovereign opt-in** (`LLM_ALLOW_DIRECT_ANTHROPIC`, off by default — it leaves Malaysia).
 
 ---
 
@@ -24,7 +24,7 @@ Two layers: a **deterministic core** (`core/`) that owns all tax math, deadlines
 
 - **Backend:** Python ≥3.11 · Pydantic 2 · FastAPI + Uvicorn · LangGraph · httpx · `openai`/`anthropic` SDKs. Package manager: **uv** (primary). Deploy → **Render** (Docker image is deploy-ready).
 - **Frontend:** Vite 5 + React 18 + TS + React Router 7 + token-CSS, reusing the ProofRank devkit design system; Bun. Deploy → **Vercel**.
-- **LLM routing:** ILMU `nemo-super` primary (sovereign) → Claude failover/escalation.
+- **LLM routing:** ILMU `nemo-super` primary (sovereign); sovereign escalation = a stronger model on the same ILMU gateway. Direct Claude = flagged non-sovereign opt-in (`LLM_ALLOW_DIRECT_ANTHROPIC`, off by default).
 - **Connectors:** MyInvois → full fixture; data.gov.my MSIC is the only live external call (spec §10).
 
 ---

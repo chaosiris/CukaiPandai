@@ -148,3 +148,43 @@ The lock was generated locally against CPython 3.14.3, but CI/Docker target 3.11
 - **Surgical:** nothing outside the uv + docs + plan-cleanup scope changed. No backend source, no tax figures, no citations, no test assertions altered. Dockerfile keeps `WORKDIR /app`, the CWD-relative corpus load, and the `CMD` intact; only the install layer switched pip→uv (+ `uv.lock` copied for reproducibility).
 
 **Smoke test:** `uv sync --extra dev` (3.14) → `uv run pytest -q` → **40 passed** · `uv sync` pinned to 3.11.14 → `pytest -q` → **40 passed** · `docker build ./backend` → success, container on 3.11.15 `/health` → `{"status":"ok"}` · `pip install -e ".[dev]" --dry-run` → resolves pytest via extra · `uv lock --python 3.11 --check` → no relock (lock is 3.11-safe) · `git check-ignore` → uv.lock committed, .venv ignored.
+
+---
+
+## [24/06/26] — Escalation reframed sovereign-by-default; direct-Claude demoted to flagged opt-in `[BE]` `[TD]`
+
+**Branch:** `main` (working tree, uncommitted). 8 files: `backend/api/llm.py`, `backend/tests/api/test_make_llm.py` (new), `.env.example`, `docs/{trd,cukaipandai-spec,plan,progress}.md`, `.claude/CLAUDE.md`.
+
+**Verdict:** Approve with comments
+
+The sovereignty rewire is correct, the tests genuinely assert the residency properties, and no AI-attribution leaked into the diff. Two stale-doc hits remain (one Major in a primary doc, one Minor) — neither breaks runtime nor the prelim's pure-ILMU path, but the Major one contradicts the new framing in a deck-facing doc and should be fixed before the commit.
+
+### Smoke test
+
+- `../.venv/Scripts/pytest tests/api/test_make_llm.py -v` → **4 passed** (uv not on PATH in this env; ran the repo-root `.venv` pytest directly).
+- `../.venv/Scripts/pytest -q` (full backend) → **100 passed, 1 warning** (pre-existing Starlette/httpx deprecation, unrelated). No regressions.
+- Diff scanned for `co-authored|generated with|claude code|noreply@anthropic|🤖` → **0 matches**.
+
+### Findings by audit area
+
+1. **`_escalation_fallback()` logic — RESOLVED.** Priority order is exactly (1) `LLM_ESCALATION_MODEL` → ILMU OpenAI-compat secondary reusing `primary_key`/`primary_base_url` (`api/llm.py:128-134`); (2) `LLM_ALLOW_DIRECT_ANTHROPIC=="1"` **AND** `ANTHROPIC_API_KEY` → `_AnthropicClient` (`:135-138`); (3) else `None` (`:139`). A bare `ANTHROPIC_API_KEY` without the flag returns `None` (short-circuit `and`), proven green by `test_anthropic_key_alone_does_not_enable_direct_fallback`. `make_llm()` returns a bare `_OpenAICompatClient` (no router) when `fallback` is falsy (`:155`).
+
+2. **`route_info()` honesty — RESOLVED.** ILMU base_url → `sovereign=True` via `"ilmu.ai" in self._base_url` (`:83`); `_AnthropicClient` → hardcoded `sovereign=False` (`:52`). A non-ILMU `LLM_ESCALATION_BASE_URL` (e.g. Gemini) correctly reports `sovereign=False` because the substring check fails — there is no path that claims `sovereign=True` while calling out-of-country. `RoutingLLMClient.route_info()` reports the **last** route taken (`self._last`), so an escalation/failover that actually hit the secondary is reported honestly, not the optimistic primary. Solid.
+
+3. **Edge cases — ISSUE (acceptable, by-design, but flag).** `make_llm()` defaults `LLM_PROVIDER` to `"anthropic"` (`:147`); with no env at all it returns a **direct `_AnthropicClient` (non-sovereign)** regardless of the new opt-in flag — the new flag only gates the *escalation secondary*, never the *primary*. This is acceptable because the committed `.env.example:14` sets `LLM_PROVIDER=openai` and `load_dotenv()` runs on startup, so the deployed default is sovereign; but it is a latent footgun (a missing/empty `.env` silently leaves Malaysia on the primary path, with `route_info` correctly reporting `sovereign=False`). Not introduced by this change and out of the stated scope — flag only. The duplicate-model case (`LLM_ESCALATION_MODEL` == primary model) is harmless: it just builds a second identical ILMU client; no correctness or sovereignty impact.
+
+4. **Doc/code consistency — ISSUE (one Major, one Minor).**
+   - `docs/runbook.md:34-41` — **[Major]** the "Environment" section still presents the model layer as **"ILMU-first (sovereign primary), Claude as fallback"** with a two-column "Sovereign (ILMU — primary) | Claude (fallback)" table — exactly the pre-change framing the rewire was meant to retire. No mention of `LLM_ESCALATION_MODEL`, the sovereign-escalation default, or that direct-Claude leaves Malaysia / is `LLM_ALLOW_DIRECT_ANTHROPIC`-gated. This is a deck/demo-facing doc and was not updated in this diff. → Fix: reframe the table to "ILMU primary + sovereign escalation (`LLM_ESCALATION_MODEL`); direct-Claude = flagged non-sovereign opt-in, off by default", matching `trd.md:93` / spec §3.4 line 173.
+   - `docs/cukaipandai-spec.md:168-171` — **[Minor]** §3.4's opening sentence still reads "**Claude (Opus 4.8) is the FALLBACK**, in two roles: 1. Failover … 2. Capability escalation". Lines 173/175/177/179 immediately below it *do* carry the corrected sovereign-by-default framing, so the section self-corrects, but the lead-in is stale and reads as a contradiction. → Fix: change the lead-in to "the secondary is sovereign by default (a stronger ILMU model); direct-Claude is a flagged opt-in," consistent with the paragraph that follows.
+   - Everything else is consistent: `trd.md:28/93/124`, spec §3.4 lines 173-179, §9.2 lines 427-436, the two ASCII diagrams (lines 305/324-326), A2 (line 510), `.env.example:19-30`, `plan.md` Q6/BE-5/DECISION lines, and `.claude/CLAUDE.md` all describe (a) sovereign escalation as the default secondary, (b) direct-Claude as off-by-default and leaving Malaysia, (c) the prelim as pure-ILMU with no router. The `demo-video-script.md` "ILMU Claw — fully in-country" line (4:15-5:00) is accurate for the pure-ILMU prelim.
+
+5. **Test coverage — RESOLVED.** All 4 tests assert the sovereignty properties, not just types: `test_escalation_model_wraps_router_staying_on_ilmu` asserts `c._fallback.route_info()["sovereign"] is True`; `test_direct_anthropic_is_optin_and_flagged_nonsovereign` asserts `... is False`; the bare-key test asserts no router is built. One untested branch: `LLM_ESCALATION_BASE_URL` set to a **non-ILMU** host (the Gemini/escalation-leaves-country case in finding 2) is verified by inspection but not by a test. Minor gap; the substring logic is trivially correct. Optional: add a one-liner asserting a non-ilmu escalation base reports `sovereign=False`.
+
+6. **No Claude attribution — RESOLVED.** Working diff and the new test file contain no `Co-Authored-By` / `Generated with Claude` / `noreply@anthropic` / 🤖 text (grep → 0). Hard requirement met.
+
+### Verified clean (no action)
+
+- **Surgical:** the code change is confined to `_escalation_fallback()` (new), `make_llm()` (rewired return), and `_OpenAICompatClient.route_info()` (substring check) plus the new test file. No tax figures, citations, or core math touched. The deterministic `ground_citation` gate still carries the prelim trust demo on pure ILMU.
+- **Prelim unaffected:** with no escalation var set, `make_llm()` returns the bare ILMU client; the escalate path is dormant. Pure-ILMU (Q6) holds.
+
+**Return to PM:** Approve with comments — the sovereignty rewire is correct, honest, and fully tested (4 new + 100 total green); no AI attribution. One **Major** stale doc (`runbook.md:34-41` still says "Claude as fallback") and one **Minor** (`cukaipandai-spec.md:168` stale lead-in) contradict the new framing in deck-facing docs and should be fixed pre-commit; the `LLM_PROVIDER` default-anthropic footgun is pre-existing and mitigated by `.env.example`. None block `main`.

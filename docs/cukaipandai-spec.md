@@ -111,7 +111,7 @@ Target user: **licensed tax agents (s.153)** managing many client entities (prim
 
 ## 3. Platform Ground-Truth — AI Layer (ILMU Claw + Claude), verified live 23 Jun 2026
 
-CukaiPandai's "platform" is its **model layer**: a sovereign Malaysian inference platform (ILMU) plus a capability fallback (Claude). This is the analog of a cloud-compute provider section — the load-bearing external dependency the whole agent layer rides on.
+CukaiPandai's "platform" is its **model layer**: a sovereign Malaysian inference platform (ILMU) that serves both the primary and the escalation route (in-country by default); a direct Claude call exists only as a flagged non-sovereign opt-in. This is the analog of a cloud-compute provider section — the load-bearing external dependency the whole agent layer rides on.
 
 ### 3.1 ILMU API — the sovereign AI layer `[VERIFIED 2026-06-23]`
 
@@ -165,18 +165,18 @@ Vision / embeddings / rerank / speech models require **PAYG**.
 
 ### 3.4 `[DECISION]` Model-routing strategy — ILMU-first (sovereign by default)
 
-Go **ILMU-first**: `nemo-super` is the **PRIMARY** reasoning backend for profiler / document-classification / deductibility / audit-defense drafting. **Claude (Opus 4.8) is the FALLBACK**, in two roles:
+Go **ILMU-first**: `nemo-super` is the **PRIMARY** reasoning backend for profiler / document-classification / deductibility / audit-defense drafting. The **escalation/failover secondary stays SOVEREIGN by default** — a stronger model on the SAME ILMU gateway (`LLM_ESCALATION_MODEL`, in-country). A direct Claude (Opus 4.8) route is a **flagged non-sovereign opt-in** (`LLM_ALLOW_DIRECT_ANTHROPIC=1`, off by default — it leaves Malaysia). The secondary serves two roles:
 
 1. **Failover** — on ILMU error/timeout.
 2. **Capability escalation on the highest-stakes step** — the **citation-critic verification** (and optionally a deductibility second opinion).
 
-This is a _stronger_ pitch than a sovereign toggle: **"sovereign by default"** (in-country inference is the normal path; Claude is the safety net) beats "sovereign mode available." It is honest about the per-task capability risk — `nemo-super` is a smaller Nemotron-class model — but the **deterministic core + citation gate bound the blast radius**: a weaker model _cannot_ emit a wrong tax figure (the engine computes it) or a fabricated-clause citation (the gate rejects unknown clause-IDs before any model sees them).
+This is a _stronger_ pitch than a sovereign toggle: **"sovereign by default"** (in-country inference is the normal path; the **escalation safety net also stays in-country** — a stronger model on the SAME ILMU gateway, `LLM_ESCALATION_MODEL`) beats "sovereign mode available." A **direct Claude call is a flagged opt-in** (`LLM_ALLOW_DIRECT_ANTHROPIC=1`) that **leaves Malaysia** — off by default. It is honest about the per-task capability risk — `nemo-super` is a smaller Nemotron-class model — but the **deterministic core + citation gate bound the blast radius**: a weaker model _cannot_ emit a wrong tax figure (the engine computes it) or a fabricated-clause citation (the gate rejects unknown clause-IDs before any model sees them).
 
-**Phase-1 status `[VERIFIED 2026-06-23]`:** `RoutingLLMClient` (`api/llm.py`) is **built and live** — ILMU-first, Claude on error / on `escalate=True` for the critic. JSON mode (`response_format={type:"json_object"}`) is wired in `_OpenAICompatClient`. Per-task routing decided from the live spike: `documents` + `deductibility` + `audit_defense` stay on `nemo-super`; the `citation_critic` has `escalate=True` to route to Claude on that step. **79 backend tests pass.**
+**Phase-1 status `[VERIFIED 2026-06-23]`:** `RoutingLLMClient` (`api/llm.py`) is **built and live** — ILMU-first, escalation to the configured **secondary** on error / on `escalate=True` for the critic. By default the secondary is **another model on the SAME ILMU gateway** (`LLM_ESCALATION_MODEL` — in-country); a direct-Claude secondary is a flagged opt-in (`LLM_ALLOW_DIRECT_ANTHROPIC=1`). With no secondary set (the prelim, Q6), `make_llm()` returns a **bare sovereign ILMU client** — no router. JSON mode (`response_format={type:"json_object"}`) is wired in `_OpenAICompatClient`. Per-task routing decided from the live spike: `documents` + `deductibility` + `audit_defense` stay on `nemo-super`; the `citation_critic` carries `escalate=True` so it routes to the secondary **when one is configured** (dormant for the prelim). **79 backend tests pass.**
 
-**Prelim constraint (Q6, Gate 1) — PURE-ILMU:** for the 28 Jun submission CukaiPandai runs **100% on ILMU `nemo-super`** — the fabricated-citation trust demo runs on the **deterministic `ground_citation` gate** (no LLM), making the sovereignty story unqualified for inference. Claude escalation (`BE-5`) is deferred post-prelim: the `escalate=True` mechanism is wired and dormant; the `ANTHROPIC_API_KEY` is not provisioned for the prelim (ILMU Claw Starter **does not include a Claude route** — verified 403). The `nemo-super` citation-critic is accepted as-is; the deterministic gate is the trust money-shot.
+**Prelim constraint (Q6, Gate 1) — PURE-ILMU:** for the 28 Jun submission CukaiPandai runs **100% on ILMU `nemo-super`** — the fabricated-citation trust demo runs on the **deterministic `ground_citation` gate** (no LLM), making the sovereignty story unqualified for inference. Escalation (`BE-5`) is deferred post-prelim: the `escalate=True` mechanism is wired and dormant; no secondary is configured. **Note the residency consequence of the route choice:** the Claw Starter tier **does not host a Claude-class model on the gateway** (verified 403), so a sovereign escalation needs an ILMU **PAYG/larger model**, while the only Claude path available today is a **direct Anthropic call that leaves Malaysia** — hence it is a flagged opt-in (`LLM_ALLOW_DIRECT_ANTHROPIC`), off by default. The `nemo-super` citation-critic is accepted as-is; the deterministic gate is the trust money-shot.
 
-**`[ROADMAP]` post-prelim:** provision a Claude route (direct `ANTHROPIC_API_KEY` or ILMU PAYG on-platform if available) → live-test the critic escalation (BE-5). The routing mechanism already exists.
+**`[ROADMAP]` post-prelim:** **prefer a sovereign escalation** — set `LLM_ESCALATION_MODEL` to a stronger model on the ILMU gateway (PAYG/larger tier; stays in-country) and live-test the critic escalation (BE-5). A direct Anthropic route (`LLM_ALLOW_DIRECT_ANTHROPIC=1`) is the non-sovereign fallback — deliberate, stated in the deck. The routing mechanism already exists.
 
 ---
 
@@ -220,7 +220,7 @@ The rubric weights **Innovation & Differentiation at 30 marks (23%)** and explic
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | 1    | LHDN issues an audit query/letter → user pastes/uploads it                                                                                             | input                                                         |
 | 2    | **Audit-Defense agent** `build_defense`: interpret contested items → return `{contested_item, claim, clause_ids}`                                      | **AI** (`nemo-super`, ILMU-first)                             |
-| 3    | **Citation verifier** `verify_claim`: deterministic existence gate (`ground_citation`) **then** LLM critic confirms the clause text supports the claim | gate = **deterministic**; critic = **AI** (Claude escalation) |
+| 3    | **Citation verifier** `verify_claim`: deterministic existence gate (`ground_citation`) **then** LLM critic confirms the clause text supports the claim | gate = **deterministic**; critic = **AI** (`nemo-super`; sovereign escalation post-prelim) |
 | 4    | Compute exposure note (s.112/113); assemble `DefensePack` (query + items + verified citations + exposure note)                                         | **Deterministic** assembly                                    |
 | 5    | Human (tax agent/finance) reviews, edits, approves → export defense pack (PDF + evidence index) for LHDN                                               | Human-in-the-loop                                             |
 
@@ -302,7 +302,7 @@ Entity: **Acme Sdn Bhd**, TIN `C2581234509`, MSIC `46900` (wholesale trade), Sdn
 │  Agents (api/agents/): profiler · documents · deductibility · audit_risk · audit_defense · │
 │                         citation_critic                                                     │
 │  Connectors (api/connectors/): MyInvoisClient (fixture-backed) · MsicClient (data.gov.my)  │
-│  Model layer (api/llm.py): RoutingLLMClient (ILMU-first → Claude failover/escalate)        │
+│  Model layer (api/llm.py): RoutingLLMClient (ILMU-first; escalation stays sovereign)       │
 └───────────────────────────────────────────┬────────────────────────────────────────────────┘
                                              │
 ┌──────────── SOVEREIGN RAG LAYER (core/rag.py — parallel to FE; BE-12/13/14) ──────────────┐
@@ -321,9 +321,9 @@ Entity: **Acme Sdn Bhd**, TIN `C2581234509`, MSIC `46900` (wholesale trade), Sdn
 │  evidence.py (EvidenceVault — sqlite in-memory fallback; Neon Postgres in BE-16)           │
 └───────────────────────────────────────────┬────────────────────────────────────────────────┘
                                              ▼
-                     ILMU API (sovereign primary)   ⇄   Anthropic Claude (failover/escalation — DEFERRED post-prelim, Q6)
-                     https://api.ilmu.ai/v1              claude-opus-4-8
-                     [inference stays 100% in-country for the prelim — pure-ILMU, Q6]
+                     ILMU API (sovereign primary + sovereign escalation)   ·   direct Anthropic Claude = flagged non-sovereign opt-in (DEFERRED post-prelim, Q6)
+                     https://api.ilmu.ai/v1  (one sk- key)                       claude-opus-4-8 — OFF by default; LLM_ALLOW_DIRECT_ANTHROPIC=1 to enable
+                     [inference stays 100% in-country for the prelim — pure-ILMU, Q6; sovereign escalation also stays on the ILMU gateway]
 ```
 
 ### 7.2 Agent topology + deterministic core
@@ -404,33 +404,49 @@ This is the single most important property to make _visible_ in the demo and def
 class LLMClient(Protocol):
     def complete(self, system: str, user: str, *, json_schema: dict | None = None) -> str: ...
 
-class FakeLLMClient:        # deterministic, scriptable stub — what the 40 tests + current demo run on
-class _AnthropicClient:     # anthropic SDK; default model claude-opus-4-8
+class FakeLLMClient:        # deterministic, scriptable stub — what the offline tests + current demo run on
+class _AnthropicClient:     # anthropic SDK; route_info()->sovereign=False (a direct Claude call leaves Malaysia)
 class _OpenAICompatClient:  # openai SDK; ILMU Claw (sovereign) OR Gemini via base_url
+class RoutingLLMClient:     # ILMU-first; falls over / escalates (escalate=True) to a secondary
+
+def _escalation_fallback(key, base_url):              # the RoutingLLMClient secondary, sovereignty-ordered:
+    if os.getenv("LLM_ESCALATION_MODEL"):             # (1) SOVEREIGN: stronger model on the SAME ILMU gateway
+        return _OpenAICompatClient(os.getenv("LLM_ESCALATION_MODEL"),
+                                   os.getenv("LLM_ESCALATION_API_KEY", key),
+                                   os.getenv("LLM_ESCALATION_BASE_URL", base_url))
+    if os.getenv("LLM_ALLOW_DIRECT_ANTHROPIC") == "1" and os.getenv("ANTHROPIC_API_KEY"):
+        return _AnthropicClient(...)                  # (2) NON-SOVEREIGN opt-in: direct Claude (leaves Malaysia)
+    return None                                       # (3) pure-ILMU (the prelim, Q6) — no router
 
 def make_llm() -> LLMClient:
-    provider = os.getenv("LLM_PROVIDER", "anthropic")     # default Claude
+    provider = os.getenv("LLM_PROVIDER", "anthropic")
     model    = os.getenv("LLM_MODEL", "claude-opus-4-8")
     key      = os.getenv("LLM_API_KEY", "")
-    if provider == "openai":      # ILMU / Gemini (OpenAI-compatible)
-        return _OpenAICompatClient(model, key, os.getenv("LLM_BASE_URL", ""))
-    return _AnthropicClient(model, key)
+    if provider != "openai":
+        return _AnthropicClient(model, key)
+    base_url = os.getenv("LLM_BASE_URL", "")
+    primary  = _OpenAICompatClient(model, key, base_url)   # ILMU (sovereign)
+    fallback = _escalation_fallback(key, base_url)
+    return RoutingLLMClient(primary, fallback) if fallback else primary
 ```
 
 Every agent depends only on the `LLMClient.complete(system, user)` protocol — so the model is a config decision, not a code one. This is what makes "sovereign mode" a one-env-var flip and what lets the 79 tests run offline against `FakeLLMClient`.
 
-**Phase-1 status `[VERIFIED 2026-06-23]`:** `make_llm()` now returns a `RoutingLLMClient` (ILMU-first → Claude on error / on `escalate=True`). `_OpenAICompatClient.complete()` passes `response_format={type:"json_object"}` when `json_schema` is provided. `api/jsonio.loads_relaxed` handles code-fenced JSON from `nemo-super`. The `FakeLLMClient` stub remains the offline-test default.
+**Phase-1 status `[VERIFIED 2026-06-23]`:** `make_llm()` returns a **bare sovereign `_OpenAICompatClient`** for the pure-ILMU prelim (Q6 — no router built). It wraps ILMU in a `RoutingLLMClient` **only** when an escalation secondary is configured: `LLM_ESCALATION_MODEL` (a stronger model on the SAME ILMU gateway — **stays in-country**) or, as a flagged non-sovereign opt-in, `LLM_ALLOW_DIRECT_ANTHROPIC=1` + `ANTHROPIC_API_KEY` (a direct Claude call that **leaves Malaysia**, OFF by default). `_OpenAICompatClient.complete()` passes `response_format={type:"json_object"}` when `json_schema` is provided. `api/jsonio.loads_relaxed` handles code-fenced JSON from `nemo-super`. The `FakeLLMClient` stub remains the offline-test default.
 
 ### 9.2 Sovereign-mode routing `[VERIFIED 2026-06-23]`
 
 ```bash
 # Prelim (pure-ILMU, Q6 — 100% sovereign):
 LLM_PROVIDER=openai  LLM_BASE_URL=https://api.ilmu.ai/v1  LLM_MODEL=nemo-super  LLM_API_KEY=sk-…
-# (ANTHROPIC_API_KEY not set → RoutingLLMClient uses ILMU only; escalate path stays dormant)
+# (no escalation var set → make_llm() returns a bare ILMU client; no router, escalate path dormant)
 
-# Post-prelim with Claude failover/escalation (BE-5):
+# Post-prelim, SOVEREIGN escalation (BE-5) — a stronger model on the SAME ILMU gateway (stays in-country):
 LLM_PROVIDER=openai  LLM_BASE_URL=https://api.ilmu.ai/v1  LLM_MODEL=nemo-super  LLM_API_KEY=sk-…
-ANTHROPIC_API_KEY=sk-ant-…  # RoutingLLMClient activates the Claude escalation path
+LLM_ESCALATION_MODEL=<larger-ilmu-model>  # RoutingLLMClient secondary = ILMU; inference never leaves Malaysia
+
+# Post-prelim, NON-SOVEREIGN opt-in — a DIRECT Anthropic call LEAVES MALAYSIA (off by default; state it in the deck):
+LLM_ALLOW_DIRECT_ANTHROPIC=1  ANTHROPIC_API_KEY=sk-ant-…  LLM_FALLBACK_MODEL=claude-opus-4-8
 ```
 
 Because ILMU's OpenAI base URL accepts the same call shape, `_OpenAICompatClient` needs **no code change** to talk to it — the integration is a base-url + key + model swap (§3.1). The `RoutingLLMClient` wraps this transparently; the route taken is reported back via the `sovereign`/`active_model` field (BE-6) so the FE indicator is evidence-backed, not hardcoded.
@@ -443,7 +459,7 @@ The agents emit _classifications, clause-ID lists, and prose drafts_ — never n
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Mis-classifies a line item         | Engine still prices it by the config rule for whatever category it landed in; human review catches a mislabel       |
 | Invents a clause ID                | `ground_citation` rejects it (`verified=False`) before it reaches a human                                           |
-| Cites a real-but-irrelevant clause | LLM critic (`nemo-super` for prelim; Claude escalation post-prelim via BE-5) catches "clause doesn't support claim" |
+| Cites a real-but-irrelevant clause | LLM critic (`nemo-super` for prelim; sovereign ILMU escalation post-prelim via BE-5) catches "clause doesn't support claim" |
 | Emits malformed JSON               | One retry + the JSON-mode flag; deterministic-core outputs are unaffected                                           |
 | Produces a wrong tax figure        | **Cannot happen** — the LLM has no write path to `FigureTrace.value`                                                |
 
@@ -504,7 +520,7 @@ Act-on-by-default design assumptions; none is architectural, all are cheap to re
 | #   | Assumption                                                                                                                                                           |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A1  | ILMU early-access tokens are **unmetered**; "Claw Starter ~RM27/seat/month" is a seat/access fee (§3.1). Revisit if metering is announced.                           |
-| A2  | The Claw-tier `nemo-super` is good enough for classification/cite/draft; Claude backstops the citation-critic (§3.4). Confirm via the spike in [`plan.md`](plan.md). |
+| A2  | The Claw-tier `nemo-super` is good enough for classification/cite/draft; a **sovereign escalation** (stronger ILMU model on the gateway) backstops the citation-critic post-prelim (§3.4) — a direct-Claude backstop is a flagged non-sovereign opt-in. Confirm via the spike in [`plan.md`](plan.md). |
 | A3  | Government APIs stay mocked/seeded for the prelim (MyInvois fixture, SSM/MySST seeded). Live integrations are `[ROADMAP]`.                                           |
 | A4  | A single Vite + React console (ProofRank devkit) calling the 3 existing endpoints is sufficient for the live-demo requirement.                                       |
 | A5  | The 5-clause law corpus is sufficient to _demonstrate_ the citation mechanism; the full corpus + pgvector is `[ROADMAP]`.                                            |
