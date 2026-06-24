@@ -9,6 +9,10 @@ class LLMClient(Protocol):
         self, system: str, user: str, *, json_schema: dict | None = None, escalate: bool = False
     ) -> str: ...
 
+    def route_info(self) -> dict:
+        """{'sovereign': bool, 'active_model': str} describing the route that served the last call."""
+        ...
+
 
 class FakeLLMClient:
     """Deterministic, scriptable LLM stub for tests — no network."""
@@ -23,6 +27,9 @@ class FakeLLMClient:
         out = self._s[self._i]
         self._i += 1
         return out
+
+    def route_info(self) -> dict:
+        return {"sovereign": True, "active_model": "fake"}
 
 
 class _AnthropicClient:
@@ -41,6 +48,9 @@ class _AnthropicClient:
         )
         return m.content[0].text
 
+    def route_info(self) -> dict:
+        return {"sovereign": False, "active_model": self._model}
+
 
 class _OpenAICompatClient:
     """ILMU (sovereign) or Gemini via an OpenAI-compatible base_url."""
@@ -50,6 +60,7 @@ class _OpenAICompatClient:
 
         self._c = OpenAI(api_key=api_key, base_url=base_url)
         self._model = model
+        self._base_url = base_url or ""
 
     def complete(
         self, system: str, user: str, *, json_schema: dict | None = None, escalate: bool = False
@@ -67,6 +78,10 @@ class _OpenAICompatClient:
         r = self._c.chat.completions.create(**kwargs)
         return r.choices[0].message.content or ""
 
+    def route_info(self) -> dict:
+        # ILMU is the in-country sovereign provider; a non-ILMU OpenAI-compat base (e.g. Gemini) is not.
+        return {"sovereign": "ilmu.ai" in self._base_url, "active_model": self._model}
+
 
 class RoutingLLMClient:
     """ILMU-first router: uses the primary (sovereign) client, falls back to the secondary
@@ -76,18 +91,26 @@ class RoutingLLMClient:
     def __init__(self, primary: LLMClient, fallback: LLMClient | None = None):
         self._primary = primary
         self._fallback = fallback
+        self._last: LLMClient | None = None
 
     def complete(
         self, system: str, user: str, *, json_schema: dict | None = None, escalate: bool = False
     ) -> str:
         if escalate and self._fallback is not None:
-            return self._fallback.complete(system, user, json_schema=json_schema)
+            self._last = self._fallback
+            return self._fallback.complete(system, user, json_schema=json_schema, escalate=escalate)
         try:
-            return self._primary.complete(system, user, json_schema=json_schema)
+            out = self._primary.complete(system, user, json_schema=json_schema)
+            self._last = self._primary
+            return out
         except Exception:
             if self._fallback is None:
                 raise
+            self._last = self._fallback
             return self._fallback.complete(system, user, json_schema=json_schema)
+
+    def route_info(self) -> dict:
+        return (self._last or self._primary).route_info()
 
 
 def make_llm() -> LLMClient:

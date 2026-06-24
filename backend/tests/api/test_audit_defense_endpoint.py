@@ -30,6 +30,8 @@ def test_audit_defense_happy_path_still_works():
             json={"query": "Justify repairs", "evidence": [["tax_payable", "tb", "ITA-1967-s33(1)"]]},
         )
         assert r.status_code == 200
-        assert r.json()["citations"][0]["verified"] is True
+        body = r.json()
+        assert body["citations"][0]["verified"] is True
+        assert "sovereign" in body and "active_model" in body  # BE-6 route field
     finally:
         app.dependency_overrides.clear()

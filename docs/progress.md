@@ -317,3 +317,15 @@ CukaiPandai/
 - §12 Open items — credentials obtained (MyInvois sandbox + ILMU seat); Neon residency item added.
 
 **Sovereignty wording: NOW HONEST.** No doc claims unqualified "all data stays in Malaysia" for the prelim. The accurate framing — in-country inference (ILMU) + in-country computation + SG persistence now / MY persistence in prod — is stated in spec §11, trd §9, and prd §7. TD-3's Q9 sub-task is the deck/README equivalent gate.
+
+---
+
+## [24/06/26] — Phase 2/3 ① critical-path BE (BE-6/7/8/9/10) `[BE]`
+
+- **BE-7 — CORS:** `CORSMiddleware` in `api/main.py`, origins via `CORS_ORIGINS`/`FRONTEND_ORIGIN` env (default `http://localhost:5173`), documented in `.env.example`. Specific-origin list **with** credentials (not the insecure `*`+credentials combo).
+- **BE-8 — `GET /entities/{tin}`:** serves the seeded `EntityTaxProfile` (404 on unknown TIN) so the FE can render onboarding + the calendar header.
+- **BE-9 — `POST /entities/{tin}/documents/classify`:** raw trial-balance text → `LineItem[]` (resolves Q7). The `documents` agent now uses JSON-object mode (`{"line_items":[...]}`, tolerates a bare array); 502 on unparseable output. Live-verified on `nemo-super`.
+- **BE-10 — 422 envelope:** `_profile`/`_line_items` catch `ValidationError` → **422** with field detail across `/obligations`, `/form-c`, `/start` (was an uncaught 500).
+- **BE-6 — route_info:** every `LLMClient` reports `{sovereign, active_model}`; `RoutingLLMClient` tracks the last route; `/audit-defense` + `/classify` carry the field (live source of truth for FE-5). Pure-ILMU → `sovereign=true`.
+- **Tests:** 89 backend pass (79 → 89; +CORS, entity, classify, 422, route-field). Live spike 4/4. Subagent-audited: all 5 RESOLVED, no regressions, no 500/security defects.
+- **Files:** `api/main.py`, `api/llm.py`, `api/agents/documents.py`, `api/schemas.py`, `.env.example`, `tests/api/{test_entity_endpoint,test_classify_endpoint,test_cors,test_validation_envelope}.py` (new) + `test_audit_defense_endpoint.py`.

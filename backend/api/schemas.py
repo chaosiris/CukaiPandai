@@ -20,3 +20,7 @@ class AuditDefenseReq(BaseModel):
 class FilingResumeReq(BaseModel):
     thread_id: str
     approved: bool
+
+
+class ClassifyReq(BaseModel):
+    raw_text: str

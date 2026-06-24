@@ -91,8 +91,8 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Add `GET /entities/{tin}` returning the seeded `EntityTaxProfile` (load `core/fixtures/entity_acme.json`, validate via `EntityTaxProfile`, `model_dump(mode="json")`); **404** when `tin` doesn't match a seeded entity → verify: `GET /entities/C2581234509` returns the profile with the right MSIC/gross_income; an unknown TIN returns 404.
-- [ ] Add a small test asserting the 200 shape + the 404 → verify: suite stays green.
+- [x] Add `GET /entities/{tin}` returning the seeded `EntityTaxProfile` (load `core/fixtures/entity_acme.json`, validate via `EntityTaxProfile`, `model_dump(mode="json")`); **404** when `tin` doesn't match a seeded entity → verify: `GET /entities/C2581234509` returns the profile with the right MSIC/gross_income; an unknown TIN returns 404.
+- [x] Add a small test asserting the 200 shape + the 404 → verify: suite stays green.
 
 **Acceptance criteria:** the FE can fetch a seeded entity profile over HTTP to render onboarding + the calendar header; unknown TIN → 404. _(FE-8 personas may extend this to multiple seeded TINs; **BE-17** later moves the read behind a Neon-backed repository seeded from this fixture, with the fixture as fallback.)_
 
@@ -102,9 +102,9 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Add `POST /entities/{tin}/documents/classify` taking `{raw_text: str}` (new `ClassifyReq` in `schemas.py`), calling `classify_line_items(raw_text, llm)` (DI'd `get_llm`), returning `{line_items: LineItem[]}` → verify: posting the Acme trial-balance text returns classified `LineItem[]` that feed straight into `/filings/form-c`.
-- [ ] **Wire JSON mode for `documents`** (the Q7 caveat): pass a `json_schema` to `llm.complete` in `classify_line_items` and keep parsing via `loads_relaxed` (already used) so the live HTTP path is reliable → verify: a JSON-mode classify call parses on `nemo-super`.
-- [ ] Wrap the parse in the same controlled-error story as `/audit-defense` (return **502** on unparseable model output, not 500) → verify: forced unparseable output yields a 502 with a clear detail.
+- [x] Add `POST /entities/{tin}/documents/classify` taking `{raw_text: str}` (new `ClassifyReq` in `schemas.py`), calling `classify_line_items(raw_text, llm)` (DI'd `get_llm`), returning `{line_items: LineItem[]}` → verify: posting the Acme trial-balance text returns classified `LineItem[]` that feed straight into `/filings/form-c`.
+- [x] **Wire JSON mode for `documents`** (the Q7 caveat): pass a `json_schema` to `llm.complete` in `classify_line_items` and keep parsing via `loads_relaxed` (already used) so the live HTTP path is reliable → verify: a JSON-mode classify call parses on `nemo-super`.
+- [x] Wrap the parse in the same controlled-error story as `/audit-defense` (return **502** on unparseable model output, not 500) → verify: forced unparseable output yields a 502 with a clear detail.
 
 **Acceptance criteria:** raw trial-balance text classifies to `LineItem[]` over HTTP (JSON-mode, 502-guarded), chainable into `form-c`; resolves **Q7**.
 
@@ -114,8 +114,8 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Validate `ssm` and `line_items` at the boundary — either type the request bodies as the Pydantic models directly (so FastAPI emits the standard **422**), or catch `ValidationError` in those handlers and `raise HTTPException(422, detail=...)` → verify: posting a malformed `ssm` to `/obligations` and `/filings/form-c` returns **422** (not 500) with which-field detail; valid payloads behave exactly as before.
-- [ ] Add tests asserting 422 on bad input for the entity routes → verify: suite stays green (existing 200-path tests unchanged).
+- [x] Validate `ssm` and `line_items` at the boundary — either type the request bodies as the Pydantic models directly (so FastAPI emits the standard **422**), or catch `ValidationError` in those handlers and `raise HTTPException(422, detail=...)` → verify: posting a malformed `ssm` to `/obligations` and `/filings/form-c` returns **422** (not 500) with which-field detail; valid payloads behave exactly as before.
+- [x] Add tests asserting 422 on bad input for the entity routes → verify: suite stays green (existing 200-path tests unchanged).
 
 **Acceptance criteria:** bad request bodies return a consistent **422** with field detail across the entity routes; the FE forms can render validation errors instead of a generic 500.
 
@@ -244,8 +244,8 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Add FastAPI `CORSMiddleware` to `api/main.py` allowing the Vercel origin, configurable via env (`FRONTEND_ORIGIN` / `CORS_ORIGINS`, comma-split), and include `http://localhost:5173` for local dev; allow the methods/headers the FE uses (GET/POST, `Content-Type`) → verify: a cross-origin `OPTIONS` preflight + a `POST` from the configured origin succeed (no CORS error); an unlisted origin is rejected.
-- [ ] Document the env var in `.env.example` (cross-lane note for DO-2) → verify: `.env.example` lists `CORS_ORIGINS`/`FRONTEND_ORIGIN`.
+- [x] Add FastAPI `CORSMiddleware` to `api/main.py` allowing the Vercel origin, configurable via env (`FRONTEND_ORIGIN` / `CORS_ORIGINS`, comma-split), and include `http://localhost:5173` for local dev; allow the methods/headers the FE uses (GET/POST, `Content-Type`) → verify: a cross-origin `OPTIONS` preflight + a `POST` from the configured origin succeed (no CORS error); an unlisted origin is rejected.
+- [x] Document the env var in `.env.example` (cross-lane note for DO-2) → verify: `.env.example` lists `CORS_ORIGINS`/`FRONTEND_ORIGIN`.
 
 **Acceptance criteria:** the deployed Vercel FE (and the localhost dev server) can call the API without CORS errors; allowed origins are env-configurable.
 
@@ -335,7 +335,7 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Have `RoutingLLMClient` record the route it took (`last_provider` / whether it escalated) and add a `sovereign: bool` + `active_model: str` field to the AI-backed responses (`/audit-defense`; `/documents/classify` from BE-9; and `/filings/form-c*` if a model runs) → verify: the field reports `nemo-super` / sovereign=true for the prelim's pure-ILMU calls; existing tests stay green (add a small test asserting the field is present and correct).
+- [x] Have `RoutingLLMClient` record the route it took (`last_provider` / whether it escalated) and add a `sovereign: bool` + `active_model: str` field to the AI-backed responses (`/audit-defense`; `/documents/classify` from BE-9; and `/filings/form-c*` if a model runs) → verify: the field reports `nemo-super` / sovereign=true for the prelim's pure-ILMU calls; existing tests stay green (add a small test asserting the field is present and correct).
 
 **Acceptance criteria:** AI responses report the active route so **FE-5** binds a live indicator; suite stays green.
 
