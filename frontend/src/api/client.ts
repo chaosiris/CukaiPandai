@@ -250,35 +250,39 @@ const MOCK_CLASSIFY: ClassifyResponse = {
   active_model: 'nemo-super'
 }
 
-const MOCK_DEFENSE: AuditDefenseResponse = {
-  query: 'Justify your RM4,800 repairs deduction',
-  items: [
-    {
-      clause_id: 'ITA_s33_1a',
-      text: 'Wholly and exclusively incurred in the production of gross income',
-      source: 'ITA 1967 s33(1)(a)'
-    }
-  ],
-  citations: [
-    {
-      claim: 'Repairs deduction RM4,800 allowed under ITA s33(1)(a)',
-      clause_ids: ['ITA_s33_1a'],
-      verified: true,
-      section: 'Section 33(1)(a)',
-      page_ref: 'ITA 1967, p.47',
-      url: 'https://www.hasil.gov.my/en/ita1967',
-      passage: 'Outgoings and expenses wholly and exclusively incurred in the production of gross income.'
-    },
-    {
-      claim: 'Fictitious clause ITA s99_ZZ — not in corpus',
-      clause_ids: ['ITA_s99_ZZ'],
-      verified: false
-    }
-  ],
-  exposure_note:
-    'No material audit risk identified for this deduction. The repairs are categorised as revenue expenditure under s33(1)(a) ITA 1967.',
-  sovereign: true,
-  active_model: 'nemo-super'
+const MOCK_DEFENSE_VERIFIED_CITATION: Citation = {
+  claim: 'Repairs deduction RM4,800 allowed under ITA s33(1)(a)',
+  clause_ids: ['ITA_s33_1a'],
+  verified: true,
+  section: 'Section 33(1)(a)',
+  page_ref: 'ITA 1967, p.47',
+  url: 'https://www.hasil.gov.my/en/ita1967',
+  passage: 'Outgoings and expenses wholly and exclusively incurred in the production of gross income.'
+}
+
+const MOCK_DEFENSE_FAKE_CITATION: Citation = {
+  claim: '(integrity probe — fabricated clause, not a real citation)',
+  clause_ids: ['ITA-1967-s999-FAKE'],
+  verified: false
+}
+
+function makeMockDefense(injectFabricated: boolean): AuditDefenseResponse {
+  return {
+    query: 'Justify your RM4,800 repairs deduction',
+    items: [
+      {
+        contested_item: 'RM4,800 repairs and maintenance deduction',
+        evidence: [['invoice', 'INV-2025-0042: Office plumbing repair RM4,800']]
+      }
+    ],
+    citations: injectFabricated
+      ? [MOCK_DEFENSE_VERIFIED_CITATION, MOCK_DEFENSE_FAKE_CITATION]
+      : [MOCK_DEFENSE_VERIFIED_CITATION],
+    exposure_note:
+      'No material audit risk identified for this deduction. The repairs are categorised as revenue expenditure under s33(1)(a) ITA 1967.',
+    sovereign: true,
+    active_model: 'nemo-super'
+  }
 }
 
 const MOCK_MSIC: Record<string, unknown> = {
@@ -367,10 +371,15 @@ export async function classifyTrialBalance(tin: string, raw_text: string): Promi
 export async function getAuditDefense(
   tin: string,
   query: string,
-  evidence: [string, string][]
+  evidence: [string, string][],
+  injectFabricated = false
 ): Promise<AuditDefenseResponse> {
-  if (MOCK_MODE) return MOCK_DEFENSE
-  return post<AuditDefenseResponse>(`/entities/${tin}/audit-defense`, { query, evidence })
+  if (MOCK_MODE) return makeMockDefense(injectFabricated)
+  return post<AuditDefenseResponse>(`/entities/${tin}/audit-defense`, {
+    query,
+    evidence,
+    ...(injectFabricated && { inject_fabricated: true })
+  })
 }
 
 /** GET /reference/msic/{code} — look up an MSIC activity code (BE-4). */

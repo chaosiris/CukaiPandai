@@ -14,4 +14,4 @@ RUN uv pip install --system --no-cache -e .
 
 EXPOSE 8000
 # Run from /app so the law-corpus relative path (core/fixtures/...) resolves.
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}

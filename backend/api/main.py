@@ -144,7 +144,7 @@ def classify(tin: str, req: ClassifyReq, llm: LLMClient = Depends(get_llm)) -> d
 @app.post("/entities/{tin}/audit-defense")
 def audit_defense(tin: str, req: AuditDefenseReq, llm: LLMClient = Depends(get_llm)) -> dict:
     try:
-        pack = build_defense(req.query, [tuple(e) for e in req.evidence], llm, _CORPUS)
+        pack = build_defense(req.query, [tuple(e) for e in req.evidence], llm, _CORPUS, inject_fabricated=req.inject_fabricated)
     except _PARSE_ERRORS as e:
         raise HTTPException(status_code=502, detail=f"Model returned unparseable output: {e}") from e
     return {**pack.model_dump(mode="json"), **llm.route_info()}

@@ -15,6 +15,7 @@ class FormCReq(BaseModel):
 class AuditDefenseReq(BaseModel):
     query: str
     evidence: list[list[str]]
+    inject_fabricated: bool = False
 
 
 class FilingResumeReq(BaseModel):

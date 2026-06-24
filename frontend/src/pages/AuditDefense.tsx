@@ -29,7 +29,7 @@ export default function AuditDefense() {
     setTechnicalOpen(false)
     const query = mode === 'demo' ? DEMO_QUERY : FABRICATION_QUERY
     const evidence = mode === 'demo' ? DEMO_EVIDENCE : FABRICATION_EVIDENCE
-    getAuditDefense(entity.tin, query, evidence)
+    getAuditDefense(entity.tin, query, evidence, mode === 'fabrication')
       .then((res) => {
         setData(res)
         setLoading(false)
