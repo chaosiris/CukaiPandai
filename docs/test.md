@@ -257,3 +257,63 @@ The FE spine is correct, contract-faithful, and the grounding invariants hold. E
 - **Edge cases:** loading windows, error windows, empty/initial state, the HITL reject branch (`handleApprove(false)`, `FilingStudio.tsx:582`), and the 404 finalized-thread branch all handled. Empty obligation/citation lists guard with `.length` checks.
 
 **Return to PM:** **Approve with comments.** The FE spine is contract-faithful against the real backend — route fields read only from their true carriers, the `FigureTrace` grounding invariant holds (no clause cites on figures), HITL/422/502/404 all handled, and the fabricated-citation money-shot reproduces with distinct verified/rejected stamps. All three gates green: build (46 modules), `tsc --noEmit` clean, biome 0 errors. No Critical/Major findings. Three Minor items are mock-vs-live divergences (the `items` shape; and — most important — the live fabrication-rejection isn't proven by this mock-only slice) to tighten before the FE-6 live swap, not blocking this commit.
+
+---
+
+## [25/06/26] — Deploy-readiness batch (BE-18 inject · FE-6 live-swap parity · Render+Vercel config) `[BE]` `[FE]` `[DO]`
+
+**Branch:** `main` (working tree, uncommitted). 11 modified + 2 new: `backend/{Dockerfile,api/agents/audit_defense.py,api/main.py,api/schemas.py,tests/api/test_audit_defense.py,tests/api/test_audit_defense_endpoint.py,uv.lock}`, `frontend/src/{api/client.ts,pages/AuditDefense.tsx}`, `docs/{plan,runbook}.md`, **new** `frontend/.env.example` + `frontend/vercel.json`.
+
+**Verdict:** Approve
+
+The honesty invariant holds end-to-end, mock↔live parity is achieved (all three prior FE-6 carry-forwards closed), the default audit-defense path is unchanged, and the deploy config is correct and secure. All gates green (105 backend / FE build / tsc / biome) and the Docker image builds with a valid, expanding `$PORT` CMD. No Critical or Major findings. One Minor doc-staleness nit and one Minor shell-form/signals tradeoff to note — neither blocks the commit. Recommend authorizing.
+
+### Honesty invariant (highest priority — VERIFIED, adversarially)
+
+- **The rejected verdict is produced by the REAL deterministic gate, not hardcoded.** `build_defense(..., inject_fabricated=True)` builds the probe `Citation(clause_ids=["ITA-1967-s999-FAKE"])` and runs it through `verify_claim` (`audit_defense.py:46`) → `ground_citation` (`citation_critic.py:13` → `core/citations.py:8-9` → `corpus.exists`). The `verified=false` is **computed**, never assigned.
+- **The fake ID is genuinely absent from the corpus.** `lawcorpus_seed.json` has 15 clause IDs; `grep`/`json` confirm `ITA-1967-s999-FAKE` (and `s999`/`FAKE`) appear **0 times**. So `ground_citation` sets `verified=False` and `verify_claim` short-circuits at `:14-15` **before any LLM call** — there is zero chance of a fluke `YES` flipping the verdict. The rejection is deterministic and reproducible. Test `test_fake_clause_id_genuinely_absent_from_corpus` asserts exactly this.
+- **FE never hardcodes a false verdict on the standard path.** Whole-tree grep: the ONLY `verified: false` literal in `frontend/src` is `client.ts:266` (`MOCK_DEFENSE_FAKE_CITATION`), included **only** when `injectFabricated` is true — mirroring BE-18. The standard (`demo`) path calls `makeMockDefense(false)` → single verified citation, no rejected row. `AuditDefense.tsx:43-44` partitions on the response's `verified` field (computed), not a constant.
+
+### Mock↔live parity (the point of FE-6 — VERIFIED, all 3 carry-forwards closed)
+
+- **#2 — `items` shape now matches live.** `makeMockDefense` emits `items:[{contested_item, evidence:[['invoice','INV-2025-0042: …']]}]` (`client.ts`), matching `build_defense`'s `items=[{"contested_item": …, "evidence": evidence}]` (`audit_defense.py:49`). The prior misleading `[{clause_id,text,source}]` shape is gone.
+- **#3 — mock branches on the inject flag, mirroring BE-18.** The rejected citation appears **only** on the fabrication path (`citations: injectFabricated ? [verified, fake] : [verified]`). The standard query now shows no rejected row in mock — matching live. The fake citation's clause_id (`ITA-1967-s999-FAKE`) and claim string (`(integrity probe — fabricated clause, not a real citation)`) are **byte-for-byte identical** to BE-18.
+- **Request body sends `inject_fabricated` only when true.** `...(injectFabricated && { inject_fabricated: true })` (`client.ts`) omits the key on the standard path, matching the backend Pydantic default `inject_fabricated: bool = False` (`schemas.py:16`). No spurious flag on the default path.
+- **Wiring:** `AuditDefense.tsx:32` passes `mode === 'fabrication'` as the 4th arg, so the fabrication button → `true`, the standard button → `false`. Correct.
+
+### Default-path regression (VERIFIED byte-for-byte identical)
+
+- With the flag absent/false, `build_defense` returns `citations=[cit]` (single citation) exactly as before BE-18 — the new code is entirely behind `if inject_fabricated:` (`audit_defense.py:41`). `test_inject_fabricated_false_is_unchanged` (unit) + `test_inject_fabricated_endpoint_no_flag_single_citation` (endpoint) both assert exactly one citation, verified=true, and no fake ID present.
+- The tests assert the **gate produced** the verdict, not just a shape: `test_inject_fabricated_true_appends_rejected_probe` asserts `fake_cits[0].verified is False` AND `any(c.verified is True for c in real_cits)`; the endpoint twin asserts the same over JSON. Genuine gate verification, not a tautology.
+
+### Deploy config correctness (VERIFIED)
+
+- **Dockerfile `$PORT` expands.** CMD is **shell form** (`CMD uvicorn … --port ${PORT:-8000}`, no JSON array), so Docker runs it via `/bin/sh -c` and the variable expands at runtime. Proven: `PORT=9999 sh -c 'echo --port ${PORT:-8000}'` → `--port 9999`; unset → `--port 8000`. `docker build ./backend` → **success** (`sha256:b8982353…`), exit 0. The exec/JSON form would NOT have expanded `$PORT` — shell form is correct and required here.
+- **vercel.json rewrite is correct.** `{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}` is the canonical Vercel SPA pattern. Vercel's filesystem handler serves real files (`/assets/*.js`, `/assets/*.css`) **before** evaluating rewrites, so the built asset bundle resolves; deep links (`/filing`, `/audit-defense`, `/obligations`) fall through to `/index.html` so client-side routing works on hard refresh.
+- **Runbook env tables correct + complete.** `LLM_PROVIDER=openai`, base/key/model present; escalation + direct-Claude left unset (pure-ILMU prelim); `CORS_ORIGINS` explicitly says **"must include the Vercel prod URL once known; exact-match, no wildcards (credentials are enabled)"**; `DATABASE_URL` **unset = fixtures fallback** documented; `/health` health-check path documented; single-worker MemorySaver constraint + free-tier cold-start pre-warm noted.
+
+### CORS (VERIFIED — env-driven, secure)
+
+- `main.py:42-46` reads `os.getenv("CORS_ORIGINS", os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"))`, comma-split, whitespace-trimmed — the human can add the Vercel origin via env with **no code change**. The runbook (4a table + §4b CORS note) instructs exactly that and warns that rotating preview URLs aren't covered by exact-match CORS (demo from prod). No wildcard is hardcoded.
+
+### Findings
+
+**Critical:** none. **Major:** none.
+
+**Minor (non-blocking):**
+
+- `docs/runbook.md:10` — [minor, doc staleness] The backend run step still says `uv run pytest -q   # expect: 40 passed`, but the suite is now **105 passed** (4 new audit-defense tests landed in this batch + prior growth). → Fix: change `40 passed` to `105 passed`. Cosmetic; does not affect runtime or deploy.
+- `backend/Dockerfile:17` — [minor, accepted tradeoff — note only] The shell-form CMD (required for `${PORT:-8000}` expansion) triggers Docker's `JSONArgsRecommended` warning and means uvicorn runs as a child of `/bin/sh`, not PID 1, so it won't receive SIGTERM directly on container stop. Acceptable on Render free tier (single instance, MemorySaver has no durable shutdown state to flush; platform force-kills after grace). The only alternatives that keep `$PORT` are an exec-form `["sh","-c","uvicorn … ${PORT:-8000}"]` or `ENV PORT` defaulting — not worth the churn for the prelim. Leave as-is; revisit if graceful shutdown matters post-BE-15.
+
+### Plan-fidelity note (not a finding)
+
+- FE-6 checkboxes at `plan.md:260-264` remain `- [ ]`. This is **correct** — those bullets are live-only verification steps (point the client at the live Render URL, walk all three consoles end-to-end against live, prove the live `verified=false` row) that cannot be ticked until DO-2/DO-1 deploy. The two QA carry-forward sub-items that ARE agent-doable now (#2 items shape, #3 branch-on-query) are implemented and verified above; the deploy-gated remainder stays open by design. This batch is deploy-**readiness**, not the live swap itself.
+
+### Verified clean (no action)
+
+- **Surgical:** changes confined to the inject opt-in (BE), the mock refactor + 4th arg (FE), the Dockerfile CMD line, two new config files, and docs. No tax figures, citations, core math, or the deterministic gate touched. `thread_provenance`/RAG path unchanged.
+- **No AI attribution:** `git diff HEAD | grep -iE 'co-authored|generated with|claude code|noreply@anthropic|🤖'` → 0 matches.
+
+**Smoke test:** `cd backend && uv run pytest -q` → **105 passed, 1 warning** (pre-existing Starlette/httpx deprecation) · `cd frontend && bun run build` → **46 modules, dist/ emitted, exit 0** · `bunx tsc --noEmit` → **exit 0** · `bunx biome check frontend/src` → **9 files, 0 errors** · `docker build ./backend` → **success (sha256:b8982353…), exit 0** · shell `${PORT:-8000}` expansion → 9999 / 8000 as expected · corpus check → `ITA-1967-s999-FAKE` absent (0/15 ids) · FE `verified:false` literals → exactly 1 (the gated fake mock).
+
+**Return to PM:** **Approve.** The honesty invariant is airtight — the rejected verdict is computed by the real `ground_citation` gate against a fake ID genuinely absent from the 15-clause corpus (short-circuits before any LLM call), and the FE's lone `verified:false` literal is gated behind the inject flag, mirroring BE-18 byte-for-byte. Mock↔live parity is achieved (all 3 FE-6 carry-forwards closed: `items` shape, inject-branched mock, flag-only-when-true body); the default path is unchanged (single verified citation, asserted by tests). Deploy config is correct and secure: shell-form Dockerfile CMD expands `$PORT` (build verified), vercel.json serves assets before the SPA catch-all, CORS is env-driven exact-match with credentials, and the runbook env tables are complete. All gates green (105 / build / tsc / biome / docker). Two Minor non-blockers: runbook says "40 passed" (now 105) and the shell-form CMD's PID-1/SIGTERM tradeoff (accepted for the prelim). No Critical/Major. Ready for Gate-2 commit authorization.

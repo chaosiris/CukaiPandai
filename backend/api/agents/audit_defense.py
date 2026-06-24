@@ -9,7 +9,16 @@ from api.jsonio import loads_relaxed
 from api.llm import LLMClient
 
 
-def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: LawCorpus) -> DefensePack:
+_FAKE_CLAUSE_ID = "ITA-1967-s999-FAKE"
+
+
+def build_defense(
+    query: str,
+    evidence: list[tuple],
+    llm: LLMClient,
+    corpus: LawCorpus,
+    inject_fabricated: bool = False,
+) -> DefensePack:
     # RAG (BE-13): retrieve candidate clauses for the auditor query; constrain the model to them
     # (fall back to the full corpus-ID list when retrieval is unavailable).
     hits = retrieve(query, k=6)
@@ -28,8 +37,15 @@ def build_defense(query: str, evidence: list[tuple], llm: LLMClient, corpus: Law
         "If the position is not sustained, exposure may arise under ITA 1967 s.113 "
         "(incorrect return) / s.112 (failure to furnish); human review required."
     )
+    citations = [cit]
+    if inject_fabricated:
+        probe = Citation(
+            claim="(integrity probe — fabricated clause, not a real citation)",
+            clause_ids=[_FAKE_CLAUSE_ID],
+        )
+        citations.append(verify_claim(probe, corpus, llm))
     return DefensePack(
         query=query,
         items=[{"contested_item": raw["contested_item"], "evidence": evidence}],
-        citations=[cit], exposure_note=note,
+        citations=citations, exposure_note=note,
     )
