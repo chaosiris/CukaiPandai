@@ -337,7 +337,7 @@ CukaiPandai/
 - **BE-12 — corpus + offline index:** `Clause` gains optional `section`/`page_ref`/`url`; `lawcorpus_seed.json` expanded 5 → 15 ITA/PR clauses (incl. **PR-6/2019** repairs ruling) with provenance; `scripts/build_rag_index.py` embeds via local static **model2vec** (`potion-base-8M`), L2-normalizes, writes the COMMITTED `core/fixtures/rag/{vectors.npz, chunks.json}`. ⚠verify of clause text/section/page is the TD-6/Q5 gate (tax-verify contributor).
 - **BE-13 — retriever + wiring:** `core/rag.py` — `lru_cache` embedder + index, cosine top-k, **fail-open** (any error → `[]`). `deductibility`/`audit_defense` replace the full-ID dump with retrieved candidate IDs (fall back to the full corpus when retrieval is `[]`); `thread_provenance` threads section/page_ref/url/passage into the `Citation` additively. The deterministic gate (`ground_citation` → `corpus.exists`) is **unchanged and authoritative**.
 - **BE-14 — tests:** golden retrieval (PR-6/2019 for repairs), fail-open, agent-fallback-when-RAG-off, and the **gate-still-rejects-fabrication invariant with RAG ON**.
-- **Honest limitation (Q6):** static-embedding precision on a 15-clause corpus is coarse and `nemo-super`'s clause *choice* among valid candidates is imperfect — accepted per Q6: the deterministic clause-ID gate + the fabricated-citation rejection (RAG-independent) carry the trust demo; the rich audit-defense query retrieves cleanly (PR-6/2019 top-1). `bge-m3`/pgvector = documented scale path.
+- **Honest limitation (Q6):** static-embedding precision on a 15-clause corpus is coarse and `nemo-super`'s clause _choice_ among valid candidates is imperfect — accepted per Q6: the deterministic clause-ID gate + the fabricated-citation rejection (RAG-independent) carry the trust demo; the rich audit-defense query retrieves cleanly (PR-6/2019 top-1). `bge-m3`/pgvector = documented scale path.
 - **Sovereign:** in-process, no foreign API; sized for the Render 256MB tier. Local model copy `backend/.hf_models/` is gitignored; CI/Render download the ~30MB model (or set `RAG_MODEL_PATH`) — RAG fails open to the gate if it can't load.
 - **Tests:** 93 backend pass (89 → 93). Live spike 4/4. Subagent-audited: BE-12/13/14 RESOLVED; fabrication invariant holds.
 - **⚠ uv.lock:** `model2vec` + `numpy` added to `pyproject.toml` → run `cd backend && uv lock` (uv unavailable in this session; mirrors the BE-4 `holidays` lock fix).
@@ -372,3 +372,34 @@ CukaiPandai/
 - **Prelim unchanged:** still **PURE-ILMU (Q6)** — no secondary configured, escalate path dormant; the deterministic `ground_citation` gate carries the trust demo.
 - **Tests:** new `tests/api/test_make_llm.py` (4 — pure-ILMU bare client, sovereign-escalation router, direct-Anthropic opt-in flagged non-sovereign, bare-key-does-not-enable). **100 backend pass** (96 → 100). Subagent-audited.
 - **Files:** `api/llm.py`, `.env.example`, `tests/api/test_make_llm.py` (new), `docs/{trd,cukaipandai-spec,plan,progress}.md`, `.claude/CLAUDE.md`.
+
+---
+
+## [25/06/26] — FE-1: Confirm scaffold + extend typed client to real surface `[FE]`
+
+- **`frontend/src/api/client.ts` — fully extended to all 9 backend routes:**
+  - New types: `EntityTaxProfile`, `RiskFlag`, `FilingStartResponse`, `FilingResumeResponse`, `ClassifyResponse`, `AuditDefenseResponse`, `RouteInfo`, `ApiValidationError`, `ValidationErrorDetail`.
+  - Fixed stale types: `FormCResponse` gains `risk_flags: RiskFlag[]`; `Citation` gains optional `section?/page_ref?/url?/passage?` (RAG provenance, BE-13).
+  - New methods: `getEntity(tin)`, `classifyTrialBalance(tin, raw_text)`, `startFiling(tin, ssm, line_items)`, `resumeFiling(tin, thread_id, approved)`, `getMsic(code)`.
+  - 422 error envelope: `handleResponse<T>()` parses FastAPI `{detail:[{loc,msg,type}]}` and attaches `.validationDetail` to the thrown Error instead of a bare `'${status} ${statusText}'` string.
+  - Mock mode updated for every new method — all fixtures use seeded Acme values (`msic_codes:['46900']`, `gross_income:5_000_000`, `tax_payable:31000`). Exported `ACME_TIN` + `ACME_SSM` constants.
+- **New `frontend/src/hooks/useEntity.ts`** — shared `useEntity(tin?)` hook. All three console pages call this instead of page-local `DEMO_SSM` stubs. Resolves FQ4 / [DRIFT] #3.
+- **New `frontend/src/components/CitationPanel.tsx`** — shared primitives:
+  - `CitationPanel` — renders a single `Citation` with expandable `<details>` for RAG provenance (`section`, `page_ref`, `url`, `passage`); all RAG fields guarded for null.
+  - `VerifiedBadge` — renders `VERIFIED`/`REJECTED` stamp using existing `.verified-stamp`/`.unverified-stamp` devkit classes.
+  - `SovereignBadge` — renders `ILMU · <model>` or `EXTERNAL · <model>` badge from BE-6 `route_info()` fields.
+- **Page updates (surgical — body logic untouched, only stub replacement):**
+  - `ObligationRadar.tsx`: removed page-local `DEMO_SSM`/`DEMO_TIN`; now calls `useEntity()` + builds the ssm argument from the live profile.
+  - `FilingStudio.tsx`: same — page-local stub gone, `useEntity()` drives the ssm; `DEMO_ITEMS` updated to Acme-consistent amounts.
+  - `AuditDefense.tsx`: `useEntity()` wired; imports `CitationPanel`+`SovereignBadge`; renders defense citations via `CitationPanel` (FE-4 builds on these primitives).
+- **Build/type status:** `tsc --noEmit` clean; `bun run build` → 46 modules, 0 errors; `bunx biome check` → 9 files, 0 errors.
+
+---
+
+## [25/06/26] — Phase 2 FE spine complete (FE-1…FE-5) — lint fix + plan tick `[FE]`
+
+- **Biome lint pass (11 violations → 0):** added `type="button"` to 9 `<button>` elements missing it (3 in `AuditDefense.tsx` lines ~60/93/271; 6 in `FilingStudio.tsx` lines ~441/494/509/561/576/605); replaced 2 array-index keys with stable keys derived from item content (`AuditDefense.tsx` ~245: `Object.entries(item).map(([k,v])=>\`${k}:${v}\`).join('|')`; ~378: `c.claim`).
+- **Verify:** `bunx biome check frontend/src` → 0 errors, 9 files; `bun run build` → 46 modules, 0 errors; `bunx tsc --noEmit` → clean.
+- **Files touched:** `frontend/src/pages/AuditDefense.tsx`, `frontend/src/pages/FilingStudio.tsx`.
+- **Plan ticked:** all sub-bullets under FE-1 (shell/shared-contract), FE-2 (Obligation Radar — entity header + obligations list), FE-3 (Filing Studio — classify + HITL gate + risk_flags + Layak trust-trio: 96px hero, honest-number IA, per-figure FigureTrace `<details>`, no clause-IDs on figures), FE-4 (Audit-Defense — CitationPanel + verified/unverified badge, live fabricated-citation rejection money-shot, 502 handling, two-tier trace), FE-5 (sovereign badge bound to real `{sovereign, active_model}` from BE-6, folded into FE-4) — marked `[x]` in `docs/plan.md`. FE-6/7/8/9 and all BE/DO/TD tasks untouched.
+- **Context:** consoles are v1/functional; a later `ui-ux-pro-max` pass owns visual redesign. Deploy (DO-1/2/3) is next on the critical path. The FE spine was built mock-first against the real backend contract (CORS/entity/classify/route_info all on `main`); all AI responses read `sovereign`/`active_model` from BE-6, not hardcoded.

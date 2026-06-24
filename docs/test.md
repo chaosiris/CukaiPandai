@@ -171,11 +171,11 @@ The sovereignty rewire is correct, the tests genuinely assert the residency prop
 
 2. **`route_info()` honesty — RESOLVED.** ILMU base_url → `sovereign=True` via `"ilmu.ai" in self._base_url` (`:83`); `_AnthropicClient` → hardcoded `sovereign=False` (`:52`). A non-ILMU `LLM_ESCALATION_BASE_URL` (e.g. Gemini) correctly reports `sovereign=False` because the substring check fails — there is no path that claims `sovereign=True` while calling out-of-country. `RoutingLLMClient.route_info()` reports the **last** route taken (`self._last`), so an escalation/failover that actually hit the secondary is reported honestly, not the optimistic primary. Solid.
 
-3. **Edge cases — ISSUE (acceptable, by-design, but flag).** `make_llm()` defaults `LLM_PROVIDER` to `"anthropic"` (`:147`); with no env at all it returns a **direct `_AnthropicClient` (non-sovereign)** regardless of the new opt-in flag — the new flag only gates the *escalation secondary*, never the *primary*. This is acceptable because the committed `.env.example:14` sets `LLM_PROVIDER=openai` and `load_dotenv()` runs on startup, so the deployed default is sovereign; but it is a latent footgun (a missing/empty `.env` silently leaves Malaysia on the primary path, with `route_info` correctly reporting `sovereign=False`). Not introduced by this change and out of the stated scope — flag only. The duplicate-model case (`LLM_ESCALATION_MODEL` == primary model) is harmless: it just builds a second identical ILMU client; no correctness or sovereignty impact.
+3. **Edge cases — ISSUE (acceptable, by-design, but flag).** `make_llm()` defaults `LLM_PROVIDER` to `"anthropic"` (`:147`); with no env at all it returns a **direct `_AnthropicClient` (non-sovereign)** regardless of the new opt-in flag — the new flag only gates the _escalation secondary_, never the _primary_. This is acceptable because the committed `.env.example:14` sets `LLM_PROVIDER=openai` and `load_dotenv()` runs on startup, so the deployed default is sovereign; but it is a latent footgun (a missing/empty `.env` silently leaves Malaysia on the primary path, with `route_info` correctly reporting `sovereign=False`). Not introduced by this change and out of the stated scope — flag only. The duplicate-model case (`LLM_ESCALATION_MODEL` == primary model) is harmless: it just builds a second identical ILMU client; no correctness or sovereignty impact.
 
 4. **Doc/code consistency — ISSUE (one Major, one Minor).**
    - `docs/runbook.md:34-41` — **[Major]** the "Environment" section still presents the model layer as **"ILMU-first (sovereign primary), Claude as fallback"** with a two-column "Sovereign (ILMU — primary) | Claude (fallback)" table — exactly the pre-change framing the rewire was meant to retire. No mention of `LLM_ESCALATION_MODEL`, the sovereign-escalation default, or that direct-Claude leaves Malaysia / is `LLM_ALLOW_DIRECT_ANTHROPIC`-gated. This is a deck/demo-facing doc and was not updated in this diff. → Fix: reframe the table to "ILMU primary + sovereign escalation (`LLM_ESCALATION_MODEL`); direct-Claude = flagged non-sovereign opt-in, off by default", matching `trd.md:93` / spec §3.4 line 173.
-   - `docs/cukaipandai-spec.md:168-171` — **[Minor]** §3.4's opening sentence still reads "**Claude (Opus 4.8) is the FALLBACK**, in two roles: 1. Failover … 2. Capability escalation". Lines 173/175/177/179 immediately below it *do* carry the corrected sovereign-by-default framing, so the section self-corrects, but the lead-in is stale and reads as a contradiction. → Fix: change the lead-in to "the secondary is sovereign by default (a stronger ILMU model); direct-Claude is a flagged opt-in," consistent with the paragraph that follows.
+   - `docs/cukaipandai-spec.md:168-171` — **[Minor]** §3.4's opening sentence still reads "**Claude (Opus 4.8) is the FALLBACK**, in two roles: 1. Failover … 2. Capability escalation". Lines 173/175/177/179 immediately below it _do_ carry the corrected sovereign-by-default framing, so the section self-corrects, but the lead-in is stale and reads as a contradiction. → Fix: change the lead-in to "the secondary is sovereign by default (a stronger ILMU model); direct-Claude is a flagged opt-in," consistent with the paragraph that follows.
    - Everything else is consistent: `trd.md:28/93/124`, spec §3.4 lines 173-179, §9.2 lines 427-436, the two ASCII diagrams (lines 305/324-326), A2 (line 510), `.env.example:19-30`, `plan.md` Q6/BE-5/DECISION lines, and `.claude/CLAUDE.md` all describe (a) sovereign escalation as the default secondary, (b) direct-Claude as off-by-default and leaving Malaysia, (c) the prelim as pure-ILMU with no router. The `demo-video-script.md` "ILMU Claw — fully in-country" line (4:15-5:00) is accurate for the pure-ILMU prelim.
 
 5. **Test coverage — RESOLVED.** All 4 tests assert the sovereignty properties, not just types: `test_escalation_model_wraps_router_staying_on_ilmu` asserts `c._fallback.route_info()["sovereign"] is True`; `test_direct_anthropic_is_optin_and_flagged_nonsovereign` asserts `... is False`; the bare-key test asserts no router is built. One untested branch: `LLM_ESCALATION_BASE_URL` set to a **non-ILMU** host (the Gemini/escalation-leaves-country case in finding 2) is verified by inspection but not by a test. Minor gap; the substring logic is trivially correct. Optional: add a one-liner asserting a non-ilmu escalation base reports `sovereign=False`.
@@ -188,3 +188,72 @@ The sovereignty rewire is correct, the tests genuinely assert the residency prop
 - **Prelim unaffected:** with no escalation var set, `make_llm()` returns the bare ILMU client; the escalate path is dormant. Pure-ILMU (Q6) holds.
 
 **Return to PM:** Approve with comments — the sovereignty rewire is correct, honest, and fully tested (4 new + 100 total green); no AI attribution. One **Major** stale doc (`runbook.md:34-41` still says "Claude as fallback") and one **Minor** (`cukaipandai-spec.md:168` stale lead-in) contradict the new framing in deck-facing docs and should be fixed pre-commit; the `LLM_PROVIDER` default-anthropic footgun is pre-existing and mitigated by `.env.example`. None block `main`.
+
+---
+
+## [25/06/26] — Phase-2 FE spine (FE-1…FE-5) — mock-first consoles vs the real backend contract
+
+**Branch:** `main` (working tree, uncommitted). Changed: `frontend/src/api/client.ts`, `frontend/src/pages/{ObligationRadar,FilingStudio,AuditDefense}.tsx`, new `frontend/src/components/CitationPanel.tsx`, new `frontend/src/hooks/useEntity.ts`, `docs/{plan,progress}.md`.
+
+**Verdict:** Approve with comments
+
+The FE spine is correct, contract-faithful, and the grounding invariants hold. Every field the FE consumes exists on the real backend response models; the `sovereign`/`active_model` route fields are read ONLY from the two responses that carry them; no clause-IDs leak onto form-c figures; and the fabricated-citation money-shot reproduces both a verified and a rejected citation with visually-distinct stamps. All three gates are green. The comments below are mock-vs-live divergences that are latent until the FE-6 live-swap — none break the mock demo, none block a commit, but two should be tightened before FE-6 so live behavior matches what the mock promises.
+
+### Smoke test (all green — verified this session)
+
+- `cd frontend && bun run build` → **`tsc -b && vite build`, 46 modules transformed, dist/ emitted, exit 0.**
+- `cd frontend && bunx tsc --noEmit` → **exit 0, clean.**
+- `bunx biome check frontend/src` → **"Checked 9 files, no fixes applied", exit 0.**
+- `git status` → only the 3 page files + `client.ts` + the two new dirs (`components/`, `hooks/`) + `docs/` changed. Shared files coherent; no stray edits to `App.tsx`/`tokens.css`/`main.tsx`. Isolation integrity holds.
+
+### Contract alignment (highest priority — verified field-by-field against the REAL backend)
+
+**route_info() carriers — CORRECT.**
+
+- `route_info()` returns exactly `{sovereign: bool, active_model: str}` (`api/llm.py:12-13,31-32,51-52,81-83`) and is spread ONLY onto `/documents/classify` (`main.py:141`) and `/audit-defense` (`main.py:150`). It is **absent** from `/form-c`, `/form-c/start`, `/form-c/resume` (`main.py:127-131,167-172,183`).
+- FE honors this exactly: `ClassifyResponse`/`AuditDefenseResponse` carry the fields (`client.ts:119-123`); `FormCResponse`/`FilingStartResponse`/`FilingResumeResponse` do NOT (`client.ts:77-93`). FilingStudio reads `sovereign`/`active_model` only off `classifyResult` (`FilingStudio.tsx:472`), never off `getFormC`/the HITL responses — verified by grep. AuditDefense reads them off the defense response (`AuditDefense.tsx:57,363-366`). **No FE path reads a route/sovereign field off a response that lacks it.**
+
+**FigureTrace grounding invariant — CORRECT (correctness-critical, passes).**
+
+- `FigureTrace` = `{value, inputs, rule_id, config_version}` (`core/models.py:42-46`), faithfully typed (`client.ts:59-64`).
+- FilingStudio's `FigureTraceRow`/`ComputationPanel` (`FilingStudio.tsx:114-309`) render ONLY `value`/`rule_id`/`config_version`/`inputs`. **No clause-IDs, no `Citation`, no `clause_ids` are rendered anywhere on the form-c figures** — confirmed by reading the full component. Clause-level citations appear only in AuditDefense via `CitationPanel`. The "render each citation where it actually exists" constraint is honored.
+
+**Citation fields — CORRECT.** `Citation` = `{claim, clause_ids, verified, section?, page_ref?, url?, passage?}` (`core/models.py:63-71`) is typed correctly (`client.ts:95-104`) and consumed defensively in `CitationPanel` (`CitationPanel.tsx:40-124`) — every optional RAG field is null-guarded (`hasProvenance` gate at :41, per-field `&&` guards at :84-119).
+
+**HITL request/response shapes — CORRECT.** `startFiling` posts `{ssm, line_items}` → reads `{thread_id, computation, requires_approval, risk_flags}`; `resumeFiling` posts `{thread_id, approved}` → reads `{approved, computation}` (`client.ts:349-358`). Matches `FormCReq` (`schemas.py:10-13`), `FilingResumeReq` (`schemas.py:20-22`), and `main.py:154,167-172,176,183` exactly. The unknown/finalized `thread_id` → 404 branch (`main.py:180-181`) is handled in the FE (`FilingStudio.tsx:355-356`) without a white-screen.
+
+**RiskFlag — CORRECT.** `{code, message, severity}` (`models.py:74-77`) typed at `client.ts:71-75`, rendered with severity in `RiskFlagList` (`FilingStudio.tsx:71-112`).
+
+**Typed 422 / 502 — CORRECT.** `handleResponse` (`client.ts:299-309`) parses the FastAPI `{detail: [{loc,msg,type}]}` envelope (matches `main.py:92` `e.errors()`) into a typed error with `validationDetail`; other non-OK statuses (incl. the controlled 502 from `/classify` + `/audit-defense`, `main.py:140,149`) throw a plain `Error` surfaced as the friendly error window (`AuditDefense.tsx:168-175`, `FilingStudio.tsx:395-402`). No white-screen on 422/502.
+
+### The trust money-shot — WORKS
+
+- `MOCK_DEFENSE.citations` (`client.ts:262-277`) contains BOTH a `verified:true` citation (with full RAG provenance) AND a `verified:false` fabricated `ITA_s99_ZZ` citation. AuditDefense partitions them (`AuditDefense.tsx:43-44`), renders the rust-coloured "DETERMINISTIC GATE — fabricated citation REJECTED / BLOCKED" callout in fabrication mode (`:130-165`), and the stamps are visually distinct: `.verified-stamp` = denim border + double-notch stamp animation; `.unverified-stamp` = rust-red, no shadow (`tokens.css:930-974`). The deterministic gate this dramatizes is real (`core/citations.py:7-11` → `corpus.exists`), unchanged by RAG (`audit_defense.py:25-26`). Money-shot reproduces faithfully in mock mode.
+
+### Findings
+
+**Critical:** none.
+
+**Major:** none.
+
+**Minor (mock-vs-live divergences — latent until FE-6; fix before/at the live-swap, not blocking now):**
+
+- `frontend/src/api/client.ts:254-261` — [minor] **`MOCK_DEFENSE.items` shape diverges from the real backend.** The mock seeds `items: [{clause_id, text, source}]`, but the real `build_defense` returns `items=[{"contested_item": <str>, "evidence": <list>}]` (`api/agents/audit_defense.py:33`). It renders fine today because AuditDefense iterates defensively over `Object.entries(item)` (`AuditDefense.tsx:254`), so this is not a runtime bug — but a teammate reading the mock will believe `items` carries clause rows when live it carries the contested-item + echoed evidence. → Fix: change the mock `items` to `[{ contested_item: 'Repairs deduction RM4,800', evidence: [['invoice','INV-2025-0042: …']] }]` to match `audit_defense.py:33` so mock and live agree.
+
+- `frontend/src/api/client.ts:361-363` (`classifyTrialBalance`) + `:367-373` (`getAuditDefense`) — [minor] **The mock returns one fixed response regardless of input, so the fabrication path is "always rejected" only because the mock hardcodes the rejected citation — live, a fabricated rejection depends on the model actually emitting an out-of-corpus clause ID.** Live, `build_defense` constrains the model to retrieved/corpus IDs (`audit_defense.py:16-23`) and returns a SINGLE citation (`citations=[cit]`), so a live fabrication query may not yield a `verified=false` row at all (the model is told to cite only valid IDs). The demo-vs-fabrication buttons (`AuditDefense.tsx:30-31`) send different queries, but in mock mode both receive the identical `MOCK_DEFENSE` (both a verified and a rejected citation) — so the "Standard defense query" button also shows a rejected citation in the list (the rejection _callout_ is correctly gated to `activeQuery==='fabrication'`, `:130`, but the citations panel isn't). → Pre-FE-6: confirm the live backend reliably produces the `verified=false` row for the fabrication query (it may need a seeded fabricated-evidence fixture or a dedicated endpoint that forces the planted fake), and consider branching the mock on `query` so the standard query returns only the verified citation. Not a blocker for the mock demo; it IS the single thing most likely to surprise at the live swap, since the money-shot's live reliability isn't proven by this slice.
+
+- `frontend/src/api/client.ts:255-260` — [minor, cosmetic] `MOCK_DEFENSE.items[0]` uses a `clause_id` that mirrors a real corpus shape but is decorative; harmless given the defensive render, folds into the first finding's fix.
+
+**Informational (no action — by design or out of scope):**
+
+- `getFormC`/the one-shot path (`FilingStudio.tsx:360-371`) is retained as a non-interactive fallback alongside the HITL primary, per FQ5. Correct — it wraps the one-shot `{computation, requires_approval}` into the approved-result shape without reading any route field.
+- `FilingStudio.tsx:35` `LIABILITY_KEYS`/`UPSTREAM_KEYS` are hardcoded field-name sets for the honest-number IA; any unknown figure falls through to "Additional Fields" (`:283-306`) so an unexpected key from the core won't be dropped. Robust.
+- Visual/UX polish (spacing, colour, inline styles vs devkit classes) intentionally NOT raised — owned by the later ui-ux-pro-max pass per the task's non-goals.
+
+### Verified clean (no action)
+
+- **Grounding invariant:** no clause-IDs on form-c figures; clause cites only in AuditDefense. Holds.
+- **Isolation:** shared files (`client.ts`, `useEntity.ts`, `CitationPanel.tsx`, `App.tsx`, `tokens.css`) coherent; `useEntity` correctly replaces the divergent page-local `DEMO_SSM` stubs with a single canonical Acme via `getEntity(ACME_TIN)` (FQ4 resolved). Both pages drive the seeded profile.
+- **Edge cases:** loading windows, error windows, empty/initial state, the HITL reject branch (`handleApprove(false)`, `FilingStudio.tsx:582`), and the 404 finalized-thread branch all handled. Empty obligation/citation lists guard with `.length` checks.
+
+**Return to PM:** **Approve with comments.** The FE spine is contract-faithful against the real backend — route fields read only from their true carriers, the `FigureTrace` grounding invariant holds (no clause cites on figures), HITL/422/502/404 all handled, and the fabricated-citation money-shot reproduces with distinct verified/rejected stamps. All three gates green: build (46 modules), `tsc --noEmit` clean, biome 0 errors. No Critical/Major findings. Three Minor items are mock-vs-live divergences (the `items` shape; and — most important — the live fabrication-rejection isn't proven by this mock-only slice) to tighten before the FE-6 live swap, not blocking this commit.
