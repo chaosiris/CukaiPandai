@@ -26,6 +26,7 @@ from api.agents.documents import classify_line_items
 from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
+from api.persistence import EntityRepository, make_checkpointer
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
@@ -59,14 +60,14 @@ _ENTITIES: dict[str, dict] = {
     e["tin"]: e
     for e in [json.loads(Path("core/fixtures/entity_acme.json").read_text(encoding="utf-8"))]
 }
+# BE-17: reads from Neon when DATABASE_URL is set, else from the fixtures above (fallback).
+_ENTITY_REPO = EntityRepository(_ENTITIES)
 
-# Single in-process HITL filing graph (MemorySaver persists paused state across the
-# start→resume calls, keyed by thread_id). The graph's compute node is deterministic —
-# it never calls the LLM — so no model client is constructed here.
-# NOTE: MemorySaver is in-process and non-durable — paused threads are lost on restart and
-# do not survive across multiple Uvicorn workers. Run a single worker on Render; made durable
-# via the Neon Postgres checkpointer in BE-15.
-_FILING_GRAPH = build_filing_graph(None)
+# Single in-process HITL filing graph. The compute node is deterministic (no LLM), so no model
+# client is constructed here. BE-15: a durable Neon Postgres checkpointer is used when
+# DATABASE_URL is set; otherwise this falls back to an in-process MemorySaver (single Uvicorn
+# worker; paused threads non-durable across restart — acceptable for the demo, durable with Neon).
+_FILING_GRAPH = build_filing_graph(None, checkpointer=make_checkpointer())
 
 # Shared MSIC client: data.gov.my caps at ~4 req/min, so reuse one instance (the catalogue is
 # fetched once and cached) rather than re-downloading per request. Tests override get_msic.
@@ -105,8 +106,9 @@ def health() -> dict:
 
 @app.get("/entities/{tin}")
 def get_entity(tin: str) -> dict:
-    """Serve a seeded entity profile so the FE can render onboarding + the calendar header (BE-8)."""
-    data = _ENTITIES.get(tin)
+    """Serve an entity profile so the FE can render onboarding + the calendar header (BE-8;
+    BE-17: from Neon when configured, else fixtures)."""
+    data = _ENTITY_REPO.get(tin)
     if data is None:
         raise HTTPException(status_code=404, detail=f"Entity {tin} not found")
     return EntityTaxProfile(**data).model_dump(mode="json")

@@ -28,11 +28,13 @@ def _approval(state: S) -> S:
     return {"approved": bool(decision.get("approved"))}
 
 
-def build_filing_graph(llm):
+def build_filing_graph(llm, checkpointer=None):
+    """Compile the HITL filing graph. ``checkpointer`` defaults to an in-process MemorySaver
+    (tests/offline); pass a durable Postgres checkpointer (BE-15) in production."""
     g = StateGraph(S)
     g.add_node("compute", _compute)
     g.add_node("approval", _approval)
     g.add_edge(START, "compute")
     g.add_edge("compute", "approval")
     g.add_edge("approval", END)
-    return g.compile(checkpointer=MemorySaver())
+    return g.compile(checkpointer=checkpointer or MemorySaver())

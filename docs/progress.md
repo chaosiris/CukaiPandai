@@ -342,3 +342,19 @@ CukaiPandai/
 - **Tests:** 93 backend pass (89 → 93). Live spike 4/4. Subagent-audited: BE-12/13/14 RESOLVED; fabrication invariant holds.
 - **⚠ uv.lock:** `model2vec` + `numpy` added to `pyproject.toml` → run `cd backend && uv lock` (uv unavailable in this session; mirrors the BE-4 `holidays` lock fix).
 - **Files:** `core/models.py`, `core/rag.py` (new), `core/fixtures/lawcorpus_seed.json`, `core/fixtures/rag/{vectors.npz,chunks.json}` (new), `scripts/build_rag_index.py` (new), `api/agents/{deductibility,audit_defense}.py`, `pyproject.toml`, `.gitignore`, `tests/api/test_rag.py` (new).
+
+---
+
+## [24/06/26] — Phase 3 ③ Neon persistence — fallback-first SEAMS (DO-4 + BE-15/16/17) `[BE]` `[DO]`
+
+> **Status: seams built + fallbacks tested; live-Neon NOT yet verified.** The plan boxes for DO-4/BE-15/16/17 stay **unticked** — their acceptance (live Neon round-trips, restart-survival) needs a `DATABASE_URL` (DO-4 provisioning is the human step). What's done is the **demo-critical fallback-first architecture**.
+
+- **Fallback-first (DB-down ≠ demo-down):** every seam degrades to in-memory/fixtures when `DATABASE_URL` is unset/unreachable; the `psycopg`/`langgraph-checkpoint-postgres` imports are **lazy** — the app boots and every endpoint works even with those packages absent (audit-verified).
+- **BE-15:** `build_filing_graph(llm, checkpointer=None)` defaults to MemorySaver; `make_checkpointer()` builds a Neon `PostgresSaver` when `DATABASE_URL` is set (`setup()` over the UNPOOLED endpoint; runtime over POOLED with `prepare_threshold=0`), else None → MemorySaver. Any error → None (degrades, never crashes).
+- **BE-16:** `make_evidence_vault()` → in-memory core `EvidenceVault` by default; `_PostgresEvidenceVault` mirrors the surface, **hashes-not-payloads** preserved.
+- **BE-17:** `EntityRepository` serves the seeded fixture by default; reads Neon `entities` when configured, falling through to fixtures on any error. `GET /entities/{tin}` reads via the repo.
+- **DO-4:** deps in `pyproject.toml`; `DATABASE_URL`/`DATABASE_URL_UNPOOLED` documented in `.env.example`; `migrations/neon_schema.sql` (audit/links + entities/filings/defense_packs; checkpoints via `PostgresSaver.setup()`). **Provisioning the Neon project + the connection string is the human step — pending.**
+- **Tests:** 96 backend pass (93 → 96; +3 persistence fallback tests). Subagent-audited: BE-15/16/17 + DO-4 seams RESOLVED, demo-safe.
+- **⚠ uv.lock:** now also needs `psycopg` + `langgraph-checkpoint-postgres` → run `cd backend && uv lock`.
+- **Next (needs creds):** provide `DATABASE_URL` → tick DO-4, wire + live-verify BE-15 restart-survival, BE-16/17 round-trips.
+- **Files:** `api/persistence.py` (new), `api/graph.py`, `api/main.py`, `pyproject.toml`, `.env.example`, `migrations/neon_schema.sql` (new), `tests/api/test_persistence.py` (new).
