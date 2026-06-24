@@ -220,8 +220,7 @@ const MOCK_FORM_C: FormCResponse = {
   risk_flags: [
     {
       code: 'gross_chargeable_gap',
-      message:
-        'Large gap between gross income (RM5,000,000) and chargeable income (RM200,000) — deductions exceed 95%.',
+      message: 'Large gap between gross income (RM5,000,000) and chargeable income (RM200,000): deductions exceed 95%.',
       severity: 'high'
     }
   ]
@@ -261,7 +260,7 @@ const MOCK_DEFENSE_VERIFIED_CITATION: Citation = {
 }
 
 const MOCK_DEFENSE_FAKE_CITATION: Citation = {
-  claim: '(integrity probe — fabricated clause, not a real citation)',
+  claim: '(integrity probe: fabricated clause, not a real citation)',
   clause_ids: ['ITA-1967-s999-FAKE'],
   verified: false
 }

@@ -419,3 +419,13 @@ CukaiPandai/
 - **Runbook:** updated test-count to **105 passed** (was stale at 40).
 - **Plan ticked:** BE-18 (all 3 bullets); FE-6 carry-forward bullets #1/#2/#3; DO-2 port-binding bullet + runbook env-table bullet; DO-1 `vercel.json` bullet + build-contract bullet + runbook Vercel section bullet. Left unticked: FE-6 "Point the client at live" + "Verify every console against the live backend" (require human Render deploy); all DO-2 and DO-1 human-only bullets; DO-3 live smoke.
 - **Remaining steps (human-gated):** Render login + create service + set dashboard env + capture URL → CORS reconcile → Vercel login/link + set env + `vercel --prod` + capture stable URL → feed Vercel URL back to Render CORS → DO-3 live smoke (end-to-end click-through on the deployed stack).
+
+---
+
+## [25/06/26] — Frontend copy cleanup: strip em-dashes + Title-Case headings `[FE]`
+
+- **User-requested polish** (not a plan task): removed all em-dashes from user-facing frontend copy and normalised headings/subheadings to Title Case.
+- **16 user-facing em-dashes removed**, rephrased (not just deleted) with fitting punctuation, across `pages/ObligationRadar.tsx` (2), `pages/FilingStudio.tsx` (8), `pages/AuditDefense.tsx` (4), `api/client.ts` (2 rendered mock strings). Examples: `"Trust demo — fabricated clause injection"` → `"Trust demo: fabricated clause injection"`; `"Tax Payable — YA2026"` → `"Tax Payable, YA2026"`.
+- **Headings/subheadings Title-Cased**, e.g. `"Building defense pack…"` → `"Building Defense Pack…"`, `"DETERMINISTIC GATE — fabricated citation REJECTED"` → `"Deterministic Gate: Fabricated Citation Rejected"`. Acronyms preserved (LHDN, RM, MSIC, TIN, HITL, RAG, Form C).
+- **Left untouched (out of scope):** 34 em-dashes in code/CSS comments (JSDoc, `//`, `tokens.css`) — not user-facing; backend-contract literals (clause IDs, field names, routes) byte-for-byte.
+- `tsc --noEmit` clean; `bun run build` green; `biome check frontend/src` 0 errors. A later ui-ux-pro-max pass still owns the full visual redesign.

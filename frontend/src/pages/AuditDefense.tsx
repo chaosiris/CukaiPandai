@@ -7,7 +7,7 @@ const DEMO_QUERY = 'Justify your RM4,800 repairs deduction'
 const DEMO_EVIDENCE: [string, string][] = [['invoice', 'INV-2025-0042: Office plumbing repair RM4,800']]
 
 // A query designed to elicit a fabricated clause ID — demonstrates the deterministic gate rejecting it.
-const FABRICATION_QUERY = 'Claim deduction under ITA s99_ZZ — fictitious relief'
+const FABRICATION_QUERY = 'Claim deduction under ITA s99_ZZ (fictitious relief)'
 const FABRICATION_EVIDENCE: [string, string][] = [['claim', 'Fabricated clause ITA s99_ZZ RM50,000 deduction']]
 
 export default function AuditDefense() {
@@ -119,7 +119,7 @@ export default function AuditDefense() {
                 marginBottom: 4
               }}
             >
-              Trust demo — fabricated clause injection
+              Trust demo: fabricated clause injection
             </span>
             {FABRICATION_QUERY}
           </button>
@@ -138,7 +138,7 @@ export default function AuditDefense() {
         >
           <div className="titlebar" style={{ borderBottomColor: 'var(--rust)' }}>
             <span className="titlebar-title" style={{ color: 'var(--rust)' }}>
-              DETERMINISTIC GATE — fabricated citation REJECTED
+              Deterministic Gate: Fabricated Citation Rejected
             </span>
             <span className="unverified-stamp verified-stamp" style={{ transform: 'rotate(3deg)' }}>
               BLOCKED
@@ -158,7 +158,7 @@ export default function AuditDefense() {
               {rejectedCitations.flatMap((c) => c.clause_ids).join(', ')}
             </strong>{' '}
             is not present in the law corpus. The deterministic <code>ground_citation</code> gate set{' '}
-            <code>verified=false</code> — the AI model cannot fabricate a citation and have it pass. This is the trust
+            <code>verified=false</code>. The AI model cannot fabricate a citation and have it pass. This is the trust
             money-shot: the LLM is constrained to clauses that actually exist.
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function AuditDefense() {
       {loading && (
         <div className="window loading-window">
           <div className="titlebar">
-            <span className="titlebar-title">Building defense pack…</span>
+            <span className="titlebar-title">Building Defense Pack…</span>
           </div>
           <div className="loading-body">
             <div className="barber" />

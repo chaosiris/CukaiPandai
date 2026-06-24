@@ -46,7 +46,7 @@ export default function ObligationRadar() {
       {(entityLoading || (!data && !displayError)) && !displayError && (
         <div className="window loading-window">
           <div className="titlebar">
-            <span className="titlebar-title">Loading obligations…</span>
+            <span className="titlebar-title">Loading Obligations…</span>
           </div>
           <div className="loading-body">
             <div className="barber" />
@@ -95,7 +95,7 @@ export default function ObligationRadar() {
                   <span className="requirement-label-text">Basis period</span>
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                  {entity.basis_period_start} — {entity.basis_period_end}
+                  {entity.basis_period_start} to {entity.basis_period_end}
                 </span>
               </div>
             </li>
@@ -115,7 +115,7 @@ export default function ObligationRadar() {
                 <div className="requirement-topline">
                   <span className="requirement-label">
                     <span className="requirement-label-text">
-                      {ob.form} — {ob.obligation_type}
+                      {ob.form}: {ob.obligation_type}
                     </span>
                     <span className="kind-tag must">{ob.status}</span>
                   </span>
