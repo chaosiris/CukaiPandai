@@ -208,7 +208,10 @@ def _owner(authorization: str | None = Header(default=None)) -> str:
     """Resolve the JWT `sub` from the Bearer token; 401 without a valid token."""
     user = _bearer_user(authorization)
     claims = auth.decode_token(authorization.split(" ", 1)[1].strip())  # type: ignore[union-attr]
-    return claims["sub"]
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(status_code=401, detail="invalid token")
+    return sub
 
 
 @app.get("/me/entity")

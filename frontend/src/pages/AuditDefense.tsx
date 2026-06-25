@@ -141,7 +141,7 @@ function AssistantTurn({ msg }: { msg: ChatMessage }) {
               {rejectedCitations.flatMap((c) => c.clause_ids).join(', ')}
             </strong>{' '}
             is not present in the law corpus. The deterministic <code>ground_citation</code> gate set{' '}
-            <code>verified=false</code> — fabricated clause IDs cannot pass.
+            <code>verified=false</code>: fabricated clause IDs cannot pass.
             {verifiedCitations.length > 0 && (
               <span>
                 {' '}

@@ -57,7 +57,7 @@ function validateMsic(v: string): string | null {
     .filter(Boolean)
   if (parts.length === 0) return 'Enter at least one MSIC code'
   const invalid = parts.filter((p) => !/^\d{4,5}$/.test(p))
-  if (invalid.length > 0) return `Invalid MSIC code(s): ${invalid.join(', ')} — must be 4-5 digits`
+  if (invalid.length > 0) return `Invalid MSIC code(s): ${invalid.join(', ')}. Must be 4-5 digits`
   return null
 }
 
@@ -299,7 +299,7 @@ export default function Entity() {
         >
           <div style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
             You are viewing a seed demo entity. Editing below will save your own profile as "My Company" and switch the
-            active entity — the seed remains selectable from Settings.
+            active entity. The seed remains selectable from Settings.
           </div>
         </div>
       )}
