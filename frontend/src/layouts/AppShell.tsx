@@ -357,6 +357,9 @@ export function AppShell() {
               <NavLink className={drawerLinkClass} to="/dashboard" end onClick={closeDrawer}>
                 Dashboard
               </NavLink>
+              <NavLink className={drawerLinkClass} to="/faq" onClick={closeDrawer}>
+                FAQ
+              </NavLink>
             </div>
 
             <div className="drawer-section">
