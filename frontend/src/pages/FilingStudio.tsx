@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useActivePersona } from '../PersonaContext'
 import {
   type ClassifyResponse,
   type FilingResumeResponse,
@@ -14,12 +15,6 @@ import {
 } from '../api/client'
 import { SovereignBadge } from '../components/CitationPanel'
 import { useEntity } from '../hooks/useEntity'
-
-// Raw trial-balance text pre-filled for the demo (mirrors Acme fixture values)
-const DEMO_RAW_TEXT = `Revenue  5000000
-Salaries and wages  2000000
-Repairs and maintenance  4800
-Depreciation  120000`
 
 type Phase =
   | { tag: 'idle' }
@@ -309,11 +304,21 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
 }
 
 export default function FilingStudio() {
+  const { persona } = useActivePersona()
   const { entity, error: entityError, loading: entityLoading } = useEntity()
-  const [rawText, setRawText] = useState(DEMO_RAW_TEXT)
+  // Reset the studio when the active persona changes
+  const [rawText, setRawText] = useState(persona.demoRawText)
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
   const [phase, setPhase] = useState<Phase>({ tag: 'idle' })
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
+  useEffect(() => {
+    setRawText(persona.demoRawText)
+    setClassifyResult(null)
+    setLineItems([])
+    setPhase({ tag: 'idle' })
+  }, [persona.tin])
 
   const displayError = entityError ?? (phase.tag === 'error' ? phase.message : null)
 

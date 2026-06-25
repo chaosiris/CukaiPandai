@@ -356,3 +356,77 @@ The honesty invariant holds end-to-end, mock↔live parity is achieved (all thre
 **Smoke test:** `yaml.safe_load(deploy.yml)` → OK · `cd frontend && bun run build` → 46 modules, exit 0 · `bunx tsc --noEmit` → exit 0 · `bunx biome check frontend/src` → 9 files, 0 errors · `ci.yml` absent (only `deploy.yml` in workflows dir) · action refs all valid major tags.
 
 **Return to PM:** **Approve.** The two failure modes that matter are both correctly closed: (1) deploy jobs are guarded by `github.ref == 'refs/heads/main' && github.event_name == 'push'`, so fork/PR events skip them entirely and need no secrets; (2) with secrets unset both deploy jobs end GREEN — `deploy-backend` warns + `exit 0` on empty `$HOOK`, `deploy-frontend` uses the legal `HAS_VERCEL` env-var/step-check pattern (not the disallowed `if: secrets.X != ''`) so every Vercel step is skipped. `permissions: contents: read`, no secret values in YAML (IDs live only in the runbook, flagged non-sensitive), correct `vercel pull→build→deploy --prebuilt --prod` chain, valid action refs, `ci.yml` removed, YAML parses, frontend green. Only two optional Minors (redundant `--token` flag; docker-build is build-only by design). The remaining human-gated steps (add 4 secrets, confirm first green run, turn off Render native auto-deploy) are correctly left unticked. Ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — FE-8: seed personas + DEMO MODE banner + 2 backend entity fixtures `[FE]` `[BE]`
+
+**Branch:** `main` (working tree, uncommitted). 9 modified + 4 new: `backend/{api/main.py,tests/api/test_entity_endpoint.py,uv.lock}`, **new** `backend/core/fixtures/{entity_sinar,entity_selera}.json`; `frontend/src/{App.tsx,api/client.ts,hooks/useEntity.ts,pages/FilingStudio.tsx}`, **new** `frontend/src/{personas.ts,PersonaContext.tsx}`; `docs/{plan,progress}.md`.
+
+**Verdict:** Approve with comments
+
+Persona↔fixture coherence is exact, the picker drives all three consoles, mock parity is complete, and all gates are green (107 backend / tsc / build / biome). No Critical or Major findings. Two Minor items: (1) the audit-defense console doesn't clear a stale defense pack when you switch persona, so its header briefly shows the new TIN above the prior persona's pack; (2) Acme and Selera derive the _same_ obligation calendar (same types and — sharing basis dates — same due dates), so only Sinar is visibly distinct. Neither blocks a commit. Recommend authorizing.
+
+### Persona↔ssm↔fixture coherence (highest priority — VERIFIED field-by-field, exact)
+
+Cross-checked `personas.ts` ssm, the backend fixtures, `client.ts` `ACME_SSM`/`MOCK_ENTITIES`, all field-by-field. **All three agree on every compute/obligation-driving field:**
+
+- **Acme** `C2581234509`: `personas.ts` reuses `ACME_SSM`; `ACME_SSM` == `entity_acme.json` == `MOCK_ENTITIES[ACME_TIN]` (sdn_bhd · msic 46900 · gross 5,000,000 · emp 12 · sst true · BP 2025-01-01→12-31 · comm 2018-03-01). Match.
+- **Sinar Digital** `C7654321098`: `personas.ts:28-39` == `entity_sinar.json` == `MOCK_ENTITIES.C7654321098` (sdn_bhd · msic 62010 · paid_up 100,000 · gross 380,000 · emp 3 · **sst false** · BP 2025 · comm 2022-04-01). Match.
+- **Selera Kita** `C3219876540`: `personas.ts:48-58` == `entity_selera.json` == `MOCK_ENTITIES.C3219876540` (sdn_bhd · msic 56101 · paid_up 500,000 · gross 2,500,000 · **emp 45** · **sst true** · BP 2025 · comm 2019-09-01). Match.
+
+**Header↔calendar cannot diverge — stronger than the spec asks.** Both consoles build the obligations/form-c `ssm` from the _fetched_ `EntityTaxProfile` (the same object that renders the header), not from the `personas.ts` ssm: `ObligationRadar.tsx:12-23` spreads `entity.*` into the `getObligations` body, and `FilingStudio` uses `buildSsm(entity)` (`:342,369`). The `personas.ts` `ssm` field only seeds `DEFAULT_PERSONA`/the mock store; live compute reads the GET response. So a persona's header (GET `/entities/{tin}`) and its calendar/form-c (POST with `ssm`) are guaranteed to tell one story. No mismatch found.
+
+### Personas drive different calendars (VERIFIED against `derive_obligations` + `ya_2026.yaml`)
+
+`derive_obligations` (`core/obligations.py`) emits: C + CP204 always; einvoice if `gross_income >= 1,000,000` (lowest `einvoice_phases.min_turnover`, `ya_2026.yaml:26`); SST-02 if `sst_registered`; CP39 if `employee_count > 0`. Resulting calendars:
+
+- **Sinar** (gross 380k < 1m, sst false, emp 3): C · CP204 · CP39 → **3 obligations, no einvoice, no SST**. Visibly distinct. ✅
+- **Acme** (gross 5m, sst true, emp 12): C · CP204 · einvoice · SST · CP39 → **5 obligations**.
+- **Selera** (gross 2.5m, sst true, emp 45): C · CP204 · einvoice · SST · CP39 → **5 obligations**.
+
+The demo's variation lands (Sinar is clearly different), but **Acme and Selera produce an identical obligation set** — same five types, and because both share `basis_period_start/end = 2025-01-01/12-31`, the due dates are identical too (einvoice/CP39 → basis_start; C → form_c_deadline(basis_end); SST → basis_end). See Minor M2 below — the demo would read more strongly if Selera's calendar differed from Acme's beyond gross-income/employee-count magnitude (which don't change the obligation _lines_).
+
+### Active-persona wiring (VERIFIED — all three consoles switch; no residual ACME\_)
+
+- `App.tsx` wraps the tree in `ActivePersonaProvider` and renders `<PersonaPicker>` (a `<select>` over `PERSONAS` keyed on tin, `:21-49`) in the topbar; switching calls `setPersona`.
+- `useEntity()` (`hooks/useEntity.ts`) resolves `tin ?? persona.tin` and re-fetches in a `useEffect` keyed on `resolvedTin` — so the picker change re-runs the entity fetch.
+- **ObligationRadar** — `useEntity()` → re-fetches obligations in a `useEffect` keyed on `entity` (`:10-26`); header shows `entity?.tin`. Switches. ✅
+- **FilingStudio** — `useEntity()` + `useActivePersona()`; a `useEffect` keyed on `persona.tin` (`:316-321`) re-seeds `rawText` from `persona.demoRawText` and clears classify/lineItems/phase; compute uses `buildSsm(entity)`. Switches and resets cleanly. ✅
+- **AuditDefense** — `useEntity()`; request uses `entity.tin`, header shows `entity?.tin` (`:32,50`). Switches. ✅ (but see M1 — no clear-on-switch for the result pack).
+- **Grep for residual `ACME_*` in `pages/`** → **zero hits.** The only `ACME_*`/`MOCK_ENTITY` references are in `client.ts` (the Acme persona's own data + `MOCK_ENTITIES[ACME_TIN]`). No page hardcodes Acme.
+
+### Mock parity (VERIFIED)
+
+- `MOCK_ENTITIES` (`client.ts:332-358`) serves all 3 TINs; `getEntity` returns the keyed profile in mock mode and throws `404` for an unknown TIN (`:362-365`), matching the live 404 (`main.py:116-117`). The old single-Acme `getEntity` that threw for non-Acme is gone.
+- The three mock entity objects are **byte-identical** to the backend fixtures (checked field-by-field above), so a `VITE_API_MOCK=1` run drives the picker for all personas with the same data the live backend would return.
+
+### Banner + no regressions (VERIFIED)
+
+- `DemoModeBanner` (`App.tsx:51-68`) returns `null` unless `import.meta.env.VITE_DEMO_MODE === '1'` — strict `=== '1'`, so absent/`'0'`/`'true'` all hide it. When hidden it renders nothing (no empty wrapper), so layout is unaffected. When shown it's a single mustard strip above the topbar.
+- FE-6 carry-forward intact: the AuditDefense fabrication path is untouched — `getAuditDefense(entity.tin, …, mode==='fabrication')` still flows to `makeMockDefense(true)`/the live `inject_fabricated` body; the `verified=false` row remains gated behind the inject flag (`client.ts:277-279`). No change to the honesty path.
+
+### Backend (VERIFIED)
+
+- The 2 new fixtures parse as valid `EntityTaxProfile`: `GET /entities/{tin}` constructs `EntityTaxProfile(**data)` (`main.py:118`) and the 2 new endpoint tests (`test_get_entity_sinar`, `test_get_entity_selera`) pass — a malformed fixture would 500/raise. `_ENTITIES` loads all three via a dict-comp keyed on `tin` (`main.py:59-66`).
+- Unknown TIN still 404s (`test_get_entity_unknown_tin_404` green). Existing tests unaffected — full suite **107 passed**.
+
+### Findings
+
+**Critical:** none. **Major:** none.
+
+**Minor:**
+
+- `frontend/src/pages/AuditDefense.tsx:13-44` — [Minor] **No clear-on-persona-switch for the defense result.** `data`/`activeQuery` are page-local state with no `useEffect` keyed on `entity`/persona (unlike FilingStudio's `:316-321` reset and ObligationRadar's `entity`-keyed refetch). After you run a defense for one persona then switch the picker, the header `page-kicker` updates to the new TIN (`:50`) while the previously-rendered defense pack (citations/exposure/items) stays on screen until the user clicks a query button again — a brief header-vs-body contradiction. Demo impact is small because the mock/demo defense content is fixed to Acme's "RM4,800 repairs" regardless of persona, but it's the one console that doesn't track the picker for its _body_. → Fix: add `useEffect(() => { setData(null); setActiveQuery(null); setError(null) }, [entity?.tin])` so the pack clears when the persona changes.
+- `core/obligations.py` + `frontend/src/personas.ts:45-65` — [Minor] **Acme and Selera derive an identical obligation calendar.** Both clear the RM1m einvoice threshold, are `sst_registered`, and have `employee_count > 0`, and they share basis-period dates — so `derive_obligations` emits the same five obligation lines with the same due dates for both. Only Sinar is visibly distinct (drops einvoice + SST). The 45-vs-12 employee gap and 2.5m-vs-5m gross gap don't change the _lines_ the radar renders (the rules are boolean on `>0` / `>=1m`). Not a bug — the seeded values are internally coherent — but the demo's "three different calendars" value is really "two identical + one different." → Optional: give Selera a sub-RM1m-but-SST-registered or sub-threshold profile, or pick basis dates that shift a due date, so its radar reads differently from Acme's. Folds into a future FE/data tweak; not blocking.
+
+**Informational (no action):**
+
+- `personas.ts:5,19` reuses the exported `ACME_SSM`/`ACME_TIN` from `client.ts` for the Acme persona rather than re-literalling the values — good (single source of truth; can't drift from the mock).
+- `FilingStudio.tsx:315` carries a `biome-ignore lint/correctness/useExhaustiveDependencies` on the reset effect (keyed on `persona.tin`, intentionally omitting the setters) — legitimate use; biome passes clean.
+- Visual polish of the picker/banner intentionally NOT raised (owned by the queued ui-ux-pro-max pass, per the task non-goals). FE not-yet-redeployed and per-persona form-c numbers differing from Acme's RM31,000 also out of scope per the brief.
+- No AI attribution in the diff (`git diff HEAD | grep -iE 'co-authored|generated with|claude code|noreply@anthropic|🤖'` → 0 matches).
+
+**Smoke test:** `cd backend && uv run pytest -q` → **107 passed, 1 warning** (pre-existing Starlette/httpx deprecation) · `cd frontend && bunx tsc --noEmit` → **exit 0** · `bun run build` → **48 modules, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from root) → **11 files, 0 errors** · persona↔fixture cross-check → exact on all compute fields · `grep ACME_ pages/` → 0 hits · `derive_obligations` calendars → Sinar 3 / Acme 5 / Selera 5 (Acme==Selera).
+
+**Return to PM:** **Approve with comments.** Persona↔fixture coherence is exact across `personas.ts`, the two new backend fixtures, and `MOCK_ENTITIES` — and the consoles build their obligations/form-c `ssm` from the _fetched_ entity, so a persona's header can never contradict its calendar. The picker drives all three consoles (no residual `ACME_*` in any page), mock mode serves all 3 TINs with 404 parity, the DEMO banner is strictly gated on `VITE_DEMO_MODE==='1'`, and the FE-6 fabrication path is untouched. All gates green (107 / tsc / build / biome). Two Minor non-blockers: AuditDefense doesn't clear a stale defense pack on persona switch (header updates, body doesn't); and Acme & Selera yield identical obligation calendars (only Sinar is distinct) so the "three different calendars" demo value is really two-plus-one. Ready for Gate-2 commit authorization.

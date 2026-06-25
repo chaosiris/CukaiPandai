@@ -445,3 +445,59 @@ CukaiPandai/
 - **`docs/plan.md`** — DO-5 added under Phase 3 with agent-done bullets ticked and human-gated bullets (add secrets, confirm green run, turn off Render auto-deploy) left unticked.
 - **Remaining human-gated steps:** add the 4 secrets in GitHub → Settings → Secrets → Actions; push to `main`; confirm the first green run in the Actions tab; turn off Render native auto-deploy.
 - **Files touched:** `.github/workflows/deploy.yml` (new), `.github/workflows/ci.yml` (deleted), `docs/runbook.md`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [25/06/26] — FE-8: seed personas + entity-picker + DEMO MODE banner; FE-6 confirmed complete `[BE]` `[FE]`
+
+### `[BE]` — FE-8 entity fixtures seeded into `_ENTITIES`
+
+- Added `backend/core/fixtures/entity_sinar.json` (Sinar Digital Sdn Bhd, TIN `C7654321098`, MSIC `62010`, gross income RM380k, 3 employees, SST-exempt — services SME; produces a visibly leaner obligation calendar than Acme).
+- Added `backend/core/fixtures/entity_selera.json` (Restoran Selera Kita Sdn Bhd, TIN `C3219876540`, MSIC `56101`, gross income RM2.5m, 45 employees, SST-registered — employer-heavy F&B; higher headcount drives a different HR/payroll obligation profile than the other two personas).
+- Extended `_ENTITIES` in `backend/api/main.py` (lines 57-64) to load all three fixtures; the `EntityRepository` / `GET /entities/{tin}` handler serves all three without further change.
+- Added `test_get_entity_sinar` and `test_get_entity_selera` in `backend/tests/api/test_entity_endpoint.py` asserting 200 + correct TIN/MSIC/field values for both new personas.
+- **Test result:** 107 passed, 1 warning (uv run pytest -q from `backend/`). All prior 105 tests remain green; 2 new entity tests added.
+
+### `[FE]` — FE-8 personas + entity-picker + DEMO MODE banner + mock fix
+
+- **`frontend/src/personas.ts`** (new): `PERSONAS` list of 3 `Persona` objects (tin, label, ssm, demoRawText) — Acme Trading / Sinar Digital / Selera Kita. Each `ssm` matches its backend fixture exactly so `getObligations` and `getEntity` tell one coherent story per persona. Each has a persona-appropriate trial-balance `demoRawText` for the Filing Studio.
+- **`frontend/src/PersonaContext.tsx`** (new): `ActivePersonaProvider` wrapping React context with `{ persona, setPersona }` state; defaults to Acme. `useActivePersona()` hook exported for consumers.
+- **`frontend/src/App.tsx`** — wrapped the router in `<ActivePersonaProvider>`; added `PersonaPicker` component (a `<select>` listing the 3 persona labels; on change calls `setPersona`); added `DemoModeBanner` component (rendered above the nav when `import.meta.env.VITE_DEMO_MODE === '1'`). The picker and banner use existing devkit tokens; no style overhaul.
+- **`frontend/src/hooks/useEntity.ts`** — now reads `useActivePersona()` and resolves `tin` from `persona.tin` when no explicit `tin` arg is passed. All three pages call `useEntity()` with no arg and therefore track the active persona automatically.
+- **`frontend/src/pages/FilingStudio.tsx`** — imports `useActivePersona`; seeds `rawText` from `persona.demoRawText`; a `useEffect` on `persona.tin` resets rawText + classify state + phase when the persona switches.
+- **`frontend/src/api/client.ts`** — mock `getEntity` extended: `MOCK_ENTITIES` map covers all 3 personas (Acme + Sinar + Selera); previously threw for any TIN != ACME_TIN, now serves all 3 personas in `VITE_API_MOCK=1` mode.
+
+### `[FE]` — FE-6 confirmed complete (live deploy + smoke test)
+
+- The two remaining FE-6 bullets ("Point the client at live" and "Verify every console against the LIVE backend") are DONE — `VITE_API_BASE_URL` and `VITE_API_MOCK=0` were set in the Vercel dashboard and the human's end-to-end smoke test passed. Ticked in `docs/plan.md`.
+
+### Build/lint status
+
+- `bunx tsc --noEmit` → clean (0 errors).
+- `bun run build` → 48 modules, `dist/` emitted cleanly (1.73s).
+- `bunx biome check frontend/src` → 0 errors, 11 files checked.
+
+### Notes
+
+- The consoles remain v1/functional pending the queued ui-ux-pro-max redesign (FE-7 / future polish pass). The persona switcher is a plain `<select>` — deliberately functional, not polished.
+- The FE still needs a manual `vercel --prod` to pick up the new files (CI deploy half-dormant until GitHub secrets are added). The PM will handle the redeploy.
+
+### Files touched
+
+- `backend/core/fixtures/entity_sinar.json` (new)
+- `backend/core/fixtures/entity_selera.json` (new)
+- `backend/api/main.py` (extend `_ENTITIES` list)
+- `backend/tests/api/test_entity_endpoint.py` (2 new tests)
+- `frontend/src/personas.ts` (new)
+- `frontend/src/PersonaContext.tsx` (new)
+- `frontend/src/App.tsx` (ActivePersonaProvider + PersonaPicker + DemoModeBanner)
+- `frontend/src/hooks/useEntity.ts` (reads active persona tin from context)
+- `frontend/src/pages/FilingStudio.tsx` (persona-aware rawText + reset effect)
+- `frontend/src/api/client.ts` (MOCK_ENTITIES map for all 3 personas)
+
+## [25/06/26] — FE-8 QA fix-pass (M1 stale-pack + M2 Selera basis-period) `[FE/BE]`
+
+- **M1:** `AuditDefense.tsx` — added `useEffect` keyed on `entity?.tin` that resets `data`, `error`, `activeQuery`, and `technicalOpen` to initial on every persona switch; matches FilingStudio pattern. Imported `useEffect` (was missing). `AuditDefense.tsx:21-27`.
+- **M2:** Varied Selera on `basis_period_start`/`basis_period_end` (Apr 2024–Mar 2025 FY vs Acme's Jan–Dec 2025). Synced identically across all three places: `backend/core/fixtures/entity_selera.json`, `frontend/src/personas.ts`, `frontend/src/api/client.ts`. Result: Selera's obligation calendar has different Form C (Oct 2025 vs Jul 2026), CP204, einvoice, and SST due-dates from Acme's — visibly distinct without changing any obligation logic.
+- **Tests:** `uv run pytest -q` → 107 passed (unchanged). `bunx tsc --noEmit` → clean. `bun run build` → 48 modules green. `bunx biome check frontend/src` → 0 errors.
+- `frontend/src/api/client.ts` (MOCK_ENTITIES map for all 3 personas)

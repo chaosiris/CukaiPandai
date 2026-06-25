@@ -327,11 +327,42 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 // --- Public API ---
 
+// Mock entity profiles for all three FE-8 personas — keyed by TIN so the picker
+// works in mock mode without hitting the backend.
+const MOCK_ENTITIES: Record<string, EntityTaxProfile> = {
+  [ACME_TIN]: MOCK_ENTITY,
+  C7654321098: {
+    tin: 'C7654321098',
+    entity_type: 'sdn_bhd',
+    msic_codes: ['62010'],
+    paid_up_capital: 100000,
+    gross_income: 380000,
+    employee_count: 3,
+    sst_registered: false,
+    basis_period_start: '2025-01-01',
+    basis_period_end: '2025-12-31',
+    commencement_date: '2022-04-01'
+  },
+  C3219876540: {
+    tin: 'C3219876540',
+    entity_type: 'sdn_bhd',
+    msic_codes: ['56101'],
+    paid_up_capital: 500000,
+    gross_income: 2500000,
+    employee_count: 45,
+    sst_registered: true,
+    basis_period_start: '2024-04-01',
+    basis_period_end: '2025-03-31',
+    commencement_date: '2019-09-01'
+  }
+}
+
 /** GET /entities/{tin} — fetch a seeded entity profile (BE-8). 404 on unknown TIN. */
 export async function getEntity(tin: string): Promise<EntityTaxProfile> {
   if (MOCK_MODE) {
-    if (tin !== ACME_TIN) throw new Error(`404 Entity ${tin} not found`)
-    return MOCK_ENTITY
+    const profile = MOCK_ENTITIES[tin]
+    if (!profile) throw new Error(`404 Entity ${tin} not found`)
+    return profile
   }
   return get<EntityTaxProfile>(`/entities/${tin}`)
 }
