@@ -37,3 +37,14 @@ CREATE TABLE IF NOT EXISTS defense_packs (
     pack       jsonb NOT NULL,
     created_at timestamptz DEFAULT now()
 );
+
+-- Auth users — password HASHES only (PBKDF2-HMAC), never raw passwords. provider = 'password'|'google'.
+-- The app also creates this lazily (UserRepository._ensure_table); included here for psql provisioning.
+CREATE TABLE IF NOT EXISTS users (
+    id            text PRIMARY KEY,
+    email         text UNIQUE NOT NULL,
+    name          text,
+    password_hash text,
+    provider      text NOT NULL DEFAULT 'password',
+    created_at    timestamptz NOT NULL DEFAULT now()
+);

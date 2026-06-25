@@ -116,9 +116,8 @@
   margin: 0 0 16px;
 }
 
-/* SSO + email — disabled, coming-soon state */
-.auth-sso,
-.auth-email {
+/* SSO (Google) — outline button */
+.auth-sso {
   width: 100%;
   display: inline-flex;
   align-items: center;
@@ -126,19 +125,79 @@
   gap: 10px;
   font-family: var(--font-body);
   font-size: 0.96rem;
-  color: var(--ink-soft);
+  color: var(--ink);
   background: var(--window);
   border: var(--border);
   border-radius: var(--radius);
   padding: 11px 16px;
-  cursor: not-allowed;
-  opacity: 0.5;
+  cursor: pointer;
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.auth-sso:hover:not(:disabled) {
+  background: var(--screen);
+}
+
+.auth-google-glyph {
+  flex: 0 0 auto;
+}
+
+/* host for the rendered Google Identity Services button */
+.auth-google-host {
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+}
+
+/* Email submit — primary filled */
 .auth-email {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin-top: 4px;
-  flex-direction: column;
-  gap: 4px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.98rem;
+  color: var(--paper);
+  background: var(--denim);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-email:hover:not(:disabled) {
+  background: var(--ink);
+}
+
+.auth-sso:disabled,
+.auth-email:disabled,
+.auth-guest:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Inline error + hint */
+.auth-error {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--paper);
+  background: var(--rust, #b3401f);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  margin: 0 0 16px;
+}
+
+.auth-hint {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin: -6px 0 10px;
 }
 
 .auth-coming-soon {
@@ -172,13 +231,17 @@
   box-sizing: border-box;
   font-family: var(--font-body);
   font-size: 0.96rem;
-  color: var(--ink-soft);
+  color: var(--ink);
   background: var(--screen);
   border: var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
-  opacity: 0.5;
-  cursor: not-allowed;
+  transition: border-color 140ms ease;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: var(--denim);
 }
 
 /* Guest — the one real action */

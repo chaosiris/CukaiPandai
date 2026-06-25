@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -20,20 +20,24 @@ from core.lawcorpus import LawCorpus
 from core.models import EntityTaxProfile, FormComputation, LineItem
 from core.obligations import derive_obligations
 
+from api import auth
 from api.agents.audit_defense import build_defense
 from api.agents.audit_risk import assess_risk
 from api.agents.documents import classify_line_items
 from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
-from api.persistence import EntityRepository, make_checkpointer
+from api.persistence import EntityRepository, UserRepository, make_checkpointer
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
     EntityCreateReq,
     FilingResumeReq,
     FormCReq,
+    GoogleAuthReq,
+    LoginReq,
     ObligationsReq,
+    SignupReq,
 )
 
 app = FastAPI(title="CukaiPandai API")
@@ -67,6 +71,10 @@ _ENTITIES: dict[str, dict] = {
 }
 # BE-17: reads from Neon when DATABASE_URL is set, else from the fixtures above (fallback).
 _ENTITY_REPO = EntityRepository(_ENTITIES)
+
+# Auth users — Neon `users` table when DATABASE_URL is set, else a process-level in-memory store
+# (fallback-first, like the repos above). Holds password hashes only.
+_USER_REPO = UserRepository()
 
 # Single in-process HITL filing graph. The compute node is deterministic (no LLM), so no model
 # client is constructed here. BE-15: a durable Neon Postgres checkpointer is used when
@@ -107,6 +115,66 @@ def _line_items(line_items: list[dict]) -> list[LineItem]:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+# --- Auth (real backend: hashed passwords + signed JWT + Google SSO; users in Neon w/ fallback) ---
+
+def _public_user(user: dict) -> dict:
+    """The user fields safe to return to the client — never the password hash."""
+    return {"id": user["id"], "email": user["email"], "name": user.get("name"), "provider": user.get("provider", "password")}
+
+
+def _bearer_user(authorization: str | None) -> dict:
+    """Resolve the current user from an `Authorization: Bearer <jwt>` header, or 401."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    claims = auth.decode_token(authorization.split(" ", 1)[1].strip())
+    if claims is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user = _USER_REPO.get_by_email(claims.get("email", ""))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unknown user")
+    return user
+
+
+def _auth_response(user: dict) -> dict:
+    return {"token": auth.create_token(user["id"], user["email"], user.get("name") or ""), "user": _public_user(user)}
+
+
+@app.post("/auth/signup")
+def signup(req: SignupReq) -> dict:
+    email = req.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1] or len(req.password) < 8:
+        raise HTTPException(status_code=422, detail="Valid email and a password of at least 8 characters are required")
+    if _USER_REPO.get_by_email(email) is not None:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    name = (req.name or email.split("@")[0]).strip()
+    user = _USER_REPO.create(email, name, auth.hash_password(req.password), provider="password")
+    return _auth_response(user)
+
+
+@app.post("/auth/login")
+def login(req: LoginReq) -> dict:
+    user = _USER_REPO.get_by_email(req.email.strip().lower())
+    if user is None or not user.get("password_hash") or not auth.verify_password(req.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return _auth_response(user)
+
+
+@app.post("/auth/google")
+def google_auth(req: GoogleAuthReq) -> dict:
+    if not auth.google_configured():
+        raise HTTPException(status_code=503, detail="Google SSO is not configured on this server")
+    info = auth.verify_google_id_token(req.id_token)
+    if info is None:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+    user = _USER_REPO.upsert_oauth(info["email"].lower(), info["name"], provider="google")
+    return _auth_response(user)
+
+
+@app.get("/auth/me")
+def me(authorization: str | None = Header(default=None)) -> dict:
+    return _public_user(_bearer_user(authorization))
 
 
 @app.post("/entities")

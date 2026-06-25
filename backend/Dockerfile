@@ -10,7 +10,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY core ./core
 COPY api ./api
-RUN uv pip install --system --no-cache -e .
+RUN uv pip install --system --no-cache -e ".[auth-google]"
 
 EXPOSE 8000
 # Run from /app so the law-corpus relative path (core/fixtures/...) resolves.

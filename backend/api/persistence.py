@@ -13,6 +13,7 @@ EntityRepository with fixtures fallback (BE-17) all pass; DB-down fallbacks are 
 from __future__ import annotations
 
 import os
+import uuid
 
 from core.evidence import EvidenceVault
 
@@ -132,3 +133,64 @@ class EntityRepository:
                     )
             except Exception:
                 pass  # fallback already written in-memory above; never crash on DB error
+
+
+class UserRepository:
+    """Auth users — a Neon ``users`` table when DATABASE_URL is set, else a process-level in-memory
+    dict (so tests + a DB-down demo still work). Stores password HASHES, never raw passwords."""
+
+    def __init__(self):
+        self._mem: dict[str, dict] = {}  # email (lowercased) -> user dict
+
+    def _ensure_table(self, conn) -> None:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users ("
+            "id text PRIMARY KEY, email text UNIQUE NOT NULL, name text, "
+            "password_hash text, provider text NOT NULL DEFAULT 'password', "
+            "created_at timestamptz NOT NULL DEFAULT now())"
+        )
+
+    def get_by_email(self, email: str) -> dict | None:
+        email = email.lower()
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    row = conn.execute(
+                        "SELECT id, email, name, password_hash, provider FROM users WHERE email=%s",
+                        (email,),
+                    ).fetchone()
+                    return dict(row) if row else None
+            except Exception:
+                pass  # fall through to in-memory — DB-down ≠ demo-down
+        return self._mem.get(email)
+
+    def create(self, email: str, name: str, password_hash: str | None, provider: str = "password") -> dict:
+        email = email.lower()
+        user = {
+            "id": uuid.uuid4().hex,
+            "email": email,
+            "name": name,
+            "password_hash": password_hash,
+            "provider": provider,
+        }
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    conn.execute(
+                        "INSERT INTO users (id, email, name, password_hash, provider) "
+                        "VALUES (%s,%s,%s,%s,%s)",
+                        (user["id"], email, name, password_hash, provider),
+                    )
+                    return user
+            except Exception:
+                pass  # DB-down ≠ demo-down: fall back to in-memory
+        self._mem[email] = user
+        return user
+
+    def upsert_oauth(self, email: str, name: str, provider: str = "google") -> dict:
+        """Link/create an SSO user — return the existing row if present, else create one (no password)."""
+        return self.get_by_email(email) or self.create(email, name, password_hash=None, provider=provider)

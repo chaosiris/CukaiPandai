@@ -474,23 +474,39 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (res.ok) return res.json() as Promise<T>
   if (res.status === 422) {
     const body = (await res.json()) as ApiValidationError
-    const msgs = body.detail.map((d) => `${d.loc.join('.')}: ${d.msg}`).join('; ')
-    const err = new Error(`Validation error: ${msgs}`) as Error & { validationDetail: ValidationErrorDetail[] }
-    err.validationDetail = body.detail
+    const msgs = Array.isArray(body.detail)
+      ? body.detail.map((d) => `${d.loc.join('.')}: ${d.msg}`).join('; ')
+      : String(body.detail)
+    const err = new Error(`Validation error: ${msgs}`) as Error & { validationDetail?: ValidationErrorDetail[] }
+    if (Array.isArray(body.detail)) err.validationDetail = body.detail
     throw err
   }
-  throw new Error(`${res.status} ${res.statusText}`)
+  // Other errors: surface the FastAPI `detail` string when present (e.g. "Invalid email or password").
+  let message = `${res.status} ${res.statusText}`
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    if (typeof body.detail === 'string') message = body.detail
+  } catch {
+    // non-JSON body; keep the status line
+  }
+  throw new Error(message)
+}
+
+/** Attach the bearer token (if signed in) to every request. */
+function authHeaders(): Record<string, string> {
+  const t = getToken()
+  return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`)
+  const res = await fetch(`${BASE_URL}${path}`, { headers: { ...authHeaders() } })
   return handleResponse<T>(res)
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body)
   })
   return handleResponse<T>(res)
@@ -618,4 +634,83 @@ export async function uploadDocument(tin: string, file: File, profile?: EntityTa
 export async function createEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
   if (MOCK_MODE) return ssm as EntityTaxProfile
   return post<EntityTaxProfile>('/entities', { ssm })
+}
+
+// --- Auth (real backend: hashed passwords + JWT + Google SSO; mock-simulated when VITE_API_MOCK=1) ---
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string | null
+  provider: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: AuthUser
+}
+
+const TOKEN_KEY = 'cp_token'
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token)
+  } catch {
+    // localStorage unavailable; the session simply won't persist across reloads
+  }
+}
+
+export function clearToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+function mockAuth(email: string, provider = 'password', name?: string): AuthResponse {
+  const lower = email.toLowerCase()
+  return {
+    token: `mock-jwt.${btoa(lower)}`,
+    user: { id: `mock-${btoa(lower).slice(0, 12)}`, email: lower, name: name ?? lower.split('@')[0], provider }
+  }
+}
+
+/** POST /auth/signup — create an account, returns {token, user}. */
+export async function authSignup(email: string, password: string, name?: string): Promise<AuthResponse> {
+  if (MOCK_MODE) {
+    if (!email.includes('@') || password.length < 8) {
+      throw new Error('Enter a valid email and a password of at least 8 characters')
+    }
+    return mockAuth(email, 'password', name)
+  }
+  return post<AuthResponse>('/auth/signup', { email, password, name })
+}
+
+/** POST /auth/login — sign in with email + password. */
+export async function authLogin(email: string, password: string): Promise<AuthResponse> {
+  if (MOCK_MODE) {
+    if (!email.includes('@') || password.length < 1) throw new Error('Enter your email and password')
+    return mockAuth(email)
+  }
+  return post<AuthResponse>('/auth/login', { email, password })
+}
+
+/** POST /auth/google — exchange a Google ID token for our session. */
+export async function authGoogle(idToken: string): Promise<AuthResponse> {
+  if (MOCK_MODE) return mockAuth('demo.user@gmail.com', 'google', 'Demo User')
+  return post<AuthResponse>('/auth/google', { id_token: idToken })
+}
+
+/** GET /auth/me — resolve the current user from the stored bearer token (real mode only). */
+export async function authMe(): Promise<AuthUser> {
+  return get<AuthUser>('/auth/me')
 }
