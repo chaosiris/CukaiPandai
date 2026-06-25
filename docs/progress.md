@@ -1020,3 +1020,14 @@ Two targeted fixes surfaced by a post-SUS re-walk.
 | `bun run build` | 73 modules, built in 1.99s |
 | `bunx biome check frontend/src` | 0 errors |
 | `bunx biome check frontend/src` | 0 errors (36 files) |
+
+## [25/06/26] — TD-6 / Q5 YA2026 figure + RAG-clause re-verify (AI-assisted online audit) `[TD]`
+
+- **Scope:** re-audited every demo-visible YA2026 figure in `core/config/ya_2026.yaml` AND all 15 RAG law-corpus clauses (`core/fixtures/lawcorpus_seed.json`) against LHDN/RMCD/MoF + the ITA 1967 (Act 53, AGC `lom.agc.gov.my`) + Big-4, via parallel research subagents.
+- **Figures — all correct** (SME bands 15/17/24 + ≤RM2.5m/≤RM50m conditions, non-SME 24%, CP204 s.107C, Form C 7-mo, CGT 10%/2% from 1 Mar 2024, TP RM30m+RM10m/RM50m, WHT 10/15/10 + contractor 10+3, SST RM500k/RM1m + 8% + enforce 1 Jan 2026). Unchanged in Budget 2026.
+- **ONE correction (e-invoicing):** the ≤RM5m band's **1 Jan 2026 implementation date stands**, but LHDN extended the penalty-free interim relaxation twice (PM Anwar 5 Jan 2026; Specific Guideline v4.7, 20 Apr 2026) → **penalty-free to 31 Dec 2027, full enforcement 1 Jan 2028**. Added `einvoice_smallband_penalty_free_until` + `einvoice_smallband_enforcement_from` (+ comment) to `ya_2026.yaml`. **No computation value changed; golden tests unaffected.**
+- **15 RAG clauses — all correctly numbered/cited** (Act 53 = ITA 1967 confirmed; **PR-6/2019** number+title verified exact; s.140A is the correct TP section, not s.140). Four MATCH-but-imprecise descriptions (s.39 entertainment is a 50% restriction; s.77A also covers LLPs/trusts/co-ops; s.140A formal marginal note; s.33(1) heading) — **gate-safe, left as-is** (tightening would force a RAG-index rebuild).
+- **Seeded Acme golden — confirmed:** `tax_payable RM31,000` = chargeable 200,000 (Revenue 500,000 − expenses 300,000); 15%×150k + 17%×50k (asserted in `tests/test_computation.py`).
+- **Tests:** **107/107 pass** after the config annotation.
+- **Caveat:** AI-assisted online re-verification — a human tax-professional glance is still advisable for the formal TD-6 sign-off. Plan TD-6 + Q5 ticked with that qualifier.
+- **Files:** `backend/core/config/ya_2026.yaml`, `docs/superpowers/research/2026-06-19-ya2026-figures-verification.md`, `docs/plan.md`, `docs/progress.md`.
