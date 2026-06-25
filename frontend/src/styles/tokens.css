@@ -1214,6 +1214,23 @@ a {
   }
 }
 
+/* Narrow-viewport topbar: hide wordmark text + MOCK chip to prevent overlap with controls.
+   The LogoMark stays; the hamburger + controls remain fully usable down to 360px. */
+@media (max-width: 480px) {
+  .topbar-wordmark {
+    display: none;
+  }
+
+  .topbar-mock-chip {
+    display: none;
+  }
+
+  .topbar-entity-select {
+    max-width: 100px;
+    font-size: 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

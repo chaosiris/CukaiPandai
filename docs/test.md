@@ -622,3 +622,54 @@ The hub deepens cleanly and non-regressively. The greeting + 3 action cards are 
 - `bunx biome check frontend/src` (from root) → 0 errors, 22 files checked.
 
 **Return to PM:** **Approve.** The Filing Studio stepper rewrite is non-regressive — all prior capabilities (classify + sovereign badge, HITL start/resume with graceful 404 handling, severity-coded risk flags, 96px tax_payable hero, honest-number liability/supporting IA, per-figure FigureTrace, one-shot fallback) are preserved, the grounding constraint holds (no clause-IDs/citations on figure rows), and the contract is intact (client.ts byte-for-byte unchanged, same response shapes consumed, no invented fields). State machine is sound with no stuck states; copy/theming clean. All three gates green. One non-blocking nit (a redundant unused union payload). Ready for Gate-2 commit authorization.
+
+## [25/06/26] — Redesign Wave 5: polish & cohesion (responsive topbar · ObligationRadar 2-col rewrite · FilingStudio dead-code nit) `[FE]`
+
+**Branch:** working tree vs `main` (uncommitted). Diff surface: `git diff main --stat -- frontend/` → 4 modified (`layouts/AppShell.tsx` +2/−0, `styles/tokens.css` +17/−0, `pages/ObligationRadar.tsx` +237/−70, `pages/FilingStudio.tsx` +3/−3) + `docs/{plan,progress}.md`. No new files, no sprawl.
+
+**Verdict:** Approve
+
+The surface is exactly the four files claimed plus docs. ObligationRadar is a faithful presentational rewrite over the same `ObligationCalendar`/`Obligation` shapes — same fetch, same persona wiring, no invented fields, all `oblig.*` rule_ids still shown, and a correct countdown/overdue computation. The tokens.css change is additive and scoped to a new `@media (max-width: 480px)` block. The FilingStudio nit is a clean union-field removal with no residual reference. All three gates green (tsc / build / biome). No Critical/Major/Minor findings. Recommend authorizing.
+
+### ObligationRadar non-regression (highest priority — VERIFIED line-by-line vs `main`)
+
+- **Same fetch contract, unchanged.** Both data hooks are byte-identical to the pre-change file: `useEntity()` for the active entity, and a `useEffect([entity])` that spreads `entity.*` into `getObligations(entity.tin, {…})`. I diffed the old file (`git show main:…`) against the new — lines 1-48 (imports, hook, the `getObligations` body, the `[entity]` dep) are unchanged. So the persona switch still repaints (new `entity` from `useEntity` → effect re-fires → obligations re-fetch), exactly as the FE-8 verdict confirmed. **No data dropped, no fields invented.**
+- **Consumes the real shapes only.** The card reads `entity.{tin,gross_income,entity_type,msic_codes,sst_registered,basis_period_start,basis_period_end,employee_count,paid_up_capital}` — every one exists on `EntityTaxProfile` (`client.ts:32-43`). The obligations list reads `ob.{form,obligation_type,rule_id,config_version,due_date,status}` — every one exists on `Obligation` (`client.ts:45-52`). No field is fabricated; tsc (exit 0) confirms.
+- **`oblig.*` rule_ids still rendered.** Each row shows `{ob.rule_id} · {ob.config_version}` (`:244`) and keys on `ob.rule_id` (`:193`) — same as the old `:131`. The audit-trail provenance the radar exists to show is intact.
+- **Countdown/overdue logic — CORRECT.** `countdown()` (`:14-25`) midnight-normalizes both today and the due date (`setHours(0,0,0,0)`) before differencing, then `Math.round`s the day delta — so DST/partial-day drift can't produce an off-by-one. `<0` → "Nd overdue" + `overdue:true`; `0` → "Due today"; `1` → "Due tomorrow"; else "in Nd". The `isUrgent` pill threshold (`:181-189`) re-derives the same midnight-normalized delta and lights `--mustard` for `0 < days <= 30`, `--rust` for overdue, `--ink-soft` otherwise — internally consistent with `countdown`. This is a fresh, self-contained implementation (not present in the old file, which rendered the raw `due_date` string) and it is correct.
+- **Obligations sorted by due date** (`:52`, `localeCompare` on ISO `due_date`) — stable for `YYYY-MM-DD` strings; purely presentational, drops nothing.
+- **Loading/error/empty states preserved.** Error window, loading window, and the `{entity && …}` guard mirror the old structure; the obligations column additionally guards `!data && !displayError` (barber) and `sorted.length > 0`. Empty list → no rows, no crash.
+
+### tokens.css change is additive + scoped (VERIFIED)
+
+- The only change is a new `@media (max-width: 480px)` block (`:1217-1231`) inserted **before** the existing `@media (prefers-reduced-motion: reduce)` block. It adds three rules: `.topbar-wordmark{display:none}`, `.topbar-mock-chip{display:none}`, `.topbar-entity-select{max-width:100px;font-size:10px}`. `git diff` confirms **+17/−0** — no existing rule, token, or media query was modified or deleted.
+- **No desktop impact.** `.topbar-mock-chip` and `.topbar-entity-select` are _new_ classnames (confirmed absent from `main`'s AppShell, present only as the JSX hooks added in this diff) and have **no rules outside the 480px block**, so at desktop width they are no-op classes — desktop topbar rendering is unchanged. `.topbar-wordmark` pre-existed and only gains a mobile `display:none`. The pre-existing `.proof-grid` collapse to one column at ≤900px (`:1155`) is reused by the rewrite — unchanged.
+- **No literal hex, tokens/sizes only.** The block uses `display`, `max-width:100px`, `font-size:10px` — no color literals. No em-dashes introduced (added lines containing `—` → 0 across all four files; the 4 in tokens.css + 2 in AppShell are pre-existing comments).
+
+### FilingStudio nit (VERIFIED — no orphan, no broken stepper)
+
+- The `classified` union variant dropped its `classify: ClassifyResponse` field (`:38`), and both constructors that set it (`:727`, `:775`) now emit `{ tag: 'classified' }`. **No `phase.classify` access exists anywhere** (grep → 0) — the stepper reads the separate `classifyResult` state (`useState<ClassifyResponse|null>`, `:683`) and threads it through `deriveStages(phase, classifyResult)` / `Stage1Detail`, none of which touch the union field. So the removed field was genuinely dead; the stepper is unaffected.
+- `ClassifyResponse` is still legitimately imported and used (5 refs: import, `deriveStages` param, `ComputationPanel` prop, `Stage1Detail` prop, the `classifyResult` state) — the import is **not** orphaned by the removal. tsc (exit 0) confirms no dangling reference.
+
+### No regressions elsewhere (VERIFIED)
+
+- AppShell change is purely the two added classnames (`topbar-mock-chip`, `topbar-entity-select`) on existing elements — `git diff` shows **+2/−0**, no logic, no JSX structure, no other attribute touched. The hamburger/drawer, theme toggle, persona picker, and MOCK chip all render identically at desktop.
+- Build transformed **59 modules** (vs 48 at FE-8) and `dist/` emitted — the filing stepper, audit money-shot, dashboard hub, landing/login, 404 all compile and bundle clean.
+
+### Verified clean (no action)
+
+- **Surgical:** every changed line traces to the task (responsive media block, the radar rewrite, the union-field removal, the two JSX classname hooks). No tax figures, citations, core math, or the honesty/fabrication path touched. No backend change.
+- **No AI attribution:** `git diff main -- frontend/ | grep -iE 'co-authored|generated with|claude code|noreply@anthropic|🤖'` → 0 matches.
+
+### Findings
+
+**Critical:** none. **Major:** none. **Minor:** none.
+
+**Informational (no action — by design / pre-existing, NOT introduced here):**
+
+- `frontend/src/pages/ObligationRadar.tsx:32-48` — [informational] On a persona switch the effect does not reset `data`/`error` to `null`, so the previous persona's obligations remain visible for the one render between the new `entity` arriving and the new `getObligations` resolving (the loading window also shows during that window since `useEntity` flips `loading` true). This transient is **identical to the pre-change file** (the old effect had the same shape) and matches the AuditDefense stale-pack pattern already logged at FE-8 M1 — it is not introduced by this rewrite. Optional future polish: `setData(null)` at the top of the effect. Not blocking.
+- Visual aesthetics (the 2-column layout, badge/pill styling, spacing) intentionally NOT assessed — owned by the PM screenshot review per the task non-goals.
+
+**Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean** · `bun run build` (`tsc -b && vite build`) → **59 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from root) → **"Checked 22 files, no fixes applied", exit 0** · `git diff main --stat -- frontend/` → 4 files (AppShell +2 / tokens +17 / ObligationRadar +237/−70 / FilingStudio +3/−3), no sprawl · added-line em-dash scan → 0 · added-line hex-literal scan (480px block) → 0 · `phase.classify` access → 0 · all `entity.*`/`ob.*` fields exist on `EntityTaxProfile`/`Obligation` · tokens used by the rewrite (`--rust`,`--denim`,`--mustard`,`--ink`,`--ink-soft`,`--font-display`,`--font-mono`,`--font-body`,`--border`) all defined.
+
+**Return to PM:** **Approve.** The diff is exactly the four claimed files + docs, no sprawl. ObligationRadar is a faithful presentational rewrite — the fetch (`useEntity` + `getObligations` spreading `entity.*`) and persona-repaint wiring are byte-identical to `main`, it consumes only real `EntityTaxProfile`/`Obligation` fields (no invented data), all `oblig.*` rule_ids + config_versions are still shown, and the new countdown/overdue logic is correct (midnight-normalized, `Math.round`ed, urgent-pill threshold consistent). The tokens.css change is additive and scoped to a new `@media (max-width:480px)` block — no existing rule/token altered, no desktop impact, tokens-only (no hex, no em-dash). The FilingStudio union-field removal leaves no `phase.classify` reference and doesn't orphan the `ClassifyResponse` import; the stepper reads `classifyResult`. All three gates green (tsc / 59-module build / biome 22 files). No Critical/Major/Minor. Ready for Gate-2 commit authorization.

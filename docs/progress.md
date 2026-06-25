@@ -631,3 +631,13 @@ CukaiPandai/
 - **No new CSS file added:** stepper layout uses exclusively existing token classes (`.window`, `.titlebar`, `.titlebar-meta`, `.req-list`, `.requirement-row`, `var(--denim)`, `var(--mustard)`, `var(--rust)`, `var(--ink-soft)`, `var(--screen)`, `var(--font-mono)`, `var(--font-display)`).
 - **Build:** `bunx tsc --noEmit` clean; `bun run build` green (59 modules, 1.80s); `bunx biome check frontend/src` 0 errors.
 - **Files touched:** `frontend/src/pages/FilingStudio.tsx`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [25/06/26] — Redesign Wave 5: Polish and Cohesion `[FE]`
+
+- **Fix 1 — Responsive topbar (real bug):** Added `className="topbar-mock-chip"` and `className="topbar-entity-select"` to the respective elements in `AppShell.tsx`. Added `@media (max-width: 480px)` block in `tokens.css` that hides `.topbar-wordmark` (LogoMark stays visible) and `.topbar-mock-chip`, and shrinks `.topbar-entity-select` to `max-width: 100px`. Desktop layout (>480px) unchanged. MarketingShell topbar already wraps cleanly at 520px — no overlap risk.
+- **Fix 2 — Console cohesion + Obligation Radar:** Rewrote `ObligationRadar.tsx` to use a `.proof-grid` two-column layout (entity snapshot panel on the left, filing obligations on the right) matching the Dashboard hub's density and visual structure. Obligation rows now use the hub's deadline-row treatment: form badge (denim/rust) + obligation type + formatted due date + countdown pill (overdue in `--rust`, urgent in `--mustard`, future in `--ink-soft`). All four app pages share the existing `.app-shell` container (consistent max-width / padding / top spacing) — no container divergence to normalize. The `.proof-grid` collapses to single-column at `max-width: 900px`. No fabricated data added.
+- **Fix 3 — FilingStudio Phase union nit:** In `FilingStudio.tsx` line 41, removed `classify: ClassifyResponse` from the `| { tag: 'classified' }` variant. Updated the two `setPhase({ tag: 'classified', classify: ... })` callsites (lines 730 and 778) to `setPhase({ tag: 'classified' })`. The field was set but never read (`phase.classify` has zero reads; the separate `classifyResult` state is used throughout). Zero behavior change.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (59 modules); `bunx biome check frontend/src` 0 errors (22 files checked).
+- **Files touched:** `frontend/src/layouts/AppShell.tsx`, `frontend/src/styles/tokens.css`, `frontend/src/pages/ObligationRadar.tsx`, `frontend/src/pages/FilingStudio.tsx`, `docs/plan.md`, `docs/progress.md`.

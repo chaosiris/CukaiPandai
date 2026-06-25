@@ -287,6 +287,20 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 ---
 
+### Redesign Wave 5 — Polish and Cohesion `[FE]`
+
+**Purpose:** Three focused fixes: responsive topbar overlap (real bug), console cohesion + Obligation Radar dead space, FilingStudio Phase union nit. FE-only, no backend, no contract changes.
+
+- [x] **Fix 1 — Responsive topbar:** At `max-width: 480px`, hide `.topbar-wordmark` (LogoMark stays) and `.topbar-mock-chip`; shrink `.topbar-entity-select` to `max-width: 100px / font-size: 10px`. Classes added to the MOCK chip and entity select in `AppShell.tsx`; CSS rules added to `tokens.css`. Desktop layout unchanged. MarketingShell topbar already wraps to two rows at 520px — no overlap risk.
+- [x] **Fix 2 — Console cohesion + Obligation Radar:** `ObligationRadar.tsx` redesigned to use `.proof-grid` two-column layout (entity snapshot panel left, filing obligations panel right) matching the Dashboard hub's structure. Obligation rows use the hub's deadline-row treatment: form badge + obligation type + due date + countdown pill (overdue in `--rust`, urgent in `--mustard`). All pages share the existing `.app-shell` container (consistent max-width / padding). No fake data added.
+- [x] **Fix 3 — FilingStudio Phase union nit (`FilingStudio.tsx:41`):** Removed the `classify: ClassifyResponse` field from the `classified` phase variant (it was set but never read — `classifyResult` state is used instead). The two `setPhase` calls updated accordingly (`classify: result` and `classify: classifyResult` dropped). Zero behavior change.
+- [x] Verified: `bunx tsc --noEmit` clean, `bun run build` green (59 modules), `bunx biome check frontend/src` 0 errors.
+- [x] Dark mode intact across all pages (tokens only, no literal hex added).
+
+**Acceptance criteria met:** topbar no longer overlaps at 360-480px (desktop unchanged); Obligation Radar uses a two-column layout with consistent spacing; consoles share the same `.app-shell` container; filing nit removed; dark mode intact; build/lint clean.
+
+---
+
 ### Redesign Wave 2 — Dashboard Hub Depth `[FE]`
 
 **Purpose:** Fill the ~50% empty dead space below the action cards with real, data-driven content mirroring Layak's dashboard density. No fake data.
