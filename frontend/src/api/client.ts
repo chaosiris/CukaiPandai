@@ -556,8 +556,14 @@ export async function getEntity(tin: string): Promise<EntityTaxProfile> {
 
 /** POST /entities/{tin}/obligations — derive the YA2026 obligation calendar. */
 export async function getObligations(tin: string, ssm: SsmProfile): Promise<ObligationCalendar> {
-  if (MOCK_MODE) return MOCK_OBLIGATIONS_BY_TIN[tin] ?? MOCK_OBLIGATIONS
-  return post<ObligationCalendar>(`/entities/${tin}/obligations`, { ssm })
+  if (MOCK_MODE) {
+    // For the Custom persona (context tin='CUSTOM'), resolve via the real SSM TIN.
+    const lookupTin = tin === 'CUSTOM' ? ssm.tin : tin
+    return MOCK_OBLIGATIONS_BY_TIN[lookupTin] ?? MOCK_OBLIGATIONS
+  }
+  // Use the real SSM TIN in the URL path (not the 'CUSTOM' context key).
+  const apiTin = tin === 'CUSTOM' ? ssm.tin : tin
+  return post<ObligationCalendar>(`/entities/${apiTin}/obligations`, { ssm })
 }
 
 /** POST /entities/{tin}/filings/form-c — one-shot synchronous computation (no HITL). */
@@ -710,7 +716,46 @@ export async function authGoogle(idToken: string): Promise<AuthResponse> {
   return post<AuthResponse>('/auth/google', { id_token: idToken })
 }
 
+/** POST /auth/guest — mint a shared-guest JWT (no body). Mock returns a fake token+user. */
+export async function authGuest(): Promise<AuthResponse> {
+  if (MOCK_MODE) {
+    return {
+      token: 'mock-guest',
+      user: { id: 'guest-shared', email: 'guest@cukaipandai.local', name: 'Guest', provider: 'guest' }
+    }
+  }
+  return post<AuthResponse>('/auth/guest', {})
+}
+
 /** GET /auth/me — resolve the current user from the stored bearer token (real mode only). */
 export async function authMe(): Promise<AuthUser> {
   return get<AuthUser>('/auth/me')
+}
+
+// --- Per-user entity profile (EP-1; EN-2) ---
+
+// Module-scoped in-memory mock store for the guest/demo entity profile.
+let _mockMyEntity: EntityTaxProfile | null = null
+
+/** GET /me/entity — fetch the current user's saved entity profile (404 if none). */
+export async function getMyEntity(): Promise<EntityTaxProfile> {
+  if (MOCK_MODE) {
+    if (!_mockMyEntity) throw new Error('404 No entity profile saved')
+    return _mockMyEntity
+  }
+  return get<EntityTaxProfile>('/me/entity')
+}
+
+/** PUT /me/entity — save the current user's entity profile. Returns the stored profile. */
+export async function putMyEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
+  if (MOCK_MODE) {
+    _mockMyEntity = { ...ssm }
+    return _mockMyEntity
+  }
+  const res = await fetch(`${BASE_URL}/me/entity`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ ssm })
+  })
+  return handleResponse<EntityTaxProfile>(res)
 }

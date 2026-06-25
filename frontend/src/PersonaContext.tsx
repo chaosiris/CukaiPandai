@@ -1,24 +1,16 @@
-// FE-8 — Active-persona shared state. All three consoles read the active persona from here
-// instead of using the ACME_* constants directly.
-// JR-1 — Extended to own a runtime list of custom personas, persisted to localStorage.
-// Custom personas are appended to the static PERSONAS import and exposed as a merged list.
+// FE-8 — Active-persona shared state. All three consoles read the active persona from here.
+// EN-2 — The "Custom" persona is now backed by GET/PUT /me/entity (backend), NOT localStorage.
+// The cp_custom_entities localStorage key is removed; only theme + cp_journey_done remain local.
+// Built-in seed personas (Acme / Sinar / Selera) stay selectable and are never mutated.
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { type SsmProfile, getMyEntity, putMyEntity } from './api/client'
 import { DEFAULT_PERSONA, PERSONAS, type Persona } from './personas'
 
 export const DEFAULT_PERSONA_KEY = 'cp_default_persona'
-const CUSTOM_ENTITIES_KEY = 'cp_custom_entities'
-const ACTIVE_PERSONA_KEY = 'cp_active_persona'
 
-function readCustomPersonas(): Persona[] {
-  try {
-    const raw = window.localStorage.getItem(CUSTOM_ENTITIES_KEY)
-    if (!raw) return []
-    return JSON.parse(raw) as Persona[]
-  } catch {
-    return []
-  }
-}
+// The fixed TIN used to identify the backend-backed custom persona in the local list.
+const CUSTOM_PERSONA_TIN = 'CUSTOM'
 
 function readDefaultPersona(allPersonas: Persona[]): Persona {
   const tin = window.localStorage.getItem(DEFAULT_PERSONA_KEY)
@@ -29,24 +21,31 @@ function readDefaultPersona(allPersonas: Persona[]): Persona {
   return DEFAULT_PERSONA
 }
 
-function readActivePersona(allPersonas: Persona[], fallback: Persona): Persona {
-  const tin = window.localStorage.getItem(ACTIVE_PERSONA_KEY)
-  if (tin) {
-    const found = allPersonas.find((p) => p.tin === tin)
-    if (found) return found
+function buildCustomPersona(ssm: SsmProfile): Persona {
+  return {
+    tin: CUSTOM_PERSONA_TIN,
+    label: `My Company (${ssm.tin})`,
+    ssm,
+    demoRawText: ''
   }
-  return fallback
 }
 
 interface PersonaContextValue {
   persona: Persona
   setPersona: (p: Persona) => void
-  /** The merged list: static PERSONAS + runtime custom personas. */
+  /** The merged list: static PERSONAS + "Custom" if a backend profile exists. */
   personas: Persona[]
-  /** Custom personas only (for custom-TIN resolution in useEntity). */
+  /** @deprecated use putMyEntity via the context — kept for callers that pass a Persona directly */
   customPersonas: Persona[]
-  /** Append a new custom persona, persist to localStorage, and set it active. */
+  /** Save a custom entity to the backend (best-effort) and set it as the active persona. */
   addCustomPersona: (p: Persona) => void
+  /**
+   * Activate a custom persona from an already-persisted SSM profile (no backend PUT).
+   * Used by Entity.tsx which does its own awaited PUT before calling this.
+   */
+  activateCustomPersona: (ssm: SsmProfile) => void
+  /** Whether the backend entity hydration has settled (no white-screen guard). */
+  entityReady: boolean
 }
 
 const PersonaContext = createContext<PersonaContextValue>({
@@ -54,48 +53,96 @@ const PersonaContext = createContext<PersonaContextValue>({
   setPersona: () => undefined,
   personas: PERSONAS,
   customPersonas: [],
-  addCustomPersona: () => undefined
+  addCustomPersona: () => undefined,
+  activateCustomPersona: () => undefined,
+  entityReady: true
 })
 
 export function ActivePersonaProvider({ children }: { children: React.ReactNode }) {
-  const [customPersonas, setCustomPersonas] = useState<Persona[]>(readCustomPersonas)
+  // The "Custom" persona derived from the backend (null = none saved yet).
+  const [customPersona, setCustomPersona] = useState<Persona | null>(null)
+  const [entityReady, setEntityReady] = useState(false)
 
-  const allPersonas = useMemo(() => [...PERSONAS, ...customPersonas], [customPersonas])
+  // On mount, best-effort fetch the user's saved entity profile.
+  useEffect(() => {
+    getMyEntity()
+      .then((profile) => {
+        setCustomPersona(buildCustomPersona(profile))
+      })
+      .catch(() => {
+        // 404 = no profile yet; any other error = treat as none saved.
+      })
+      .finally(() => {
+        setEntityReady(true)
+      })
+  }, [])
 
-  const [persona, setPersonaState] = useState<Persona>(() => {
-    const defaultP = readDefaultPersona(allPersonas)
-    return readActivePersona(allPersonas, defaultP)
-  })
+  const allPersonas = useMemo(() => (customPersona ? [...PERSONAS, customPersona] : PERSONAS), [customPersona])
+
+  const [persona, setPersonaState] = useState<Persona>(() => readDefaultPersona(PERSONAS))
+
+  // Once the backend hydrates the custom persona, switch to it if nothing else is active
+  // (i.e., the user's last chosen persona was "Custom").
+  useEffect(() => {
+    if (!entityReady) return
+    const stored = window.localStorage.getItem(DEFAULT_PERSONA_KEY)
+    if (stored === CUSTOM_PERSONA_TIN && customPersona) {
+      setPersonaState(customPersona)
+    }
+  }, [entityReady, customPersona])
 
   const setPersona = useCallback((p: Persona) => {
     try {
-      window.localStorage.setItem(ACTIVE_PERSONA_KEY, p.tin)
+      window.localStorage.setItem(DEFAULT_PERSONA_KEY, p.tin)
     } catch {
       // Silently ignore quota errors.
     }
     setPersonaState(p)
   }, [])
 
+  // Save a custom entity to the backend and activate it.
   const addCustomPersona = useCallback(
     (p: Persona) => {
-      setCustomPersonas((prev) => {
-        // Replace existing entry with the same TIN (upsert), or append.
-        const next = prev.some((c) => c.tin === p.tin) ? prev.map((c) => (c.tin === p.tin ? p : c)) : [...prev, p]
-        try {
-          window.localStorage.setItem(CUSTOM_ENTITIES_KEY, JSON.stringify(next))
-        } catch {
-          // Silently ignore quota errors.
-        }
-        return next
+      const newPersona: Persona = {
+        ...p,
+        // Normalise to the stable CUSTOM_PERSONA_TIN so context tracks it consistently.
+        tin: CUSTOM_PERSONA_TIN,
+        label: `My Company (${p.ssm.tin})`
+      }
+      setCustomPersona(newPersona)
+      setPersona(newPersona)
+      // Best-effort backend write — do not block the UI.
+      putMyEntity(p.ssm).catch(() => {
+        // Silently ignore; entity is active locally even if the write fails.
       })
-      setPersona(p)
     },
     [setPersona]
   )
 
+  // Activate a custom persona without triggering a backend PUT (used by Entity.tsx which
+  // does its own awaited PUT to surface errors, then calls this to update context).
+  const activateCustomPersona = useCallback(
+    (ssm: SsmProfile) => {
+      const newPersona = buildCustomPersona(ssm)
+      setCustomPersona(newPersona)
+      setPersona(newPersona)
+    },
+    [setPersona]
+  )
+
+  const customPersonas = useMemo(() => (customPersona ? [customPersona] : []), [customPersona])
+
   const value = useMemo(
-    () => ({ persona, setPersona, personas: allPersonas, customPersonas, addCustomPersona }),
-    [persona, setPersona, allPersonas, customPersonas, addCustomPersona]
+    () => ({
+      persona,
+      setPersona,
+      personas: allPersonas,
+      customPersonas,
+      addCustomPersona,
+      activateCustomPersona,
+      entityReady
+    }),
+    [persona, setPersona, allPersonas, customPersonas, addCustomPersona, activateCustomPersona, entityReady]
   )
 
   return <PersonaContext.Provider value={value}>{children}</PersonaContext.Provider>

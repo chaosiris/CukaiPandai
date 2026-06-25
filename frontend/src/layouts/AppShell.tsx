@@ -474,6 +474,9 @@ export function AppShell() {
               <NavLink className={drawerLinkClass} to="/audit-defense" onClick={closeDrawer}>
                 Audit Defense
               </NavLink>
+              <NavLink className={drawerLinkClass} to="/entity" onClick={closeDrawer}>
+                Entity
+              </NavLink>
             </div>
 
             <div className="drawer-section">

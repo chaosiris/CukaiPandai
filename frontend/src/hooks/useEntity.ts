@@ -1,9 +1,7 @@
 // Shared hook — all three consoles call this to get the active entity profile.
-// Replaces the divergent page-local DEMO_SSM stubs (FQ4 / [DRIFT] #3).
-// FE-8: reads the active persona's TIN from PersonaContext so switching the picker
-// re-renders all three consoles against the chosen entity.
-// JR-1: resolves a custom (non-seeded) TIN from local state BEFORE any network call
-// so consoles never white-screen when a custom entity is active.
+// EN-2: the "Custom" persona is now hydrated from the backend (PersonaContext) rather than
+// localStorage, so resolving a custom TIN returns the backend-sourced profile with no
+// white-screen (the data is already in context by the time consoles mount).
 
 import { useEffect, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
@@ -21,8 +19,8 @@ export function useEntity(tin?: string) {
     setLoading(true)
     setError(null)
 
-    // JR-1: if the TIN belongs to a custom persona, resolve from local state
-    // without any network call — avoids the getEntity throw in mock + 404 in live.
+    // EN-2: if the TIN belongs to the "Custom" persona, resolve from context (backend-sourced)
+    // without any network call — avoids 404 for custom TINs and no white-screen.
     const customMatch = customPersonas.find((p) => p.tin === resolvedTin)
     if (customMatch) {
       setEntity(customMatch.ssm as EntityTaxProfile)

@@ -1222,3 +1222,62 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `frontend/src/pages/AuditDefense.tsx`
 - `frontend/src/pages/Settings.tsx`
 - `docs/plan.md` — UI-1/OB-1/GR-1...GR-9 ticked `[x]`
+
+---
+
+## [26/06/26] — Wave 2: AUTH-FE + EN-1 + EN-2 (guest token, /entity page, backend-backed Custom persona) `[FE]`
+
+### AUTH-FE — `continueAsGuest` now calls `POST /auth/guest`
+
+- Added `authGuest(): Promise<AuthResponse>` to `frontend/src/api/client.ts`. Mock branch returns `{token:'mock-guest', user:{id:'guest-shared', ...provider:'guest'}}`. Live branch calls `POST /auth/guest`.
+- `AuthContext.continueAsGuest()` made async: calls `authGuest()`, stores the returned token via `setToken()`, persists user to `USER_KEY` localStorage, sets `GUEST_KEY='1'`, updates `isGuest=true` and `user` state. Every subsequent `authHeaders()` call attaches `Authorization: Bearer <guest-token>`.
+- `AuthScreen.tsx` `onGuest()` made async; wraps `await continueAsGuest()` in a try/catch (best-effort) with `busy` state while the call is in-flight. Navigation after guest auth unchanged.
+- Hydration on reload: the existing `authMe()` path now validates the guest token correctly (guest is a real user in the backend). Mock mode reads `readStoredUser()` as before.
+- Sign-out clears `USER_KEY` + `GUEST_KEY` + `cp_token` — guest session fully dropped.
+
+### EN-1 — `/entity` page (Compliance nav)
+
+- Created `frontend/src/pages/Entity.tsx`: view + edit the active company's full `EntityTaxProfile`.
+  - One-line page description under `<h1>`.
+  - Snapshot card showing all 9 fields (TIN, entity type, MSIC codes, gross income, paid-up capital, employees, SST, basis period, commencement date) with an `InfoTip` on the card heading.
+  - Sectioned edit form (Company Identity / Financial Profile / Basis Period) reusing the validation helpers and field layout from `CustomCompany.tsx`. Each section card has an `InfoTip`. Pre-fills from the active entity.
+  - Seed-entity notice shown when the active persona is one of the three built-in seeds.
+  - On save: `await putMyEntity(ssm)` (awaitable, surfaces 422 detail), then `activateCustomPersona(ssm)` to update context without a second PUT.
+  - Save status feedback (saving / saved / error inline).
+- Added `/entity` route in `frontend/src/App.tsx` (under `<AppShell/>`).
+- Added "Entity" NavLink to the **Compliance** drawer group in `frontend/src/layouts/AppShell.tsx` (after Audit Defense).
+- `WALKTHROUGH_ROUTES` in `AppShell.tsx` already included `/entity` (Wave 1 GR-4) — no change needed.
+
+### EN-2 — Persona model backed by `GET/PUT /me/entity`; localStorage data store removed
+
+- Added `getMyEntity(): Promise<EntityTaxProfile>` and `putMyEntity(ssm): Promise<EntityTaxProfile>` to `client.ts`. Mock branch: module-scoped `_mockMyEntity` (null until a PUT). Live: `GET/PUT /me/entity` with `authHeaders()`.
+- Refactored `PersonaContext.tsx`:
+  - Removed `cp_custom_entities` localStorage read/write and `cp_active_persona` data store entirely.
+  - On mount: best-effort `getMyEntity()` — if 200, builds a "Custom" persona (`tin='CUSTOM'`) from the profile and adds it to `allPersonas`; 404/error treated as "no custom entity yet".
+  - Added `activateCustomPersona(ssm)` action: updates context state without triggering a PUT (used by `/entity` page which does its own awaited PUT).
+  - `addCustomPersona(p)` still exists for `CustomCompany.tsx` (which needs the fire-and-forget path): updates context + fires `putMyEntity` best-effort.
+  - `entityReady: boolean` exposed so consumers can avoid white-screen while the initial fetch settles.
+  - Only `theme` + `cp_journey_done` remain in localStorage (UI prefs only).
+- Updated `useEntity.ts`: resolves "Custom" TIN from `customPersonas` (backend-sourced) without any network call — no white-screen for custom entities.
+- Updated `CustomCompany.tsx`: removed `createEntity` + `serverError` + the old localStorage + server-warn path. `handleSubmit` now just calls `addCustomPersona(persona)` (which does `putMyEntity` best-effort) and navigates. Updated footer/description copy (no "stored locally").
+- Updated `getObligations` in `client.ts`: for `tin='CUSTOM'` (the context key), resolves mock lookup and live URL path via `ssm.tin` so the backend always receives the real TIN.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **78 modules** (was 77; +1 new Entity page), 339 KB JS, 49 KB CSS, built in 1.94s
+- `bunx biome check frontend/src`: 0 errors (41 files checked)
+- No em-dashes in user-facing copy; Title Case headings; acronyms preserved (TIN, MSIC, SST, YA2026).
+
+### Files touched
+
+- `frontend/src/api/client.ts` (+`authGuest`, +`getMyEntity`, +`putMyEntity`, CUSTOM-TIN fix in `getObligations`)
+- `frontend/src/AuthContext.tsx` (async `continueAsGuest`, import `authGuest`)
+- `frontend/src/pages/AuthScreen.tsx` (async `onGuest`)
+- `frontend/src/PersonaContext.tsx` (backend-backed Custom persona, `activateCustomPersona`, `entityReady`)
+- `frontend/src/hooks/useEntity.ts` (CUSTOM TIN resolves from context)
+- `frontend/src/pages/CustomCompany.tsx` (use `addCustomPersona` only; removed `createEntity` + `serverError`)
+- `frontend/src/pages/Entity.tsx` (new)
+- `frontend/src/App.tsx` (+Entity import +`/entity` route)
+- `frontend/src/layouts/AppShell.tsx` (+Entity NavLink in Compliance group)
+- `docs/plan.md` (AUTH-FE/EN-1/EN-2 all sub-bullets ticked `[x]`)

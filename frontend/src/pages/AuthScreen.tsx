@@ -98,8 +98,15 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     document.body.appendChild(s)
   }, [])
 
-  const onGuest = () => {
-    continueAsGuest()
+  const onGuest = async () => {
+    setBusy(true)
+    try {
+      await continueAsGuest()
+    } catch {
+      // best-effort — proceed even if the BE call fails
+    } finally {
+      setBusy(false)
+    }
     // JR-3: first-run guests (no cp_journey_done) go to /welcome; returning users go to /dashboard.
     let journeyDone = false
     try {

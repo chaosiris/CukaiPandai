@@ -10,6 +10,7 @@ import Analytics from './pages/Analytics'
 import AuditDefense from './pages/AuditDefense'
 import CustomCompany from './pages/CustomCompany'
 import Dashboard from './pages/Dashboard'
+import Entity from './pages/Entity'
 import Faq from './pages/Faq'
 import FilingStudio from './pages/FilingStudio'
 import { Landing } from './pages/Landing'
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path="/obligations" element={<ObligationRadar />} />
                 <Route path="/filing" element={<FilingStudio />} />
                 <Route path="/audit-defense" element={<AuditDefense />} />
+                <Route path="/entity" element={<Entity />} />
 
                 {/* Guided wizard routes (JR-2): wizard chrome wrapping the same console components */}
                 <Route path="/start" element={<WizardLayout />}>
