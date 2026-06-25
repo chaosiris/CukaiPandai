@@ -166,6 +166,40 @@
   text-underline-offset: 2px;
 }
 
+.settings-reset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 13px;
+  border: var(--border);
+  background: var(--screen);
+}
+
+.settings-reset-row + .settings-reset-row {
+  margin-top: 10px;
+}
+
+.settings-reset-desc {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-reset-desc strong {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.settings-reset-desc span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+
 .settings-reset-btn {
   align-self: start;
   padding: 9px 16px;
@@ -182,6 +216,16 @@
 .settings-reset-btn:hover {
   background: var(--rust);
   color: var(--paper);
+}
+
+.settings-reset-btn--full {
+  background: var(--rust);
+  color: var(--paper);
+  border-color: var(--rust);
+}
+
+.settings-reset-btn--full:hover {
+  opacity: 0.85;
 }
 
 @media (max-width: 760px) {

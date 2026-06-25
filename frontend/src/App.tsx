@@ -4,6 +4,8 @@ import { AppShell } from './layouts/AppShell'
 import { MarketingShell } from './layouts/MarketingShell'
 import { WizardLayout } from './layouts/WizardLayout'
 import { NotificationProvider } from './notifications'
+import About from './pages/About'
+import Analytics from './pages/Analytics'
 import AuditDefense from './pages/AuditDefense'
 import CustomCompany from './pages/CustomCompany'
 import Dashboard from './pages/Dashboard'
@@ -43,6 +45,7 @@ export default function App() {
               <Route path="/welcome" element={<Welcome />} />
 
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/faq" element={<Faq />} />
 
               {/* Standalone console routes — always reachable for returning users */}
@@ -61,6 +64,7 @@ export default function App() {
               <Route path="/start/custom" element={<CustomCompany />} />
 
               <Route path="/settings" element={<Settings />} />
+              <Route path="/about" element={<About />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

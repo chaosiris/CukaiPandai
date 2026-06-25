@@ -6,6 +6,128 @@ import { BellIcon, ProfileIcon, ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
 import { type NotifKind, useNotifications } from '../notifications'
 
+// ---- Walkthrough modal ----
+
+function WalkthroughModal({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  function handleYes() {
+    try {
+      window.localStorage.removeItem('cp_journey_done')
+    } catch {
+      // ignore
+    }
+    onClose()
+    navigate('/welcome')
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 300,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          border: 0,
+          background: 'rgba(18, 17, 15, 0.8)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          cursor: 'pointer'
+        }}
+      />
+      {/* Modal */}
+      <dialog
+        open
+        className="window"
+        aria-labelledby="walkthrough-title"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: 'min(400px, calc(100vw - 32px))',
+          border: 'var(--border)',
+          padding: 0,
+          background: 'var(--window)',
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--shadow)'
+        }}
+      >
+        <div className="titlebar">
+          <span className="closebox" aria-hidden="true" />
+          <span className="titlebar-title" id="walkthrough-title">
+            Need A Walkthrough?
+          </span>
+        </div>
+        <div style={{ padding: '20px 18px 16px', display: 'grid', gap: 16 }}>
+          <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.6, color: 'var(--ink-soft)' }}>
+            Want the guided tour of CukaiPandai? It walks you through your deadlines, a cited Form C, and an
+            audit-defense pack.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleYes}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                border: 'var(--border)',
+                background: 'var(--denim)',
+                color: 'var(--paper)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              Yes, Show Me
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                border: 'var(--border)',
+                background: 'transparent',
+                color: 'var(--ink)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              No Thanks
+            </button>
+          </div>
+        </div>
+      </dialog>
+    </div>
+  )
+}
+
 const isMock = import.meta.env.VITE_API_MOCK === '1'
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === '1'
 
@@ -50,6 +172,7 @@ function kindDotColor(kind: NotifKind): string {
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activePopover, setActivePopover] = useState<TopbarPopover>(null)
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona, personas } = useActivePersona()
@@ -356,8 +479,8 @@ export function AppShell() {
               <NavLink className={drawerLinkClass} to="/dashboard" end onClick={closeDrawer}>
                 Dashboard
               </NavLink>
-              <NavLink className={drawerLinkClass} to="/faq" onClick={closeDrawer}>
-                FAQ
+              <NavLink className={drawerLinkClass} to="/analytics" onClick={closeDrawer}>
+                Analytics
               </NavLink>
             </div>
 
@@ -373,9 +496,55 @@ export function AppShell() {
                 Audit Defense
               </NavLink>
             </div>
+
+            <div className="drawer-section">
+              <div className="drawer-section-title">Essentials</div>
+              <NavLink className={drawerLinkClass} to="/settings" onClick={closeDrawer}>
+                Settings
+              </NavLink>
+              <NavLink className={drawerLinkClass} to="/faq" onClick={closeDrawer}>
+                FAQ
+              </NavLink>
+              <NavLink className={drawerLinkClass} to="/about" onClick={closeDrawer}>
+                About
+              </NavLink>
+            </div>
           </nav>
         </aside>
       </div>
+
+      {/* Floating help button */}
+      <button
+        type="button"
+        aria-label="Open walkthrough"
+        onClick={() => setWalkthroughOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: 176,
+          right: 20,
+          zIndex: 90,
+          width: 44,
+          height: 44,
+          border: 'var(--border)',
+          borderRadius: '50%',
+          background: 'var(--denim)',
+          color: 'var(--paper)',
+          fontFamily: 'var(--font-display)',
+          fontSize: 22,
+          fontWeight: 700,
+          lineHeight: 1,
+          cursor: 'pointer',
+          boxShadow: '2px 2px 0 rgba(28, 27, 25, 0.22)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        ?
+      </button>
+
+      {/* Walkthrough modal */}
+      {walkthroughOpen && <WalkthroughModal onClose={() => setWalkthroughOpen(false)} />}
 
       {/* Fixed denim footer */}
       <footer className="app-footer">

@@ -1031,3 +1031,63 @@ Two targeted fixes surfaced by a post-SUS re-walk.
 - **Tests:** **107/107 pass** after the config annotation.
 - **Caveat:** AI-assisted online re-verification — a human tax-professional glance is still advisable for the formal TD-6 sign-off. Plan TD-6 + Q5 ticked with that qualifier.
 - **Files:** `backend/core/config/ya_2026.yaml`, `docs/superpowers/research/2026-06-19-ya2026-figures-verification.md`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [26/06/26] — Settings: "Reset all data" button `[FE]`
+
+- Added a **"Reset all data"** button to the Settings page Reset section alongside the existing "Reset all preferences" button. Both buttons now display in labelled rows with a one-line description so their scope is distinct: preferences (theme + default entity, reload) vs. data (full first-run reset, navigate to `/`).
+- On confirm (`window.confirm`), iterates `localStorage` keys and removes any starting with `cp_` or `cukaipandai-` — covers all known keys (`cp_default_persona`, `cp_active_persona`, `cp_journey_done`, `cp_entered_as_guest`, `cp_custom_entities`, `cukaipandai-theme`) and any future keys added under those prefixes. No blanket `localStorage.clear()`.
+- After clearing, `window.location.href = '/'` for a full reload to the marketing landing; next Continue-as-Guest will show `/welcome` because `cp_journey_done` was cleared.
+- "Reset all data" button styled with `settings-reset-btn--full` (rust fill, matching the hover state of the existing button) to signal a more destructive action.
+- **Files touched:** `frontend/src/pages/Settings.tsx`, `frontend/src/pages/Settings.css`.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (0 errors, 0 warnings); `bunx biome check frontend/src` 36 files, 0 errors.
+
+---
+
+## [26/06/26] — Sidebar groups, floating help, analytics, about, settings reset `[FE]`
+
+Four related FE changes implemented:
+
+**1. Sidebar three groups (`AppShell.tsx`)**
+
+- Restructured `drawer-nav` into exactly three `drawer-section` groups: **Workspace** (Dashboard, Analytics), **Compliance** (Obligations, Filing, Audit Defense), **Essentials** (Settings, FAQ, About).
+- FAQ moved from Workspace to Essentials. Settings added to drawer (profile popover entry unchanged). Analytics (new) and About (new) added to their respective groups.
+
+**2. Floating "?" help button + walkthrough modal (`AppShell.tsx`)**
+
+- A circular "?" button is fixed bottom-right (z-index 90, above content, below z-300 modal) in `--denim` with `--paper` text, visible in light and dark.
+- Clicking opens a centered `<dialog>` modal (Escape + backdrop-click close) titled "Need A Walkthrough?" with body copy and two buttons: "Yes, Show Me" (removes `cp_journey_done` from `localStorage` and navigates to `/welcome`) and "No Thanks" (dismiss).
+- `WalkthroughModal` is a standalone component at the top of `AppShell.tsx`; uses `useNavigate` internally.
+
+**3. Settings "Reset all data" lands on `/welcome` (`Settings.tsx`)**
+
+- Changed `window.location.href = '/'` to `window.location.href = '/welcome'` in `handleResetAllData`. The `window.confirm` guard and prefix-based clearing (`cp_`, `cukaipandai-`) are unchanged.
+
+**4. New `/analytics` page (`Analytics.tsx` + route in `App.tsx`)**
+
+- Reads the active persona from `useActivePersona()` and fetches `getObligations(persona.tin, persona.ssm)` — re-fetches on `persona.tin` change.
+- Loading state (`.barber`), error state, empty state all handled.
+- Content is fully grounded in real obligation data and entity profile (no fabricated figures):
+  - Stat cards: total obligations, overdue count, due-within-30-days count, next due date.
+  - Status Breakdown panel: horizontal bars by deadline window (overdue / within 30 days / later) + count table by form type (CP204, Form C, SST-02, etc.).
+  - Entity Snapshot panel: gross income hero figure + rows for TIN, entity type, MSIC, SST, basis period, employees, paid-up capital — from `useEntity()` (resolves custom entities via `customPersonas`, no network).
+  - Compliance ratio alert when overdue count > 0 (plain arithmetic over real counts).
+  - Cross-links to Obligation Calendar and Filing.
+
+**5. New `/about` page (`About.tsx` + route in `App.tsx`)**
+
+- Three sections: "The Problem" (3 problem statements grounded in real product framing), "Objectives" (4 numbered objectives matching the product), "How It Works" (deterministic core, agentic layer, citation gate, in-country inference).
+- No fabricated stats or figures. Ends with the "Decision support, not legal advice" disclaimer.
+- Added to the Essentials group in the drawer.
+
+**Files touched:** `frontend/src/layouts/AppShell.tsx`, `frontend/src/pages/Settings.tsx`, `frontend/src/pages/Analytics.tsx` (new), `frontend/src/pages/About.tsx` (new), `frontend/src/App.tsx`.
+
+**Build:**
+| Check | Result |
+|---|---|
+| `bunx tsc --noEmit` | 0 errors |
+| `bun run build` | 75 modules, built in 2.16s |
+| `bunx biome check frontend/src` | 38 files, 0 errors |
+
+Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were removed and rephrased (comma+participle, colon, semicolon); remaining em-dashes in the batch are code comments only.
