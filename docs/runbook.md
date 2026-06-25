@@ -80,7 +80,7 @@ test ─────────────────────────
 **Deploy mechanism:**
 
 - Backend: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"` (fails the job if the hook call fails)
-- Frontend: `vercel pull --yes --environment=production` → `vercel build --prod` → `vercel deploy --prebuilt --prod`
+- Frontend: `vercel pull --yes --environment=production` → `vercel build --prod` → `vercel deploy --prebuilt --prod` (`deploy-frontend` installs Bun via `oven-sh/setup-bun` so `vercel build` can run the project's bun-based build)
 
 **Required GitHub repository secrets (add in Settings → Secrets → Actions):**
 
