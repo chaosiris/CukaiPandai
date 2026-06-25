@@ -380,6 +380,23 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Acceptance criteria:** the deployed FE+BE complete the whole demo flow end-to-end over the network — entity loads, obligations render, the filing HITL gate works, the **live** audit-defense fabricated-citation rejection shows `verified=false`, and the sovereign badge reflects the real route — capturing any prod-only breakage early; if Neon is wired, the persistence fallback is confirmed.
 
+### DO-5 `[DO]` — Gated CI/CD deploy pipeline (tests → deploy both services) _(25/06/26)_
+
+**Purpose:** A single, verifiable GitHub Actions pipeline (`deploy.yml`) that runs tests first and deploys both backend (Render) and frontend (Vercel) only if tests pass — so every push to `main` is provably green before it hits production.
+
+**Implementation:**
+
+- [x] **Author `.github/workflows/deploy.yml`** — four jobs: `test` (backend pytest + frontend tsc/build/biome), `docker-build` (smoke-build `./backend`, `needs: test`), `deploy-backend` (`needs: [test, docker-build]`, push-to-main guard only, curl the Render deploy hook), `deploy-frontend` (`needs: test`, push-to-main guard only, `vercel pull → build → deploy --prebuilt --prod`). → verify: YAML parses cleanly (`yaml.safe_load`); `if:` guards are correct (deploy skipped on PRs); no secret values hardcoded — only `${{ secrets.* }}` references.
+- [x] **Delete `.github/workflows/ci.yml`** — its backend `test` + `docker-build` jobs are folded into `deploy.yml`; no duplicate workflow remains. → verify: only `deploy.yml` exists in `.github/workflows/`.
+- [x] **Update `docs/runbook.md`** — new §4 CI/CD subsection: the 4 required GitHub secrets and where each comes from, the job graph (test → docker-build → deploy-backend; test → deploy-frontend), the note that **Render native auto-deploy must be turned OFF** once the pipeline is verified (hook becomes the sole trigger), the manual CLI fallback remains documented, and the live URLs (`https://cukaipandai.vercel.app`, `https://cukaipandai-api.onrender.com`). → verify: runbook CI/CD section lists all 4 secrets with sources; live URLs correct.
+- [ ] **HUMAN: Add the 4 secrets in GitHub → Settings → Secrets → Actions** — `RENDER_DEPLOY_HOOK_URL` (Render dashboard → service → Settings → Deploy Hook), `VERCEL_TOKEN` (Vercel Account Settings → Tokens), `VERCEL_ORG_ID` = `team_CwktsdBSB9TLrdwdCV3dZRbg`, `VERCEL_PROJECT_ID` = `prj_0KnVQwxUPBqML8k4KjgPQv1iaYTE`. → verify: a push to `main` after secrets are set produces a green Actions run with all four jobs visible.
+- [ ] **HUMAN: Confirm the first green Actions run** in the GitHub Actions tab — test + docker-build + deploy-backend + deploy-frontend all pass. → verify: green tick on a `main` push; both services update.
+- [ ] **HUMAN: Turn off Render native auto-deploy** (Render dashboard → service → Settings → Auto-Deploy → Off) so the deploy hook is the sole trigger going forward. → verify: a subsequent push to `main` deploys via the hook only (one deploy, not two).
+
+**Acceptance criteria:** `deploy.yml` is the only workflow; the `test` job covers both backend pytest and frontend tsc/build/biome; `deploy-backend` and `deploy-frontend` fire only on push to `main` after all tests pass; YAML is valid; `ci.yml` is removed; runbook CI/CD section documents the 4 secrets and the Render auto-deploy cutover note. The human-gated steps (add secrets, confirm green run, turn off Render auto-deploy) are the remaining open actions.
+
+---
+
 ### DO-4 `[DO]` — Provision managed Neon Postgres + schema + env _(committed; off the FE critical path; do early so BE-15/16/17 can build)_
 
 **Purpose:** Stand up the managed Neon serverless Postgres (AWS `ap-southeast-1` Singapore region, free tier) and the schema/connection the persistence tasks build on. Neon is **plain Postgres via a connection string** — no vendor SDK. **Sovereignty caveat: Singapore, not MY (Q9)** — prod path is self-hosted / MY-region Postgres with the identical schema. **Per DQ3, this is a FOLLOW-ON after the fixtures-first deploy is proven** — not part of the first Render deploy.

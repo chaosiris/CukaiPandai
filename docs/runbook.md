@@ -52,9 +52,65 @@ Prelim is **pure-ILMU (Q6)** — leave the escalation vars blank and `make_llm()
 | `MYINVOIS_BASE_URL`                                                | `https://preprod-api.myinvois.hasil.gov.my` |
 | `MYINVOIS_TIN` · `MYINVOIS_CLIENT_ID` · `MYINVOIS_CLIENT_SECRET_1` | sandbox creds (preprod MyTax portal)        |
 
-## 4. Deployment
+## 4. CI/CD
 
-### 4a. Render (backend — Docker, free tier)
+### Gated pipeline (`.github/workflows/deploy.yml`)
+
+Every push to `main` and every PR against `main` runs the `test` job (backend + frontend). Deploys only fire on `push` to `main` once tests pass.
+
+**Job graph:**
+
+```
+test ──────────────────────────────── deploy-frontend (push to main only)
+  └─── docker-build ─── deploy-backend (push to main only)
+```
+
+| Job               | Runs on             | Trigger                       |
+| ----------------- | ------------------- | ----------------------------- |
+| `test`            | PR + push           | always                        |
+| `docker-build`    | push (after `test`) | always                        |
+| `deploy-backend`  | push to `main` only | `needs: [test, docker-build]` |
+| `deploy-frontend` | push to `main` only | `needs: test`                 |
+
+**What `test` checks:**
+
+- Backend: `uv sync --extra dev` then `uv run pytest -q` (working-directory `backend`)
+- Frontend: `bun install --frozen-lockfile`, `bunx tsc --noEmit`, `bun run build`, `bunx biome check frontend/src`
+
+**Deploy mechanism:**
+
+- Backend: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"` (fails the job if the hook call fails)
+- Frontend: `vercel pull --yes --environment=production` → `vercel build --prod` → `vercel deploy --prebuilt --prod`
+
+**Required GitHub repository secrets (add in Settings → Secrets → Actions):**
+
+| Secret                   | Where to get it                                                           |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `RENDER_DEPLOY_HOOK_URL` | Render dashboard → your service → Settings → Deploy Hook → copy the URL   |
+| `VERCEL_TOKEN`           | Vercel dashboard → Account Settings → Tokens → Create token               |
+| `VERCEL_ORG_ID`          | `team_CwktsdBSB9TLrdwdCV3dZRbg` (the Vercel team/org ID; not sensitive)   |
+| `VERCEL_PROJECT_ID`      | `prj_0KnVQwxUPBqML8k4KjgPQv1iaYTE` (the Vercel project ID; not sensitive) |
+
+**Live URLs:**
+
+- Frontend: `https://cukaipandai.vercel.app`
+- Backend: `https://cukaipandai-api.onrender.com`
+
+**Render native auto-deploy:** while the gated pipeline is being validated, Render's native auto-deploy may still be ON (it triggers a Render build on every push to `main` independently of the hook). Once the first green pipeline run is confirmed in the Actions tab, **turn off Render's native auto-deploy** in the Render dashboard (Settings → Auto-Deploy → Off) so the deploy hook becomes the sole trigger. Until then, two deploys will fire on each push (harmless but redundant).
+
+**Manual CLI deploy fallback (§4a/§4b below)** remains the documented fallback if CI is unavailable.
+
+**PRs on forks / without secrets:** on pull_request events the `deploy-backend` and `deploy-frontend` jobs are guarded by `if: github.ref == 'refs/heads/main' && github.event_name == 'push'` and are **skipped entirely** — PRs run tests only and stay green without any secrets being set.
+
+**Graceful secret-absence (push to main before secrets are configured):** both deploy jobs skip cleanly (exit 0, green) when their secrets are unset — `deploy-backend` warns and exits 0 if `RENDER_DEPLOY_HOOK_URL` is empty; `deploy-frontend` warns and skips all Vercel steps if `VERCEL_TOKEN` is empty. This means the workflow can be merged before the 4 secrets are added to the repo; the deploy steps activate automatically once secrets are present. Until then, Render's native auto-deploy covers the backend.
+
+**Gitleaks false positive:** a `gitleaks` scan over full history is clean. The single `generic-api-key` hit at `docs/plan.md:292` is a verified false positive — it is prose referring to "psycopg/SQLAlchemy over the Postgres connection string", not a credential.
+
+---
+
+## 5. Deployment
+
+### 5a. Render (backend — Docker, free tier)
 
 **One-time setup in the Render dashboard:**
 
@@ -88,7 +144,7 @@ Prelim is **pure-ILMU (Q6)** — leave the escalation vars blank and `make_llm()
 
 ---
 
-### 4b. Vercel (frontend — Vite SPA)
+### 5b. Vercel (frontend — Vite SPA)
 
 **One-time setup:**
 
@@ -120,7 +176,7 @@ bunx vercel --prod
 
 **CORS note:** add the stable Vercel prod URL (`https://<your-project>.vercel.app`) to `CORS_ORIGINS` on Render. Per-deploy preview URLs rotate and are not covered by exact-match CORS — demo from the prod URL, not a preview.
 
-## 5. Demo flow (matches the video script)
+## 6. Demo flow (matches the video script)
 
 1. Onboard **Acme** (seed: `backend/core/fixtures/entity_acme.json` + `myinvois_acme.json`).
 2. **Obligations** → calendar (Form C, e-invoice, SST, employer).

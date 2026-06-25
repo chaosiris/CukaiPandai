@@ -317,3 +317,42 @@ The honesty invariant holds end-to-end, mock↔live parity is achieved (all thre
 **Smoke test:** `cd backend && uv run pytest -q` → **105 passed, 1 warning** (pre-existing Starlette/httpx deprecation) · `cd frontend && bun run build` → **46 modules, dist/ emitted, exit 0** · `bunx tsc --noEmit` → **exit 0** · `bunx biome check frontend/src` → **9 files, 0 errors** · `docker build ./backend` → **success (sha256:b8982353…), exit 0** · shell `${PORT:-8000}` expansion → 9999 / 8000 as expected · corpus check → `ITA-1967-s999-FAKE` absent (0/15 ids) · FE `verified:false` literals → exactly 1 (the gated fake mock).
 
 **Return to PM:** **Approve.** The honesty invariant is airtight — the rejected verdict is computed by the real `ground_citation` gate against a fake ID genuinely absent from the 15-clause corpus (short-circuits before any LLM call), and the FE's lone `verified:false` literal is gated behind the inject flag, mirroring BE-18 byte-for-byte. Mock↔live parity is achieved (all 3 FE-6 carry-forwards closed: `items` shape, inject-branched mock, flag-only-when-true body); the default path is unchanged (single verified citation, asserted by tests). Deploy config is correct and secure: shell-form Dockerfile CMD expands `$PORT` (build verified), vercel.json serves assets before the SPA catch-all, CORS is env-driven exact-match with credentials, and the runbook env tables are complete. All gates green (105 / build / tsc / biome / docker). Two Minor non-blockers: runbook says "40 passed" (now 105) and the shell-form CMD's PID-1/SIGTERM tradeoff (accepted for the prelim). No Critical/Major. Ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — DO-5: Gated CI/CD deploy pipeline (`deploy.yml`) `[DO]`
+
+**Verdict:** Approve
+
+**Scope:** Static infra/YAML review of `.github/workflows/deploy.yml` (replacing `ci.yml`), plus runbook §4 / plan DO-5 / progress alignment. Actual deploy not exercisable here (no secrets) — reviewed statically per the brief.
+
+**Required-behavior verification (all PASS):**
+
+1. **Test gate** (lines 13–42) — PASS. `test` job runs backend (`uv sync --extra dev` L25 → `uv run pytest -q` L28, `working-directory: backend`) AND frontend (`bun install --frozen-lockfile` L34 → `bunx tsc --noEmit` L37 → `bun run build` L40, all `working-directory: frontend`; `bunx biome check frontend/src` L42 at repo root where `biome.json` lives). All are sequential steps in one job, so any non-zero exit fails the whole job and blocks every downstream `needs: test` job. Frontend failure genuinely fails the job (verified `biome.json` resolves at root, `bun.lock` present for `--frozen-lockfile`).
+2. **Deploy gating** (L52–55, 67–70) — PASS. `deploy-backend` (`needs: [test, docker-build]`, L54) and `deploy-frontend` (`needs: test`, L69) each carry `if: github.ref == 'refs/heads/main' && github.event_name == 'push'` (L55, L70). On any `pull_request` event (incl. fork PRs) `github.event_name == 'push'` is false → both jobs are SKIPPED, never queued. Forks/PRs cannot trigger a deploy and need no secrets. **This is the failure mode that matters and it is correctly closed.**
+3. **Graceful secret-absence (critical)** — PASS, no red-on-empty path exists.
+   - `deploy-backend` (L57–65): `HOOK` from `secrets.RENDER_DEPLOY_HOOK_URL` via step `env:`; `[ -z "$HOOK" ]` → `::warning::` + `exit 0` (green); else `curl -fsS -X POST "$HOOK"`. Empty secret → exit 0.
+   - `deploy-frontend` (L74–110): check step writes `HAS_VERCEL=0|1` to `$GITHUB_ENV` (L80/L82) and itself always exits 0; the install/pull/build/deploy steps each carry `if: env.HAS_VERCEL == '1'` (L85/88/96/104) → all skipped when `VERCEL_TOKEN` empty → job green.
+   - Correctly uses the **env-var / step-check** pattern, NOT `if: secrets.X != ''` (which GitHub disallows at job/step `if:`). Confirmed no job-level `if:` references `secrets.*`.
+4. **Least privilege** (L9–10) — PASS. Top-level `permissions: contents: read`.
+5. **Secret hygiene** — PASS. No secret VALUES in the workflow; Render hook and Vercel token referenced only as `${{ secrets.RENDER_DEPLOY_HOOK_URL }}` / `${{ secrets.VERCEL_TOKEN }}`. Vercel org/project IDs are NOT in the workflow at all (only `${{ secrets.VERCEL_ORG_ID/PROJECT_ID }}`); the literal IDs appear only in `runbook.md` L89–90, flagged there as non-sensitive — acceptable.
+6. **Deploy-command correctness** — PASS. `deploy-frontend` runs `vercel pull --yes --environment=production` (L90) → `vercel build --prod` (L98) → `vercel deploy --prebuilt --prod` (L106) from `working-directory: frontend`, with `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID`/`VERCEL_TOKEN` in each step `env:` (L91-94, 99-102, 107-110). `--token=$VERCEL_TOKEN` shell-expands correctly because `VERCEL_TOKEN` is in the same step's `env:`. `deploy-backend` curls the hook with `-fsS` (fails job on HTTP error, as runbook §4 promises). No flag/path errors that would break a real run.
+
+**Also-verified:**
+
+- YAML parses: `python3 -c "import yaml; yaml.safe_load(...)"` → OK.
+- `ci.yml` deleted: `.github/workflows/` contains only `deploy.yml`; `git status` shows `D .github/workflows/ci.yml`. No duplicate test workflow.
+- Frontend builds: `cd frontend && bun run build` → 46 modules, dist/ emitted, exit 0.
+- Action refs sane: `actions/checkout@v4`, `actions/setup-python@v5`, `astral-sh/setup-uv@v6`, `oven-sh/setup-bun@v2`, `actions/setup-node@v4` — all real, current major tags.
+- New untracked `frontend/.gitignore` adds `.vercel` (the dir `vercel pull` creates) — correct, keeps deploy artifacts out of git.
+- Docs aligned: runbook §4 lists all 4 secrets + sources + the Render auto-deploy cutover note + live URLs; plan DO-5 acceptance criteria match the workflow; progress entry accurate.
+
+**Findings:**
+
+- `.github/workflows/deploy.yml:90,98,106` — [Minor / optional] `--token=$VERCEL_TOKEN` is redundant given `VERCEL_TOKEN` is already in each step's `env:` (the Vercel CLI reads it automatically). Harmless and works; could drop the flag for tidiness. Not blocking.
+- `.github/workflows/deploy.yml:44–50` — [Minor / informational] `docker-build` only smoke-builds the image; it does not run the container or `/health`. Matches the documented intent ("smoke") and DO-3 owns live smoke — noting scope, not a defect.
+- No Critical, no Major.
+
+**Smoke test:** `yaml.safe_load(deploy.yml)` → OK · `cd frontend && bun run build` → 46 modules, exit 0 · `bunx tsc --noEmit` → exit 0 · `bunx biome check frontend/src` → 9 files, 0 errors · `ci.yml` absent (only `deploy.yml` in workflows dir) · action refs all valid major tags.
+
+**Return to PM:** **Approve.** The two failure modes that matter are both correctly closed: (1) deploy jobs are guarded by `github.ref == 'refs/heads/main' && github.event_name == 'push'`, so fork/PR events skip them entirely and need no secrets; (2) with secrets unset both deploy jobs end GREEN — `deploy-backend` warns + `exit 0` on empty `$HOOK`, `deploy-frontend` uses the legal `HAS_VERCEL` env-var/step-check pattern (not the disallowed `if: secrets.X != ''`) so every Vercel step is skipped. `permissions: contents: read`, no secret values in YAML (IDs live only in the runbook, flagged non-sensitive), correct `vercel pull→build→deploy --prebuilt --prod` chain, valid action refs, `ci.yml` removed, YAML parses, frontend green. Only two optional Minors (redundant `--token` flag; docker-build is build-only by design). The remaining human-gated steps (add 4 secrets, confirm first green run, turn off Render native auto-deploy) are correctly left unticked. Ready for Gate-2 commit authorization.
