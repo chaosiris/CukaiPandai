@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../AuthContext'
 import { useActivePersona } from '../PersonaContext'
 import { type SsmProfile, getObligations } from '../api/client'
 import { BellIcon, ProfileIcon, ThemeIcon } from '../components/icons'
@@ -176,6 +177,7 @@ export function AppShell() {
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona, personas } = useActivePersona()
+  const { user, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAllRead, dismiss, seedDeadlines, notify } = useNotifications()
 
@@ -412,8 +414,8 @@ export function AppShell() {
                 {activePopover === 'profile' && (
                   <div className="window topbar-popover" id="cp-profile-popover">
                     <div className="profile-summary">
-                      <strong>{persona.label}</strong>
-                      <span>{persona.tin}</span>
+                      <strong>{user ? user.name || user.email : isGuest ? 'Guest' : persona.label}</strong>
+                      <span>{user ? user.email : persona.tin}</span>
                     </div>
                     <button
                       className="popover-action"
@@ -430,7 +432,7 @@ export function AppShell() {
                       type="button"
                       onClick={() => {
                         setActivePopover(null)
-                        window.localStorage.removeItem('cp_entered_as_guest')
+                        signOut()
                         navigate('/')
                       }}
                     >
