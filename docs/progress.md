@@ -546,3 +546,46 @@ CukaiPandai/
 ### Deferred (Wave 2+)
 
 - Marketing landing, auth/guest gate, settings depth, chat surface, persistent sidebar rail, console-internals redesign — all remain in the Wave 2+ deferred list as documented.
+
+---
+
+## [25/06/26] — Redesign Wave 2: Dashboard Hub Depth `[FE]`
+
+**Task:** Fill the ~50% empty dead space below the action cards with real, data-driven content.
+
+### Changes
+
+- **`frontend/src/api/client.ts`** — Extended `MOCK_OBLIGATIONS` from a single shared dataset to `MOCK_OBLIGATIONS_BY_TIN` (a `Record<string, ObligationCalendar>` keyed by TIN) so persona switching fetches different obligation sets:
+  - Acme Trading: 4 obligations (Form C, CP204 overdue, CP37 overdue, SST-02)
+  - Sinar Digital: 3 obligations (Form C, CP204 overdue, CP204A)
+  - Selera Kita: 4 obligations (Form C overdue, CP204 overdue, SST-02, Audited Accounts overdue)
+  - `getObligations` now resolves `MOCK_OBLIGATIONS_BY_TIN[tin] ?? MOCK_OBLIGATIONS` in mock mode.
+
+- **`frontend/src/pages/Dashboard.tsx`** — Rewrote to add a content section below the action cards:
+  - **`DeadlinesPanel`** (2/3 width, primary column): calls `getObligations(persona.tin, persona.ssm)`, sorts soonest-first by `due_date`, renders each obligation with: form badge (rust if overdue, denim if current), obligation type, `rule_id · config_version` mono meta, formatted due date, and a countdown pill ("Xd overdue" in rust, "in Xd" in mustard if urgent ≤30d, plain otherwise). Re-fetches on persona switch via `key={persona.tin}`. Loading state shows `.barber` strip. "Open full calendar →" footer link.
+  - **`SnapshotPanel`** (1/3 width, secondary column): uses `useEntity()` hook, shows RM-formatted gross income as a hero figure, then a 2-column facts table (MSIC codes, SST registered, basis period, employee count, paid-up capital). Re-fetches on persona switch via `key={\`snap-${persona.tin}\`}`. Loading state shows `.barber` strip.
+  - **`TrustStrip`** (full-width, 3-column): sovereign · cited · audit-ready, each with a one-line detail. Static, no invented data.
+  - Countdown logic: `countdown(dueDate)` computes `diffDays` from midnight-normalised today; negative → "Xd overdue" (`overdue: true`); 0 → "Due today"; 1 → "Due tomorrow"; else "in Xd". Urgency: ≤30d remaining (not overdue).
+
+### CSS
+
+- No new CSS added. All styling uses exclusively existing devkit tokens: `.window`, `.titlebar`, `.titlebar-meta`, `.closebox`, `.req-list`, `.requirement-row`, `.barber`, `var(--rust)`, `var(--denim)`, `var(--mustard)`, `var(--ink-soft)`, `var(--font-mono)`, `var(--font-display)`, `var(--font-body)`, `var(--border)`.
+
+### Verification
+
+- `bunx tsc --noEmit` → clean (0 errors)
+- `bun run build` → green (53 modules, 226kB JS gzip 69kB)
+- `bunx biome check frontend/src` → 0 errors (16 files checked)
+- Persona switch: `DeadlinesPanel` and `SnapshotPanel` both carry `key` prop tied to `persona.tin` — forces React remount and fresh `useEffect` fetch on each switch.
+- Dark mode: all color references are `var(--…)` tokens; no literal hex. Both themes use the correct rust/mustard/denim/ink-soft contrast.
+- Mock mode (`VITE_API_MOCK=1`): all three personas return distinct obligation sets; entity snapshot shows correct entity per persona.
+
+### Files touched
+
+- `frontend/src/api/client.ts`
+- `frontend/src/pages/Dashboard.tsx`
+
+### [25/06/26] — Wave 2 post-ship fixes (badge overflow + mock-fidelity) `[FE]`
+
+- **Badge fix:** form badge column widened from `56px` to `80px` with `overflow:hidden; text-overflow:ellipsis; min-width:0` so long labels (e.g. `MyInvois`) truncate cleanly without overlapping the row title; short labels (`CP204`, `C`, `CP39`) unaffected.
+- **Mock-fidelity:** rewrote all three persona obligation sets in `MOCK_OBLIGATIONS_BY_TIN` to mirror `derive_obligations()` exactly — canonical `oblig.*` rule_ids, correct `obligation_type` values, `config_version:'YA2026.1'`; removed invented `ITA_s77A`/`ITA_s107C`/`ITA_s109`/`SST_s26`/`CA_s259` references and non-existent forms (`CP37`, `CP204A`, `Audited Accounts`); Sinar (sst_registered=false, gross_income=380k) now correctly omits SST-02 and MyInvois; Selera (sst+45 employees) now includes SST-02+CP39+MyInvois as the backend would emit; due dates derived from `form_c_deadline`/`cp204_deadline` logic per each persona's basis period. Build/lint: `tsc --noEmit` clean, `bun run build` green (53 modules), `biome check` 0 errors.
