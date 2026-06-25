@@ -716,3 +716,16 @@ CukaiPandai/
 - **Non-regression:** Shell/nav/notifications/consoles untouched; only `Dashboard.tsx` restructured and a scoped CSS block added.
 - **Build:** `bunx tsc --noEmit` clean; `bun run build` green (69 modules, 1.88s); `bunx biome check frontend/src` 0 errors (32 files).
 - **Files touched:** `frontend/src/pages/Dashboard.tsx`, `frontend/src/styles/tokens.css`, `docs/progress.md`.
+
+---
+
+## [25/06/26] — Neon persistence verified end-to-end (DO-4 + BE-15/16/17) `[BE]` `[DO]`
+
+- **Local seam suite: 19/19 passed** — pooled PgBouncer connect (`prepare_threshold=0`) + direct unpooled endpoint both reach Neon; schema applied (`audit` / `links` / `entities` / `filings` / `defense_packs`); `make_checkpointer()` returns a real `PostgresSaver` and auto-creates `checkpoints*` tables (BE-15); `EvidenceVault` audit+links roundtrip stores and reads back hashes (BE-16); `EntityRepository` reads from Neon with fixtures fallback (BE-17); DB-down path falls through to `None` checkpointer / in-memory vault / fixture reads without raising.
+- **Fallback suite: 107/107 passed** — `env -u DATABASE_URL -u DATABASE_URL_UNPOOLED uv run pytest -q` against no DB, all tests green; no regression.
+- **Live deployed (Render):** HITL filing `start`→`resume` flow confirmed over the wire (tax_payable RM675,000); `thread_id` confirmed persisted in Neon (`checkpoints` rows written); the deployed instance is actively writing to Neon, not the in-process fallback.
+- **Neon details:** PostgreSQL 18.4, `aws-ap-southeast-1` Singapore region (Q9 sovereignty caveat stands — SG not MY; prod path = self-hosted MY-region Postgres, identical schema, deploy-config swap).
+- **DB-down ≠ demo-down confirmed:** hero beats (cited Form C, audit-defense, fabricated-citation rejection) run on deterministic seeded data and do not hard-depend on Neon.
+- **EntityRepository note:** `entities` table is intentionally empty in Neon — `EntityRepository` serves fixtures by design; seeding it from fixtures is a documented optional future step.
+- **Docstring updated:** `backend/api/persistence.py` NOTE revised from "not yet verified" to verified, citing the durable checkpointer + evidence vault + entity repo + fallbacks.
+- **Plan ticked:** DO-4 (all 3 bullets), BE-15 (all 4 bullets), BE-16 (both bullets), BE-17 (all 3 bullets) marked `[x]` in `docs/plan.md`.
