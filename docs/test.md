@@ -385,7 +385,7 @@ Cross-checked `personas.ts` ssm, the backend fixtures, `client.ts` `ACME_SSM`/`M
 - **Acme** (gross 5m, sst true, emp 12): C · CP204 · einvoice · SST · CP39 → **5 obligations**.
 - **Selera** (gross 2.5m, sst true, emp 45): C · CP204 · einvoice · SST · CP39 → **5 obligations**.
 
-The demo's variation lands (Sinar is clearly different), but **Acme and Selera produce an identical obligation set** — same five types, and because both share `basis_period_start/end = 2025-01-01/12-31`, the due dates are identical too (einvoice/CP39 → basis_start; C → form_c_deadline(basis_end); SST → basis_end). See Minor M2 below — the demo would read more strongly if Selera's calendar differed from Acme's beyond gross-income/employee-count magnitude (which don't change the obligation _lines_).
+The demo's variation lands (Sinar is clearly different), but **Acme and Selera produce an identical obligation set** — same five types, and because both share `basis_period_start/end = 2025-01-01/12-31`, the due dates are identical too (einvoice/CP39 → basis*start; C → form_c_deadline(basis_end); SST → basis_end). See Minor M2 below — the demo would read more strongly if Selera's calendar differed from Acme's beyond gross-income/employee-count magnitude (which don't change the obligation \_lines*).
 
 ### Active-persona wiring (VERIFIED — all three consoles switch; no residual ACME\_)
 
@@ -430,3 +430,52 @@ The demo's variation lands (Sinar is clearly different), but **Acme and Selera p
 **Smoke test:** `cd backend && uv run pytest -q` → **107 passed, 1 warning** (pre-existing Starlette/httpx deprecation) · `cd frontend && bunx tsc --noEmit` → **exit 0** · `bun run build` → **48 modules, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from root) → **11 files, 0 errors** · persona↔fixture cross-check → exact on all compute fields · `grep ACME_ pages/` → 0 hits · `derive_obligations` calendars → Sinar 3 / Acme 5 / Selera 5 (Acme==Selera).
 
 **Return to PM:** **Approve with comments.** Persona↔fixture coherence is exact across `personas.ts`, the two new backend fixtures, and `MOCK_ENTITIES` — and the consoles build their obligations/form-c `ssm` from the _fetched_ entity, so a persona's header can never contradict its calendar. The picker drives all three consoles (no residual `ACME_*` in any page), mock mode serves all 3 TINs with 404 parity, the DEMO banner is strictly gated on `VITE_DEMO_MODE==='1'`, and the FE-6 fabrication path is untouched. All gates green (107 / tsc / build / biome). Two Minor non-blockers: AuditDefense doesn't clear a stale defense pack on persona switch (header updates, body doesn't); and Acme & Selera yield identical obligation calendars (only Sinar is distinct) so the "three different calendars" demo value is really two-plus-one. Ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — Redesign Wave 1 (RW-1…RW-6: app shell · drawer · footer · LogoMark · dashboard hub · theme toggle · 404)
+
+**Branch:** working tree vs `main` (uncommitted). Diff surface: `git diff main --stat -- frontend/` → 4 modified (`App.tsx` +11/−103, the 3 consoles +2/−2 each) + 5 new files (`layouts/AppShell.tsx`, `hooks/useTheme.ts`, `components/icons.tsx`, `pages/Dashboard.tsx`, `pages/NotFound.tsx`).
+
+**Verdict:** Approve
+
+Clean, surgical, fully non-regressive. The headline risks — console behavior drift (#1) and a forked persona state (#2) — are both confirmed _not_ present. All gates green. No Critical/Major/Minor findings; two informational notes only.
+
+### #1 — Console non-regression (PASS, highest priority)
+
+`git diff main --unified=0` on `ObligationRadar/FilingStudio/AuditDefense.tsx` shows **exactly 2 changed lines each**, and they are _only_ the wrapper swap:
+
+- `ObligationRadar.tsx:31` / `:132` — `<div className="app-shell">` → `<>` … `</div>` → `</>`
+- `FilingStudio.tsx:394` / `:634` — same
+- `AuditDefense.tsx:55` / `:435` — same
+
+No logic, data-fetching, `useEntity`/`PersonaContext`, HITL flow (classify→start→approve→resume), `CitationPanel`/`SovereignBadge`/`VerifiedBadge`, or BE-18 fabrication-rejection code is touched anywhere in the three files. The `app-shell` class is not lost — it moves to a single owner, `<main className="app-shell">` in `AppShell.tsx:185`, so page layout/padding is preserved and double-wrapping is avoided. The consoles now render a Fragment, which is correct under the `<Outlet/>`.
+
+### #2 — PersonaContext single-source (PASS)
+
+No forked persona state. `App.tsx:12` still wraps the tree in `<ActivePersonaProvider>`; the new topbar entity-switcher (`AppShell.tsx:126-150`) reads `const { persona, setPersona } = useActivePersona()` (`:37`) and calls `setPersona(next)` (`:130`) against the _same_ `PersonaContext.tsx` provider (`setPersona` from `useState`, `PersonaContext.tsx:18-19`). `Dashboard.tsx:33` and the profile popover (`AppShell.tsx:167`) consume the same `useActivePersona().persona`. The old inline `PersonaPicker` was deleted from `App.tsx` (net −103 lines) — not duplicated. Switching the entity drives all three consoles through the one context, identical to pre-wave behavior.
+
+### #3 — Routing (PASS)
+
+`App.tsx:14-22`: a single layout route `<Route element={<AppShell/>}>` with `index → <Dashboard/>` (so `/` is the hub; the old `/`→`/obligations` redirect is gone, as intended), `/obligations`, `/filing`, `/audit-defense`, and `path="*" → <NotFound/>` — all children render under the shell's `<Outlet/>` (`AppShell.tsx:186`), so a bad URL hits the **in-shell** 404 (verified: NotFound sits inside the same layout route). `VITE_DEMO_MODE` banner (`AppShell.tsx:13-30`, gated on `=== '1'`) and `VITE_API_MOCK` MOCK chip (`:100-112`, gated on `=== '1'`) are carried verbatim from the old `App.tsx` into the new shell and render in-place.
+
+### #4 — Theme toggle (PASS)
+
+`useTheme.ts` sets/removes `data-theme="dark"` on `document.documentElement` (`:21-25`), which matches the canonical selector `[data-theme="dark"]` in `tokens.css:35` exactly. Persistence via `localStorage['cukaipandai-theme']` (`:45`); initial state reads stored→system (`:17`). First-paint safe for this Vite SPA: `localStorage`/`matchMedia` are accessed inside `useState` initializers and effects that only run client-side (no SSR). System-preference listener is correctly gated off once the user has an explicit stored choice (`:28-41`). No literal colors in the new components except `Dashboard.tsx:61` `rgba(0,0,0,0.22)` — a hover _box-shadow_ (not a fg/bg color), theme-agnostic by design and matching the existing `--shadow` idiom; does not break dark mode. Informational only.
+
+### #5 — Build hygiene (PASS)
+
+`App.tsx` has zero orphaned imports/dead code — `NavLink`/`Navigate`/`useActivePersona`/`PERSONAS`/`navStyle`/`isMock`/`isDemoMode` all moved to `AppShell.tsx` where they're used; `App.tsx` imports only what it references. `tokens.css` is **unchanged** vs `main` (drawer/footer/topbar/popover classes already existed on `main`; `git diff main -- frontend/src/styles/tokens.css` is empty). All AppShell-referenced classes resolve in `tokens.css`.
+
+### Findings
+
+None blocking.
+
+**Informational (no action):**
+
+- `Dashboard.tsx:61` — `rgba(0,0,0,0.22)` literal in an inline hover `boxShadow`. Theme-agnostic (a translucent drop-shadow, not a themed color), so it does not break dark mode; matches the existing shadow convention. No fix required.
+- `icons.tsx:9` carries a `biome-ignore lint/a11y/noSvgWithoutTitle` justified by the `aria-hidden` parent span — legitimate; biome passes clean.
+
+**Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0** · `bun run build` (`tsc -b && vite build`) → **53 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from repo root) → **16 files checked, 0 errors** · console diff audit (`git diff main --unified=0`) → **2 wrapper-only lines per console, no functional change** · `data-theme` selector parity → `useTheme` writes `data-theme="dark"`, `tokens.css:35` reads it.
+
+**Return to PM:** **Approve.** Wave 1 is surgical and non-regressive — the two highest-risk checks pass cleanly: each console changed _exactly_ 2 lines (outer `app-shell` wrapper → Fragment, no logic/HITL/citation/fabrication code touched), and the new topbar entity-switcher writes to the _same_ `ActivePersonaProvider`/`setPersona` (no forked persona state). Routing is correct (`/`→Dashboard hub, consoles under `<Outlet/>`, in-shell 404), the theme toggle's `data-theme="dark"` matches `tokens.css`, DEMO/MOCK gating is carried over verbatim, `App.tsx` has no orphaned imports, and `tokens.css` is untouched. All gates green (tsc 0 / build 53-modules / biome 0). No Critical/Major/Minor findings — ready for Gate-2 commit authorization.

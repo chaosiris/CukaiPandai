@@ -536,3 +536,145 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 **Acceptance criteria (STRETCH):** the Filing Studio shows a live "watch-the-agent-think" stepper when streaming is available, and falls back to the FE-3 non-streamed stepped-progress UI otherwise.
 
 ---
+
+# REDESIGN WAVE 1 — Foundational App Shell + IA `[FE]`
+
+> **New section, appended 25/06/26.** Owned by **PL**; presented at **Gate 1** before any implementation. This is **Wave 1 of a multi-wave UI/UX redesign** — it is **deliberately narrow**: it builds the SaaS **app shell** (topbar + drawer nav + footer + logo + theme toggle) and the **dashboard-hub entry** that every later wave hangs on, reusing **ProofRank's** `AppShell` component pattern and **CukaiPandai's existing `tokens.css`**. It does **NOT** redesign the three consoles' internals, add marketing/auth pages, or build the live filing stepper — those are **Wave 2+** (scoped-out list below).
+>
+> **Lane:** every Wave 1 task is `[FE]`. **Stack:** Bun + Vite 5 + React 18 + React Router 7 + token-CSS (unchanged). **Hard gates on every task:** `bun run build` green · `bunx tsc --noEmit` clean · `bunx biome check frontend/src` clean. **Non-regression gate on every task:** the three consoles' live behaviour (real backend calls, persona switching, the **BE-18 fabricated-citation money-shot**, the **FE-5 sovereign badge**) must be byte-for-byte unaffected — the shell _wraps_, it must not rewire the consoles.
+
+---
+
+## Redesign Wave 1 — Triage (PM findings, recorded + verified against the code on disk)
+
+**Subject (current state):** `docs/screenshots/cukaipandai/` — `01-obligations`, `02b-filing-populated`, `03-audit-defense`, `04-persona-switch`, `05-nav`.
+**Design-shell target:** `docs/screenshots/proofrank/` — esp. `08-app-shortlist` (the app shell), `11-settings`, `12-notfound`, `06-sign-in`.
+**User-flow target:** `docs/screenshots/layak/` — esp. `03-dashboard` (the hub), `01-landing`, `02-auth-guest`, `04-upload-onboarding`, `07-pipeline-running`, `13-ask-chat`.
+**ProofRank component/token source (reuse / adapt — copy into `frontend/src`):** `/home/adam/CS/chutes/aic-hackathon/devkit/proofrank/frontend/src` — `layouts/AppShell.tsx` (the topbar+drawer+footer pattern), `hooks/useTheme.ts` (theme toggle), `components/icons.tsx` (`LogoMark`/`ThemeIcon`/`BellIcon`/`ProfileIcon`), `pages/screening/PositionShortlist.tsx` + `pages/Landing.tsx` (hub/landing patterns), `pages/Settings.tsx`, `pages/NotFound.tsx`.
+
+**Finding 0 — the visual language is already correct, AND the shell CSS already ships.** CukaiPandai inherited ProofRank's full `tokens.css` in R-FE-2 (`frontend/src/styles/tokens.css`). **Verified:** that file _already contains the entire app-shell CSS_ — `.topbar`/`.topbar-inner`/`.topbar-controls`/`.topbar-control-button`/`.topbar-popover`, `.icon-button`, `.brand-lockup`/`.logo-mark`, `.nav-drawer`/`.drawer-layer`/`.drawer-backdrop`/`.drawer-head`/`.drawer-nav`/`.drawer-section`/`.drawer-link`, `.app-shell`, `.app-footer`/`.footer-inner`/`.footer-links`/`.footer-wordmark`, plus the full `[data-theme="dark"]` ramp and `--topbar-height` (tokens.css:32, 35-48, 168-555, 1088-1148). **Consequence: Wave 1 is overwhelmingly React wiring of CSS that already exists — not CSS authoring.** This materially de-risks the wave and is why the theme toggle is _cheap_ (below).
+
+**Finding 1 — no real app shell (PARTIALLY stale vs the PM brief — corrected here).** Current `App.tsx` _does_ render a `.topbar` with a `CukaiPandai` wordmark, a styled persona `<select>` (`PersonaPicker`), three `NavLink` text links, a `MOCK` chip, and a DEMO MODE banner (FE-8 already added `PersonaContext.tsx` + `personas.ts`). **What is genuinely missing** (confirmed `App.tsx:70-118`): the **hamburger + slide-in drawer nav** (the `.nav-drawer` CSS is unused), the **LogoMark** (no logo anywhere), the **topbar icon-controls** (theme toggle, profile/menu — `.topbar-control-button`/`.topbar-popover` unused), and the **fixed denim footer band** (`.app-footer` unused). Nav is 3 flat links with **no IA grouping**; the persona switcher is a **raw native `<select>`** (`App.tsx:24-47`) rather than a shell-integrated control.
+
+**Finding 2 — pages float in dead space.** Each console wraps itself in its _own_ `.app-shell` + `.page-head` (`ObligationRadar.tsx:31`, `FilingStudio.tsx`, `AuditDefense.tsx`) and renders a stack of `.window` cards. Screenshots `01`/`02b`/`03` confirm everything sits in the top ~600px of a ~1440px column with a large dead cream band below + the footer band absent. **Root cause:** `.app-shell` is per-page (no shared layout `<Outlet/>`) and there is no footer to anchor the viewport bottom.
+
+**Finding 3 — no entry journey.** `App.tsx:109` redirects `/` → `/obligations`; the app drops straight into a data console. There is **no hub** to choose an action from (contrast Layak `03-dashboard`: a greeting + action-card grid).
+
+**Finding 4 — flow doesn't follow Layak.** Layak's journey is landing → guest gate → **dashboard hub of action cards** → sample-data onboarding → live stepper → cited results + chat. Wave 1 adopts **only the dashboard-hub beat** (the cheapest, highest-leverage piece that reframes the product as a workspace); the rest is Wave 2+.
+
+**Finding 5 — missing surfaces:** landing, auth + guest gate, settings/profile depth, 404, theme toggle, footer, logo. **Wave 1 ships:** footer, logo, theme toggle, and a `404`. **Wave 1 defers:** marketing landing, auth/guest gate, settings depth (see scoped-out list).
+
+**Non-regression assets that MUST survive the wave (verified on disk):** `PersonaContext.tsx` + `personas.ts` (3 seed personas) drive `useEntity.ts` (`hooks/useEntity.ts:11-12` reads the active persona TIN) — the persona switcher is **load-bearing for all three consoles**, so the Wave-1 entity-switcher upgrade must keep writing to the **same `useActivePersona().setPersona`**. `components/CitationPanel.tsx` (`CitationPanel`/`VerifiedBadge`/`SovereignBadge`) and the consoles' real `api/client.ts` calls are untouched by this wave.
+
+---
+
+## Redesign Wave 1 — Open Questions for Gate 1 (PL surfaces; PO decides)
+
+> Each has a **recommended default** so implementation can proceed if unanswered. **RW-Q1, RW-Q3, RW-Q7** are the load-bearing ones.
+
+- [ ] **RW-Q1 — Drawer (slide-in overlay) vs a persistent sidebar rail?** ProofRank's `AppShell` uses a **hamburger-triggered slide-in drawer** (`AppShell.tsx:79-90,194-251`) and the matching `.nav-drawer` CSS (translateX overlay + backdrop) is **already in our `tokens.css`** (tokens.css:409-555); a **persistent rail** has _no_ CSS in our tokens and would be net-new layout work + a content-margin reflow on every console. **PL recommends the slide-in drawer** — it reuses ProofRank's exact pattern + our existing CSS verbatim, is the lowest-risk path, and matches the design-shell target screenshot (`08-app-shortlist`). A persistent rail can be a Wave 2+ enhancement if the PO wants always-visible nav. Confirm **drawer**, or request a persistent rail.
+
+- [ ] **RW-Q2 — Keep the 3 topbar text-links _in addition to_ the drawer, or drawer-only?** ProofRank is drawer-only (no inline nav links in the topbar). Our current topbar has 3 inline `NavLink`s. **PL recommends drawer-only** (move Obligations/Filing/Audit into the drawer's "Compliance" section, matching ProofRank) so the topbar is clean (logo · spacer · controls) — _but_ keep the **dashboard/home** reachable via the brand lockup (`/`) like ProofRank. If the PO prefers the primary three to stay one-click in the topbar on desktop, the alternative is a hybrid (inline links on wide viewports, drawer on narrow). Confirm **drawer-only**, or hybrid.
+
+- [ ] **RW-Q3 — Dashboard hub at `/` (demote the console default) vs keep `/obligations` as the landing route?** The current redirect is `/` → `/obligations` (`App.tsx:109`). Layak opens on a hub (`03-dashboard`). **PL recommends making `/` the new dashboard hub** (greeting + 3 action cards routing to the consoles) and keeping `/obligations` reachable but **no longer the default** — this is the single change that most reframes the product as a SaaS workspace and is the Wave-1 centrepiece. **Demo-safety caveat:** the live demo script (TD-3) currently opens on a console; if the PO wants the judge walkthrough to still _land_ on Obligations, we keep `/` as the hub but the demo simply clicks the "Obligation Calendar" card first (one extra click). Confirm **hub at `/`**, or keep `/obligations` as the default and mount the hub at `/dashboard`.
+
+- [ ] **RW-Q4 — Include the theme (dark-mode) toggle in Wave 1, or defer?** The PM brief said "IF cheap (else defer)." **It is cheap:** the full `[data-theme="dark"]` ramp is already in our `tokens.css` (tokens.css:35-48) and ProofRank's `hooks/useTheme.ts` is a drop-in (localStorage + `prefers-color-scheme`, toggles `data-theme` on `<html>`). **PL recommends INCLUDING it** — copy `useTheme.ts` + the `ThemeIcon`, wire one topbar button (~30 lines, zero new CSS). **Risk to check during implementation:** the three consoles use a few **inline hardcoded colours** (e.g. `var(--ink)` is a token so fine, but any literal hex in page files would not flip) — the task includes a quick audit + a screenshot of each console in dark mode; if a console renders unreadably in dark and the fix is non-trivial, the toggle ships **light-locked with the button hidden** and dark goes to Wave 2. Confirm **include theme toggle**, or defer it entirely.
+
+- [ ] **RW-Q5 — LogoMark: inline SVG vs image asset?** ProofRank's `LogoMark` loads two `.webp` files from `/public` (`icons.tsx:3-10`) with a light/dark swap; **CukaiPandai has no `frontend/public/` dir and no brand asset.** **PL recommends a self-contained inline-SVG `LogoMark`** (a simple geometric mark in `currentColor`, so it inherits ink/denim and needs **no** asset file, **no** `public/` wiring, and **no** light/dark image swap — it themes for free). The `.logo-mark` CSS box (30×30) already exists (tokens.css:237-263). If the PO has/ wants a bespoke raster logo, the alternative is adding `frontend/public/` + two webp files. Confirm **inline SVG**, or supply/commission a raster asset.
+
+- [ ] **RW-Q6 — How literally do we copy ProofRank's `AppShell`?** Options: **(A — PL recommends) adapt, don't import** — copy `AppShell.tsx` into `frontend/src/layouts/AppShell.tsx` and _strip_ ProofRank-specific dependencies our app doesn't have (`getIdentity`/`signOut` from `auth.tsx`, `useNotifications`, `useSettings`, the notifications popover) down to what Wave 1 needs (drawer + theme + a **placeholder** profile menu + footer), and replace the nav sections with CukaiPandai IA. **(B)** copy ProofRank's auth/notifications/settings modules too (pulls in Wave 2+ surfaces early — scope creep). **PL recommends (A)** — reuse the _structure + CSS classes verbatim_, but only the pieces Wave 1 defines; the profile control is a **non-functional placeholder** (opens a small popover with the active persona + a disabled "Settings (coming soon)") since real auth/settings are Wave 2+. Confirm **(A) adapt-minimal**.
+
+- [ ] **RW-Q7 — Add a thin landing now, or pure app-shell (no marketing)?** The PM brief lists the marketing landing as Wave 2+. **PL recommends NO landing in Wave 1** — the dashboard **hub** (RW-Q3) _is_ the entry surface for the prelim; a marketing/value-prop landing (Layak `01-landing`, ProofRank `01-landing`) is a separate Wave-2 surface with its own copy/hero work and would compete for the 4-day window. The hub greeting ("Good afternoon — CukaiPandai workspace") covers the "you've arrived somewhere intentional" need without marketing scope. Confirm **no landing in W1** (hub only), or request a thin landing now.
+
+- [ ] **RW-Q8 — Footer content (links target nothing yet).** ProofRank's footer links to GitHub/Team/About/FAQ (`AppShell.tsx:259-266`) — CukaiPandai has none of those pages. **PL recommends a minimal footer**: LogoMark + `CukaiPandai` wordmark + a single GitHub link (the repo) + a static "YA2026 · decision-support, not legal advice" line (reinforces the product's core guardrail, which TD-3/prd already require). No dead internal links. Confirm the **minimal footer**, or specify footer links.
+
+---
+
+## RW-1 `[FE]` — Adapt ProofRank `AppShell`: shared layout (topbar + drawer + footer) _(gating; everything else mounts inside it)_
+
+**Purpose / issue:** There is no shared app shell — each console renders its own `.app-shell` and there is no drawer/footer/logo (Findings 1, 2). Create one `AppShell` layout (ProofRank pattern, RW-Q6=A) that owns the topbar (LogoMark + wordmark + controls), a slide-in drawer nav (RW-Q1) with CukaiPandai IA (RW-Q2), and the fixed denim footer (RW-Q8), then route every page through it via `<Outlet/>`. **All required CSS already exists in `frontend/src/styles/tokens.css`** (Finding 0) — this task writes **no new CSS** beyond trivial inline tweaks.
+
+**Implementation:**
+
+- [x] Create `frontend/src/layouts/AppShell.tsx` by adapting `/home/adam/CS/chutes/aic-hackathon/devkit/proofrank/frontend/src/layouts/AppShell.tsx`: keep the `.page-scroll` → `.topbar` → `<main className="app-shell"><Outlet/></main>` → `.drawer-layer` → `.app-footer` structure and **all** its class names; **strip** the ProofRank-only deps (`getIdentity`/`signOut`, `useNotifications`, `useSettings`, the notifications popover/badge) per RW-Q6=A → verify: `AppShell` compiles with **no** import of any module CukaiPandai doesn't have.
+- [x] **Topbar:** hamburger `.icon-button` (opens drawer) · `<Link className="brand-lockup" to="/">` with the new `LogoMark` (RW-2) + `CukaiPandai` `.topbar-wordmark` · `.topbar-spacer` · `.topbar-controls` containing the **theme toggle** (RW-4) + the **persona entity-switcher** (RW-5) + a **profile placeholder** popover (active persona label + a disabled "Settings — coming soon", per RW-Q6) → verify: the topbar renders logo + wordmark + controls; no console error.
+- [x] **Drawer nav (RW-Q1 overlay, RW-Q2 drawer-only):** reuse `.nav-drawer`/`.drawer-*` markup; sections — **"Compliance"** → Obligations (`/obligations`) · Filing (`/filing`) · Audit Defense (`/audit-defense`); **"Workspace"** → Dashboard (`/`) (+ a disabled "Settings — Wave 2" placeholder using `.drawer-placeholder`). Use `NavLink` with `drawer-link is-active`; close the drawer on link click + on `Escape` + on backdrop click (carry over ProofRank's `useEffect` Escape handler) → verify: the hamburger opens the drawer; each link navigates + closes it; Escape/backdrop close it; the active route is highlighted.
+- [x] **Footer (RW-Q8 minimal):** `.app-footer` with `LogoMark` + `CukaiPandai` `.footer-wordmark`, one GitHub link to the repo, and the static "YA2026 · decision-support, not legal advice" line → verify: the denim footer band renders fixed at the viewport bottom on every route.
+- [x] Keep `frontend/src/styles/tokens.css` **unchanged** (the shell CSS is already present); do not author new shell CSS → verify: `git diff --stat` shows `tokens.css` untouched by RW-1.
+
+**Acceptance criteria:** a single `AppShell` layout renders a ProofRank-style topbar (logo + wordmark + controls), a working slide-in drawer with CukaiPandai's Compliance/Workspace IA, and the fixed denim footer; it imports only modules that exist in this repo; `tokens.css` is unchanged; `bun run build` + `tsc --noEmit` + `biome` are clean.
+
+## RW-2 `[FE]` — CukaiPandai `LogoMark` (inline SVG) _(small; consumed by RW-1)_
+
+**Purpose / issue:** ProofRank brands a `LogoMark` across topbar/drawer/footer; CukaiPandai has none, and ProofRank's loads `.webp` assets we don't have (RW-Q5). Provide a self-contained inline-SVG mark.
+
+**Implementation:**
+
+- [x] Add `frontend/src/components/icons.tsx` (or extend a new icons module) exporting `LogoMark` as an **inline SVG** in a `.logo-mark` span, drawn in `currentColor` (so it inherits `--ink`/`--denim` and themes for free — no light/dark asset swap) — a simple, legible geometric mark (e.g. a stamped/ledger motif fitting the "tax-assurance" identity), 30×30 viewBox → verify: `LogoMark` renders at the 30×30 `.logo-mark` size in topbar, drawer head, and footer with no network request and no missing-asset 404.
+- [x] Export the `ThemeIcon` (sun/moon) needed by RW-4 in the same module, adapted from ProofRank's `icons.tsx:12-37` → verify: `ThemeIcon` flips glyph by `theme` prop.
+
+**Acceptance criteria:** an asset-free inline-SVG `LogoMark` (+ `ThemeIcon`) that inherits theme colour, used by the shell in all three slots; no `public/` dir or image file is required; build/type/lint clean.
+
+## RW-3 `[FE]` — Route the consoles under the shell + surgical layout pass _(makes pages stop floating)_
+
+**Purpose / issue:** Pages each wrap their own `.app-shell` and there is no shared layout, so content floats with no footer anchor (Finding 2). Move `.app-shell` into the shared `AppShell` `<Outlet/>` and have the consoles render their content (page-head + windows) **without** re-wrapping `.app-shell`. **This is a layout/wrapper change only — NOT a redesign of any console's internals.**
+
+**Implementation:**
+
+- [x] In `frontend/src/App.tsx`, restructure `<Routes>` so the consoles are **children of an `AppShell` route** rendering `<Outlet/>`: `<Route element={<AppShell/>}>` → `index`/`/obligations`/`/filing`/`/audit-defense` (+ the RW-5 dashboard + RW-6 404). Remove the old inline `.topbar` + `PersonaPicker` + `DemoModeBanner` from `App.tsx` (the shell now owns the topbar; the DEMO MODE banner moves **into** `AppShell` above `.page-scroll` so it still shows) → verify: every route renders inside the shell (one topbar, one footer); the DEMO MODE banner still appears when `VITE_DEMO_MODE==='1'`.
+- [x] In `ObligationRadar.tsx`, `FilingStudio.tsx`, `AuditDefense.tsx`: **remove each page's own `<div className="app-shell">` wrapper** (the shared `<main className="app-shell">` now provides it); keep each page's `.page-head` + `.window` blocks exactly as-is. Do **not** touch the data-fetching, the `useEntity`/persona wiring, the HITL flow, the citation/badge rendering, or any `api/client.ts` call → verify: each console renders identically _inside_ the shell, fills the column under the topbar, and the footer anchors the bottom (no dead band); `git diff` on each page shows **only** the wrapper removal + nothing in the body logic.
+- [x] Confirm the **money-shot + badges still work end-to-end**: walk Obligations (entity header + ≥3 obligations), Filing (classify → HITL start→approve→resume, 96px hero `tax_payable`), Audit Defense (cited pack + the **REJECTED** fabricated-citation stamp + the `ILMU · nemo-super` sovereign badge) — all unchanged by the reparenting → verify: all three console beats behave exactly as before the shell (manual walkthrough in mock mode; live unaffected).
+
+**Acceptance criteria:** all consoles render through the shared `AppShell`/`<Outlet/>`, fill the viewport with the footer anchoring the bottom (no floating-in-dead-space), and their functional behaviour + money-shot + sovereign badge are provably unchanged; the per-page diffs contain only `.app-shell` wrapper removal.
+
+## RW-4 `[FE]` — Theme toggle (light/dark) wired into the topbar _(cheap; ramp + hook already exist)_
+
+**Purpose / issue:** The dark ramp ships in `tokens.css` but nothing toggles it (Finding 5). Wire a working toggle (RW-Q4 = include, since cheap).
+
+**Implementation:**
+
+- [x] Copy `/home/adam/CS/chutes/aic-hackathon/devkit/proofrank/frontend/src/hooks/useTheme.ts` → `frontend/src/hooks/useTheme.ts` (rename the localStorage key to `cukaipandai-theme`); it toggles `data-theme="dark"` on `<html>`, persists to localStorage, and respects `prefers-color-scheme` until the user chooses → verify: toggling flips `document.documentElement[data-theme]` and the choice persists across reload.
+- [x] In `AppShell`, render the `.topbar-control-button` with `ThemeIcon` (RW-2) bound to `useTheme().toggleTheme` (`aria-pressed`, `aria-label`) → verify: clicking the button flips the whole app between the cream and the late-night-blueprint ramps.
+- [x] **Dark-mode regression audit (the RW-Q4 caveat):** open all three consoles + the dashboard in dark and screenshot each; confirm no hardcoded-hex element renders unreadably (tokens are fine; literal hex in page files is the risk). If any surface is broken and the fix is non-trivial, **hide the toggle (light-locked) and move dark to Wave 2** — record which → verify: either dark mode is legible on all four surfaces, or the toggle is hidden and the deferral is noted in `progress.md`.
+
+**Acceptance criteria:** a persistent light/dark toggle in the topbar flips the documented `[data-theme="dark"]` ramp across the whole app and all four surfaces are legible in both themes — or, if a surface can't be made legible cheaply, the toggle is hidden and dark mode is explicitly deferred to Wave 2; build/type/lint clean.
+
+## RW-5 `[FE]` — Dashboard hub entry (Layak pattern) + topbar entity-switcher upgrade _(the Wave-1 centrepiece)_
+
+**Purpose / issue:** No entry hub; the app drops into a console; the persona switcher is a raw native `<select>` (Findings 3, 1). Add a dashboard hub at `/` (RW-Q3) with a greeting + 3 action cards, and replace the native `<select>` with a shell-integrated entity-switcher that **writes to the same `PersonaContext`** (non-regression).
+
+**Implementation:**
+
+- [x] Add `frontend/src/pages/Dashboard.tsx` rendering a `.page-head` greeting (e.g. "Good afternoon" + "CukaiPandai workspace · YA2026 · <active entity label>") and a **3-card action grid** (reuse `.window` cards in a CSS grid; pattern-match Layak `03-dashboard` + ProofRank's hub `08-app-shortlist`): **Obligation Calendar** → `/obligations` · **Cited Form C Filing** → `/filing` · **Audit Defense** → `/audit-defense`, each card a `<Link>` with a title, one-line description, and a mono kicker → verify: `/` renders the greeting + 3 cards; clicking each routes to the right console; the grid is responsive (stacks ≤900px).
+- [x] Mount the hub: `<Route index element={<Dashboard/>}/>` under the `AppShell` route and **change the `/` redirect** (RW-Q3) — if PO confirms hub-at-`/`, remove the `/`→`/obligations` redirect; keep `/obligations` reachable from the hub/drawer → verify: navigating to `/` shows the hub, not the Obligation console.
+- [x] **Entity-switcher upgrade (replaces the raw `<select>`):** build a small shell-integrated switcher (a styled control in `.topbar-controls`, or a labelled control in the hub header) listing `PERSONAS` and calling **`useActivePersona().setPersona`** — the **exact same context the consoles already read via `useEntity`** (`hooks/useEntity.ts:11`), so switching still re-renders all three consoles. Style it with existing tokens (mono label, `--screen`/`--grid`); it must visually belong to the shell rather than read as a browser default → verify: switching the entity re-renders the consoles against the chosen persona (Acme / Sinar Digital / Selera Kita) exactly as the old `<select>` did — same `PersonaContext`, no behaviour change.
+- [x] Confirm the **DEMO MODE banner + persona list are unchanged in data** (still the 3 FE-8 personas; the banner copy still lists them) → verify: persona switching + DEMO MODE behave as before; only the _control's presentation_ changed.
+
+**Acceptance criteria:** `/` is a dashboard hub (greeting + 3 action cards routing to the consoles); the persona switcher is a shell-integrated control that writes to the existing `PersonaContext` (consoles re-render identically on switch — no regression to `useEntity`); responsive; build/type/lint clean. _(If PO picks RW-Q3=keep-`/obligations`, the hub mounts at `/dashboard` and the redirect stays.)_
+
+## RW-6 `[FE]` — 404 Not-Found page inside the shell _(small; rounds out the IA)_
+
+**Purpose / issue:** No catch-all route (Finding 5); an unknown URL white-screens. Add a 404 using the devkit's empty-state idiom.
+
+**Implementation:**
+
+- [x] Add `frontend/src/pages/NotFound.tsx` (adapt ProofRank `pages/NotFound.tsx` / the `.empty-window`/`.empty-body`/`.empty-arrow`/`.empty-hello` classes already in `tokens.css:984-1035`): a friendly "not found" with a `<Link to="/">` back to the hub; mount as `<Route path="*" element={<NotFound/>}/>` under the `AppShell` route → verify: an unknown path renders the 404 _inside the shell_ (topbar + footer present) with a working link home.
+
+**Acceptance criteria:** unknown routes render a styled in-shell 404 with a link back to the dashboard; build/type/lint clean.
+
+---
+
+## Redesign — DEFERRED to Wave 2+ (explicitly OUT of Wave 1 scope)
+
+> Recorded so the Wave-1 boundary is unambiguous. None of these are built in Wave 1.
+
+- **Marketing landing page** (value-prop hero / sections — Layak `01-landing`, ProofRank `01-landing`). _(RW-Q7: the hub is the W1 entry; no marketing surface.)_
+- **Auth pages + guest gate** (sign-in / sign-up / guest entry — ProofRank `06`/`07`, Layak `02-auth-guest`). The Wave-1 profile control is a non-functional placeholder.
+- **Live 6-step Filing stepper** ("watch the agent reason" — Layak `07-pipeline-running`/`08-pipeline-technical`). _(Already tracked as the STRETCH FE-9/BE-11 SSE pair; not Wave 1.)_
+- **Sample-data / persona onboarding screen** (Layak `04-upload-onboarding`/`06-upload-filled`). FE-8's persona picker stands in for now.
+- **RAG chat surface** ("Cik Lay" analog — Layak `13-ask-chat`).
+- **Settings page depth** (Layak/ProofRank `11-settings`: account/workspace/scoring/appearance/notifications). Wave 1 leaves a disabled "Settings — Wave 2" placeholder in the drawer + profile menu.
+- **Badge / stamp polish parity, what-if sliders, results-strategy surfaces** (Layak `09`/`11`/`12`) and any **console-internals redesign** — Wave 1 only _reparents_ the consoles into the shell; their internal layouts are a later wave.
+- **Persistent sidebar rail** (if chosen over the drawer at RW-Q1) and the **inline-topbar-nav hybrid** (RW-Q2) — enhancements for a later wave if the PO wants them.
+
+---
