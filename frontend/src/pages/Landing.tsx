@@ -149,7 +149,7 @@ export function Landing() {
               and builds audit-defense packs where every citation is verified against the law corpus. Nothing is
               hallucinated.
             </p>
-            <Link className="lp-hero-cta" to="/login">
+            <Link className="lp-hero-cta" to="/sign-in">
               Get Started
             </Link>
           </div>
@@ -229,7 +229,7 @@ export function Landing() {
         <section className="lp-section lp-finale">
           <div className="lp-inner lp-finale-inner">
             <p className="lp-script">every figure has a citation.</p>
-            <Link className="lp-finale-cta" to="/login">
+            <Link className="lp-finale-cta" to="/sign-in">
               Open the Demo
             </Link>
           </div>

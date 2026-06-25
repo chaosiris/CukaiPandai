@@ -1,41 +1,23 @@
-/* LoginGate — standalone full-screen 50:50 auth split.
-   Left: denim hero panel. Right: cream form card.
-   Mirrors ProofRank's AuthScreen layout. */
+/* Auth — standalone full-screen 50:50 split. Left: denim hero. Right: cream form. */
 
-/* Override the marketing-main padding — the login gate is full-screen */
-.marketing-page:has(.lg) {
-  margin-bottom: 0;
-}
-
-.marketing-shell:has(.lg) .marketing-footer {
-  display: none;
-}
-
-.lg {
-  /* Break out of the marketing-main content constraint */
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  min-height: calc(100vh - var(--topbar-height));
+.auth {
+  min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
 
 /* Left: branded hero */
-.lg-hero {
+.auth-hero {
   background: var(--denim);
   color: var(--paper);
-  padding: 52px;
+  padding: 48px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 32px;
 }
 
-[data-theme="dark"] .lg-hero {
-  background: #1d2634;
-}
-
-.lg-brand {
+.auth-brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -46,81 +28,60 @@
   font-size: 1.3rem;
 }
 
-[data-theme="dark"] .lg-brand {
-  color: var(--ink);
-}
-
-.lg-brand .logo-mark {
+.auth-brand .logo-mark {
   width: 26px;
   height: 26px;
-  color: var(--paper);
 }
 
-[data-theme="dark"] .lg-brand .logo-mark {
-  color: var(--ink);
-}
-
-.lg-hero-line {
+.auth-hero-line {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: clamp(1.6rem, 2.4vw, 2.4rem);
+  font-size: clamp(1.7rem, 2.6vw, 2.5rem);
   line-height: 1.12;
   margin: 0 0 16px;
   max-width: 14em;
   color: var(--paper);
 }
 
-[data-theme="dark"] .lg-hero-line {
-  color: var(--ink);
-}
-
-.lg-hero-line em {
+.auth-hero-line em {
   font-style: italic;
   color: var(--mustard);
 }
 
-.lg-script {
+.auth-script {
   font-family: var(--font-script);
-  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
   color: var(--mustard);
   margin: 0;
 }
 
-.lg-hero-foot {
+.auth-hero-foot {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.04em;
+  line-height: 1.7;
   opacity: 0.8;
   margin: 0;
   color: var(--paper);
-  line-height: 1.7;
-}
-
-[data-theme="dark"] .lg-hero-foot {
-  color: rgba(233, 237, 243, 0.75);
 }
 
 /* Right: form panel */
-.lg-panel {
+.auth-panel {
   background: var(--paper);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   gap: 24px;
-  padding: 52px;
+  padding: 48px;
 }
 
-[data-theme="dark"] .lg-panel {
-  background: var(--paper);
-}
-
-.lg-form {
+.auth-form {
   width: 100%;
   max-width: 360px;
 }
 
-.lg-title {
+.auth-title {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1.8rem;
@@ -128,17 +89,17 @@
   margin: 0 0 6px;
 }
 
-.lg-subtitle {
+.auth-subtitle {
   font-family: var(--font-body);
   color: var(--ink-soft);
   margin: 0 0 24px;
 }
 
-.lg-section {
+.auth-section {
   margin-bottom: 16px;
 }
 
-.lg-section-label {
+.auth-section-label {
   display: block;
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -148,16 +109,16 @@
   margin: 0 0 10px;
 }
 
-.lg-divider {
+.auth-divider {
   border: 0;
   border-top: 1px solid var(--ink);
   opacity: 0.15;
   margin: 0 0 16px;
 }
 
-/* Disabled SSO + email fields */
-.lg-sso,
-.lg-email {
+/* SSO + email — disabled, coming-soon state */
+.auth-sso,
+.auth-email {
   width: 100%;
   display: inline-flex;
   align-items: center;
@@ -174,13 +135,13 @@
   opacity: 0.5;
 }
 
-.lg-email {
+.auth-email {
   margin-top: 4px;
   flex-direction: column;
   gap: 4px;
 }
 
-.lg-coming-soon {
+.auth-coming-soon {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
@@ -191,12 +152,12 @@
   opacity: 0.75;
 }
 
-.lg-field {
+.auth-field {
   display: block;
   margin-bottom: 14px;
 }
 
-.lg-field > span {
+.auth-field > span {
   display: block;
   font-family: var(--font-mono);
   font-size: 0.74rem;
@@ -206,7 +167,7 @@
   margin-bottom: 6px;
 }
 
-.lg-input {
+.auth-input {
   width: 100%;
   box-sizing: border-box;
   font-family: var(--font-body);
@@ -220,8 +181,8 @@
   cursor: not-allowed;
 }
 
-/* The one real action */
-.lg-guest {
+/* Guest — the one real action */
+.auth-guest {
   width: 100%;
   font-family: var(--font-body);
   font-weight: 500;
@@ -237,35 +198,47 @@
   transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.lg-guest:hover {
+.auth-guest:hover {
   background: var(--ink);
 }
 
-.lg-legal {
+.auth-switch {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  text-align: center;
+  color: var(--ink-soft);
+  margin: 18px 0 0;
+}
+
+.auth-switch a,
+.auth-legal a {
+  color: var(--denim);
+}
+
+.auth-legal {
   font-family: var(--font-body);
   font-size: 0.8rem;
   color: var(--ink-soft);
   text-align: center;
-  margin: 18px 0 0;
+  margin: 0;
 }
 
 @media (max-width: 760px) {
-  .lg {
+  .auth {
     grid-template-columns: 1fr;
-    min-height: auto;
   }
 
-  .lg-hero {
-    padding: 36px;
+  .auth-hero {
+    padding: 32px;
     gap: 20px;
     min-height: 220px;
   }
 
-  .lg-hero-line {
+  .auth-hero-line {
     font-size: 1.5rem;
   }
 
-  .lg-panel {
+  .auth-panel {
     padding: 36px;
   }
 }
