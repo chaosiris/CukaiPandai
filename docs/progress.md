@@ -1346,3 +1346,50 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `frontend/src/App.tsx` (new routes: `/filing/new`, `/filing/:id`, `/start/filing/new`)
 - `frontend/src/layouts/WizardLayout.tsx` (step 2 repointed to `/start/filing/new`)
 - `docs/plan.md` (FM-1/FM-2/FM-3 all sub-bullets ticked `[x]`)
+
+---
+
+## [26/06/26] — Wave 4: AD-1 + AD-2 (Conversational Audit Assistant) `[FE]`
+
+### AD-1 — Saved-filing picker on `/audit-defense`
+
+- Rewrote `frontend/src/pages/AuditDefense.tsx` as a two-phase conversational Audit Assistant.
+- Phase 1 (picker): fetches `listFilings()` on mount; shows a "Your Filed Returns" list with each record's label, TIN, created date, and tax payable, each with a "Defend This Filing" button.
+- Empty state: friendly explanation that a filing must be created first + a "Create a Filing" link to `/filing/new`.
+- Loading state: barber strip while `listFilings()` is in flight.
+- One-line page description under `<h1>` with an `InfoTip` (UI-1) on the heading explaining the citation-grounded justification promise and fabrication-rejection guarantee.
+- The "Why This Is Trustworthy" trust headline preserved (always visible on the page), pointing to the Trust Demo chip.
+- No `WhatNext` card (already removed in GR-7; not re-added).
+
+### AD-2 — Chat interface + seeded questions + fabrication trust signal
+
+- Phase 2 (chat): activated when a filing is selected; shows a "Defending Filing" header with label, TIN, date, and a "Switch Filing" button.
+- "Suggested Questions" card with tappable chips seeded from `rec.computation.fields` via `seedQuestions(rec)`: generates figure-specific questions (e.g. "Why is the tax payable RM 31,000?", "How is the chargeable income of RM 200,000 derived?") for up to 5 chips drawn from the filing's actual computed figures.
+- "Trust Demo: inject fabricated clause" chip (red border) sends `inject_fabricated=true` via the existing `getAuditDefense` path (BE-18 preserved).
+- Free-text input ("Ask a Question") with Enter-to-send and a "Send" button; disabled during in-flight requests.
+- Each message send: `getAuditDefense(rec.tin, query, filingEvidence(rec), isFabrication)` where `filingEvidence` derives `[[key, 'RM N'], ...]` from all `computation.fields` entries. Multi-turn thread appends both user bubble and assistant turn per message; 502/network errors surface as an inline red error bubble without breaking the thread.
+- Each assistant turn renders: a "Trust Payoff: Fabricated Clause Blocked" elevated panel (rust, BLOCKED stamp) when the Trust Demo ran and there are rejected citations; a "Defense Narrative" card with `SovereignBadge`; a "Citations" card with `CitationPanel` + `VerifiedBadge` per citation.
+- `notify()` fires on rejected fabricated citations (existing notification path preserved).
+- Auto-scroll to bottom of thread on each new message.
+- Switching the selected filing (clicking "Switch Filing") clears the thread, resets the input, and re-seeds chips from the new record's figures.
+- Persona/entity change also resets the picker (re-fetches filings) and clears chat.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules** (same count as Wave 3; no new modules added), 349 KB JS, 49 KB CSS, built in 1.77s
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+- No em-dashes in user-facing copy; Title Case headings; acronyms (TIN, MSIC, SST, RM, YA2026) preserved.
+- No backend change -- `/audit-defense` endpoint unchanged; `inject_fabricated` (BE-18) preserved as the trust-demo path.
+
+### Mock-mode reasoning
+
+- `listFilings()` mock reads from the module-scoped `_mockFilings[]` store (populated by `saveFiling()` in `FilingNew.tsx`). Empty by default until a filing is saved via the wizard or `/filing/new`.
+- Empty state links to `/filing/new`; saving a filing there populates the mock store and the picker shows immediately on return to `/audit-defense`.
+- Trust Demo chip uses `TRUST_DEMO_EVIDENCE` (fixed fabricated clause); not derived from the filing figures, so it works in mock mode even without a specific figure in the record.
+
+### Files touched
+
+- `frontend/src/pages/AuditDefense.tsx` (full rewrite -- AD-1 + AD-2)
+- `docs/plan.md` (AD-1/AD-2 all sub-bullets ticked `[x]`)
+- `docs/progress.md` (this entry)
