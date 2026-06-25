@@ -479,3 +479,50 @@ None blocking.
 **Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0** · `bun run build` (`tsc -b && vite build`) → **53 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from repo root) → **16 files checked, 0 errors** · console diff audit (`git diff main --unified=0`) → **2 wrapper-only lines per console, no functional change** · `data-theme` selector parity → `useTheme` writes `data-theme="dark"`, `tokens.css:35` reads it.
 
 **Return to PM:** **Approve.** Wave 1 is surgical and non-regressive — the two highest-risk checks pass cleanly: each console changed _exactly_ 2 lines (outer `app-shell` wrapper → Fragment, no logic/HITL/citation/fabrication code touched), and the new topbar entity-switcher writes to the _same_ `ActivePersonaProvider`/`setPersona` (no forked persona state). Routing is correct (`/`→Dashboard hub, consoles under `<Outlet/>`, in-shell 404), the theme toggle's `data-theme="dark"` matches `tokens.css`, DEMO/MOCK gating is carried over verbatim, `App.tsx` has no orphaned imports, and `tokens.css` is untouched. All gates green (tsc 0 / build 53-modules / biome 0). No Critical/Major/Minor findings — ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — Wave 2 — Dashboard hub depth (Upcoming Deadlines · Entity Snapshot · Trust strip) `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). Changed: `frontend/src/pages/Dashboard.tsx` (+381), `frontend/src/api/client.ts` (per-persona mock obligations, mock-only). `git diff main --stat -- frontend/` confirms **exactly 2 files** — no sprawl.
+
+**Verdict:** Approve
+
+The hub deepens cleanly and non-regressively. The greeting + 3 action cards are unchanged; the new panels both trace their dynamic data to `getObligations`/`getEntity` (no fabricated activity/timestamps); the live request path is untouched (mock change is fully gated behind `MOCK_MODE`); the countdown math is correct around every boundary; persona switch re-fetches both panels; and no literal colors were introduced. All three gates green. No Critical/Major/Minor findings — only two informational notes below.
+
+### Smoke test (all green — this session)
+
+- `cd frontend && bunx tsc --noEmit` → **exit 0, clean.**
+- `cd frontend && bun run build` (`tsc -b && vite build`) → **53 modules transformed, dist/ emitted, exit 0.**
+- `bunx biome check frontend/src` (from repo root) → **"Checked 16 files, no fixes applied", exit 0.**
+- `git diff main --stat -- frontend/` → **2 files** (`Dashboard.tsx`, `api/client.ts`) only. Surgical.
+
+### Review focus — all PASS
+
+1. **Non-regression / live path untouched — PASS.** `getObligations` (`client.ts:451-454`) is unchanged on the live branch: `if (MOCK_MODE) return MOCK_OBLIGATIONS_BY_TIN[tin] ?? MOCK_OBLIGATIONS` else `post('/entities/${tin}/obligations', { ssm })`. `MOCK_MODE = import.meta.env.VITE_API_MOCK === '1'` (`client.ts:6`); with the flag off, the mock lookup is never reached and the real POST (body `{ ssm }`, matching `main.py`) is identical to before. The mock change is **mock-only and did not leak into live behavior.** Greeting (`Dashboard.tsx:28-33,399`), the 3 action cards (`:404-460`, routes `/obligations`,`/filing`,`/audit-defense`), and persona wiring (`useActivePersona`, `:394`) are intact — the cards block is unchanged except a `{/* Action cards */}` comment.
+
+2. **Countdown correctness — PASS (no off-by-one).** `countdown()` (`:36-48`) normalizes both `today` (`new Date()`) and `due` to local midnight via `setHours(0,0,0,0)`, then `diffDays = Math.round((due - today) / 86_400_000)`. Boundaries: `< 0` → "Xd overdue" + `overdue:true`; `=== 0` → "Due today"; `=== 1` → "Due tomorrow"; else "in Xd". Midnight-aligning both ends before differencing means no fractional-day off-by-one mislabels today/tomorrow; `Math.round` absorbs any DST ±1h skew. Colour mapping is correct: overdue → `--rust` (badge border+text `:146-147`, pill `:184-185`); urgent (`isUrgent`, `:116-124`, `<= 30` days and not overdue) → `--mustard`; otherwise `--ink-soft`. `isUrgent` recomputes the same midnight-diff as `countdown` (consistent threshold).
+
+3. **No fabricated data — PASS.** The only static content is `TRUST_ITEMS` (the trust strip, `:345-349` — explicitly allowed) and the `SnapshotPanel` footer label "Seeded · BE-8 / getEntity" (`:337`). Every dynamic value — deadline rows (form, type, rule_id, config_version, due_date, countdown) and snapshot rows (entity_type, msic_codes, gross_income, sst_registered, basis period, employee_count, paid_up_capital, tin) — is read from the `ObligationCalendar`/`EntityTaxProfile` responses. **No invented "recent activity", no fake timestamps, no synthesized numbers.**
+
+4. **Persona repaint — PASS.** `DeadlinesPanel` carries `key={persona.tin}` (`:472`) AND keys its `useEffect` on `[tin, ssm]` (`:79`), resetting `loading/error/calendar` before each fetch — switching persona re-fetches deadlines. `SnapshotPanel` carries `key={`snap-${persona.tin}`}` (`:473`) and internally `useEntity()` re-fetches on `resolvedTin` change (`useEntity.ts:30`). Both panels repaint per persona. The three persona TINs in `personas.ts` (`C2581234509`/`C7654321098`/`C3219876540`) each have a matching dataset in `MOCK_OBLIGATIONS_BY_TIN` (`client.ts:170-274`), so persona switching shows genuinely distinct deadlines in mock mode; unknown TINs fall back to ACME (`?? MOCK_OBLIGATIONS`, `:277`).
+
+5. **Theming — PASS.** `git diff main --unified=0 | grep '^+'` for `#hex`/`rgba(` → **0 matches in added lines.** All colour, border, font, and spacing values use `var(--*)` tokens, so dark mode holds. (The lone `rgba(0,0,0,0.22)` in the action-card hover handler, `Dashboard.tsx:423`, is **pre-existing in `main`** on an untouched line — out of scope for this diff, not introduced here.)
+
+6. **Loading / empty / error — PASS.** `DeadlinesPanel` has all four states: `loading` → barber + "Loading obligations…" (`:91-98`); `error` → message in `--rust` (`:100-104`); empty → "No obligations found." (`:106-110`); populated → sorted list (`:112-196`). The `.catch((err: Error) => setError(err.message))` surfaces a live-call failure without a white-screen. `SnapshotPanel` mirrors loading/error/populated states (`:252-323`). Live calls can be slow; the loading state covers it.
+
+### Findings
+
+**Critical / Major / Minor:** none.
+
+**Informational (no action — by design or latent until a future live path):**
+
+- `Dashboard.tsx:128` — [informational] Deadline rows use `key={ob.rule_id}`. In each mock persona the `rule_id` values are unique, so the React key is stable today. The `ObligationCalendar` contract does not _guarantee_ `rule_id` uniqueness within a calendar, so a future live response that returns two rows sharing a `rule_id` (e.g. two periods under one rule) would collide keys. Not a bug now; if it surfaces at live-swap, key on `${ob.rule_id}-${ob.due_date}` or the array index-stable form. Noted, not blocking.
+- `Dashboard.tsx:116-124` — [informational] `isUrgent` recomputes the midnight day-diff inline rather than reusing `countdown()`'s already-computed value. Harmless duplication (same result); a one-line cleanup could return `diffDays` from `countdown` and derive urgency from it. Cosmetic only.
+
+### Verified clean (no action)
+
+- **Surgical:** changes confined to the new hub panels + the mock obligations map. No tax figures, citations, core math, or HITL code touched. No edits to `App.tsx`, `tokens.css`, `useEntity.ts`, or the consoles. New mock `status: 'overdue'` values are display-only (`Obligation.status` is typed `string`); they do not feed any computation.
+- **No orphaned imports:** `useEffect`/`useState`/`Link`/`useActivePersona`/`ObligationCalendar`/`getObligations`/`useEntity` are all used.
+
+**Return to PM:** **Approve.** Wave 2 is non-regressive and contract-clean — the live request path is byte-for-byte unchanged (the new per-persona obligations are gated entirely behind `MOCK_MODE`), the countdown math is correct at every boundary (no today/tomorrow off-by-one), both panels re-fetch on persona switch and show distinct data, no fabricated activity/timestamps leak in (only the allowed static trust strip), and no literal colors were added so dark mode holds. All three gates green (tsc 0 · build 53 modules · biome 0 errors); diff is exactly the 2 expected files. No Critical/Major/Minor findings — ready for Gate-2 commit authorization.

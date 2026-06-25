@@ -166,35 +166,159 @@ const MOCK_ENTITY: EntityTaxProfile = {
   commencement_date: '2018-03-01'
 }
 
-const MOCK_OBLIGATIONS: ObligationCalendar = {
-  entity_tin: ACME_TIN,
-  obligations: [
-    {
-      obligation_type: 'corporate_tax',
-      form: 'Form C',
-      due_date: '2026-07-31',
-      rule_id: 'ITA_s77A',
-      config_version: 'ya_2026_v1',
-      status: 'pending'
-    },
-    {
-      obligation_type: 'estimated_tax',
-      form: 'CP204',
-      due_date: '2026-01-31',
-      rule_id: 'ITA_s107C',
-      config_version: 'ya_2026_v1',
-      status: 'pending'
-    },
-    {
-      obligation_type: 'withholding_tax',
-      form: 'CP37',
-      due_date: '2026-02-28',
-      rule_id: 'ITA_s109',
-      config_version: 'ya_2026_v1',
-      status: 'pending'
-    }
-  ]
+// Per-persona mock obligations — keyed by TIN so persona switching shows different deadlines.
+// These mirror derive_obligations() in backend/core/obligations.py exactly:
+//   Form C (income_tax / oblig.income_tax.formc): always; due = last day of 7th month after FYE
+//   CP204  (income_tax / oblig.income_tax.cp204): always; due = basis_period_start - 30 days
+//   MyInvois (einvoice / oblig.einvoice.phase): if gross_income >= 1,000,000; due = basis_period_start
+//   SST-02 (sst / oblig.sst.return): if sst_registered; due = basis_period_end
+//   CP39  (employer_mtd / oblig.employer.mtd): if employee_count > 0; due = basis_period_start
+// config_version matches ya_2026.yaml: 'YA2026.1'
+const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
+  // Acme: gross_income=5,000,000; sst_registered=true; employee_count=12
+  // basis_period 2025-01-01–2025-12-31; commencement 2018-03-01 (not in basis period)
+  // Form C due: 2025-12-31 + 7m → last day of Jul 2026 = 2026-07-31
+  // CP204  due: 2025-01-01 - 30d = 2024-12-02
+  // MyInvois: 5,000,000 >= 1,000,000 → due = basis_period_start = 2025-01-01
+  // SST-02: sst_registered → due = basis_period_end = 2025-12-31
+  // CP39: employees → due = basis_period_start = 2025-01-01
+  [ACME_TIN]: {
+    entity_tin: ACME_TIN,
+    obligations: [
+      {
+        obligation_type: 'income_tax',
+        form: 'C',
+        due_date: '2026-07-31',
+        rule_id: 'oblig.income_tax.formc',
+        config_version: 'YA2026.1',
+        status: 'pending'
+      },
+      {
+        obligation_type: 'income_tax',
+        form: 'CP204',
+        due_date: '2024-12-02',
+        rule_id: 'oblig.income_tax.cp204',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'einvoice',
+        form: 'MyInvois',
+        due_date: '2025-01-01',
+        rule_id: 'oblig.einvoice.phase',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'sst',
+        form: 'SST-02',
+        due_date: '2025-12-31',
+        rule_id: 'oblig.sst.return',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'employer_mtd',
+        form: 'CP39',
+        due_date: '2025-01-01',
+        rule_id: 'oblig.employer.mtd',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      }
+    ]
+  },
+  // Sinar: gross_income=380,000; sst_registered=false; employee_count=3
+  // basis_period 2025-01-01–2025-12-31; commencement 2022-04-01 (not in basis period)
+  // Form C due: 2025-12-31 + 7m = 2026-07-31
+  // CP204  due: 2025-01-01 - 30d = 2024-12-02
+  // MyInvois: 380,000 < 1,000,000 → OMITTED
+  // SST-02: sst_registered=false → OMITTED
+  // CP39: 3 employees → due = basis_period_start = 2025-01-01
+  C7654321098: {
+    entity_tin: 'C7654321098',
+    obligations: [
+      {
+        obligation_type: 'income_tax',
+        form: 'C',
+        due_date: '2026-07-31',
+        rule_id: 'oblig.income_tax.formc',
+        config_version: 'YA2026.1',
+        status: 'pending'
+      },
+      {
+        obligation_type: 'income_tax',
+        form: 'CP204',
+        due_date: '2024-12-02',
+        rule_id: 'oblig.income_tax.cp204',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'employer_mtd',
+        form: 'CP39',
+        due_date: '2025-01-01',
+        rule_id: 'oblig.employer.mtd',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      }
+    ]
+  },
+  // Selera: gross_income=2,500,000; sst_registered=true; employee_count=45
+  // basis_period 2024-04-01–2025-03-31; commencement 2019-09-01 (not in basis period)
+  // Form C due: 2025-03-31 + 7m → last day of Oct 2025 = 2025-10-31
+  // CP204  due: 2024-04-01 - 30d = 2024-03-02
+  // MyInvois: 2,500,000 >= 1,000,000 → due = basis_period_start = 2024-04-01
+  // SST-02: sst_registered → due = basis_period_end = 2025-03-31
+  // CP39: 45 employees → due = basis_period_start = 2024-04-01
+  C3219876540: {
+    entity_tin: 'C3219876540',
+    obligations: [
+      {
+        obligation_type: 'income_tax',
+        form: 'C',
+        due_date: '2025-10-31',
+        rule_id: 'oblig.income_tax.formc',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'income_tax',
+        form: 'CP204',
+        due_date: '2024-03-02',
+        rule_id: 'oblig.income_tax.cp204',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'einvoice',
+        form: 'MyInvois',
+        due_date: '2024-04-01',
+        rule_id: 'oblig.einvoice.phase',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'sst',
+        form: 'SST-02',
+        due_date: '2025-03-31',
+        rule_id: 'oblig.sst.return',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      },
+      {
+        obligation_type: 'employer_mtd',
+        form: 'CP39',
+        due_date: '2024-04-01',
+        rule_id: 'oblig.employer.mtd',
+        config_version: 'YA2026.1',
+        status: 'overdue'
+      }
+    ]
+  }
 }
+
+// Fallback for unknown TINs
+const MOCK_OBLIGATIONS = MOCK_OBLIGATIONS_BY_TIN[ACME_TIN]
 
 const MOCK_FORM_C: FormCResponse = {
   computation: {
@@ -369,7 +493,7 @@ export async function getEntity(tin: string): Promise<EntityTaxProfile> {
 
 /** POST /entities/{tin}/obligations — derive the YA2026 obligation calendar. */
 export async function getObligations(tin: string, ssm: SsmProfile): Promise<ObligationCalendar> {
-  if (MOCK_MODE) return MOCK_OBLIGATIONS
+  if (MOCK_MODE) return MOCK_OBLIGATIONS_BY_TIN[tin] ?? MOCK_OBLIGATIONS
   return post<ObligationCalendar>(`/entities/${tin}/obligations`, { ssm })
 }
 

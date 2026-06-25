@@ -267,6 +267,22 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Acceptance criteria:** all consoles run on the live Render API end-to-end (CORS via BE-7 + the DO-2/DO-1 origin reconciliation); the **live** fabricated-citation rejection is proven to yield `verified=false` (DQ1/BE-18 path) — or, if DQ1=(B), the rejection is explicitly demoed in mock and noted in TD-3; the mock `items` shape matches live `[{contested_item, evidence}]`; and the mock branches on query so standard-vs-fabrication parity holds with live. The three `docs/test.md` carry-forward items are closed. _(Deploy handled by **DO-1/DO-2**.)_
 
+### Redesign Wave 2 — Dashboard Hub Depth `[FE]`
+
+**Purpose:** Fill the ~50% empty dead space below the action cards with real, data-driven content mirroring Layak's dashboard density. No fake data.
+
+- [x] Extend `client.ts` mock obligations to per-persona datasets (keyed by TIN) so persona switching changes the deadlines list — Acme (4 rows, 2 overdue), Sinar Digital (3 rows, 1 overdue), Selera Kita (4 rows, 3 overdue).
+- [x] Add **Upcoming Deadlines panel** (2/3 width, primary column) — calls `getObligations(persona.tin, persona.ssm)`, sorts soonest-first, shows form badge · obligation type · due date · relative countdown pill; overdue flagged in `--rust`, urgent (≤30d) in `--mustard`; persona switch re-fetches.
+- [x] Add **Entity Snapshot panel** (1/3 width, secondary column) — from `useEntity()` / `getEntity`, compact facts card: entity_type · MSIC code(s) · gross income (RM formatted, hero figure) · SST registered · basis period · employee count · paid-up capital; persona switch re-fetches.
+- [x] Add **Trust Strip** (3-column mono strip below the 2-column section) — sovereign · cited · audit-ready, each with a one-line detail. Static, no invented data.
+- [x] Uses exclusively existing devkit classes (`.window`, `.titlebar`, `.titlebar-meta`, `.closebox`, `.req-list`, `.requirement-row`, `.barber`). No new CSS added.
+- [x] Verified: `bunx tsc --noEmit` clean, `bun run build` green, `bunx biome check frontend/src` 0 errors.
+- [x] Responsive 2-column collapses naturally via CSS grid `minmax`; dark-mode tokens only (no literal hex outside of `var(--…)`).
+
+**Acceptance criteria met:** hub fills the viewport (no dead space); deadlines sorted with correct countdowns, overdue in rust; snapshot matches entity; persona switch repaints both panels; dark mode legible; build/lint clean.
+
+---
+
 ### FE-7 `[FE]` — Styling pass to the devkit design tokens _(polish; cut candidate)_
 
 **Implementation:**
