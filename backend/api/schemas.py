@@ -3,6 +3,18 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class FilingRecordReq(BaseModel):
+    tin: str
+    label: str | None = None
+    computation: dict
+    risk_flags: list[dict] = []
+    line_items: list[dict] | None = None
+
+
+class MultiDeleteReq(BaseModel):
+    ids: list[str]
+
+
 class SignupReq(BaseModel):
     email: str
     password: str

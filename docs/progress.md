@@ -1091,3 +1091,55 @@ Four related FE changes implemented:
 | `bunx biome check frontend/src` | 38 files, 0 errors |
 
 Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were removed and rephrased (comma+participle, colon, semicolon); remaining em-dashes in the batch are code comments only.
+
+---
+
+## [26/06/26] — Wave 0 BE Foundation: EP-0 + EP-1 + EP-2 `[BE]`
+
+### EP-0 — Shared guest user + `POST /auth/guest`
+
+- **Constants** (`api/main.py`): `GUEST_USER_ID = "guest-shared"`, `GUEST_EMAIL = "guest@cukaipandai.local"`, `GUEST_NAME = "Guest"` — single source of truth.
+- **`UserRepository.ensure_guest(guest_id, guest_email, guest_name)`** (`api/persistence.py`): idempotent seeder — `get_by_email` first; only creates if absent; takes `provider="guest"`. `UserRepository.create` gained an optional `id` arg so the fixed guest id survives restarts.
+- **Startup seed** (`api/main.py`): `_USER_REPO.ensure_guest(...)` called immediately after `_USER_REPO = UserRepository()`.
+- **`POST /auth/guest`** (`api/main.py`): returns `{token, user}` — mints JWT via `auth.create_token(GUEST_USER_ID, GUEST_EMAIL, GUEST_NAME)`; never leaks a hash; defensively re-seeds if the row is absent.
+- **Design note (shared-data caveat):** the guest is a single shared backend account. All guests share one `sub`; any data written under that sub (entity profile, filing records) is shared/public across all guest sessions. This is the intended demo behaviour and will be documented in TD-W3.
+- **Tests:** `tests/api/test_guest_auth.py` (7 tests — token returned, sub == GUEST_USER_ID, email matches constant, /auth/me round-trip, idempotent seed, stable id across calls, provider == "guest").
+
+### EP-1 — `GET/PUT /me/entity` (per-user entity profile)
+
+- **`UserEntityRepository`** (`api/persistence.py`): `get(owner)` / `put(owner, data)`. Neon path: `user_entities(user_id text PRIMARY KEY, data jsonb)` with lazy `CREATE TABLE IF NOT EXISTS`; in-memory dict fallback; any DB error falls through silently.
+- **`_USER_ENTITY_REPO = UserEntityRepository()`** instantiated at startup in `api/main.py`.
+- **`_owner(authorization)` dependency** (`api/main.py`): calls `_bearer_user` (existing, 401 without token), then decodes the same token to extract `claims["sub"]`; returns the sub string.
+- **`GET /me/entity`**: returns saved profile or 404 if none yet.
+- **`PUT /me/entity`**: validates `{ssm}` via existing `_profile()` helper (422 on bad input), upserts via `_USER_ENTITY_REPO.put()`, returns the normalised profile.
+- **Migration** (`migrations/neon_schema.sql`): additive `CREATE TABLE IF NOT EXISTS user_entities (user_id text PRIMARY KEY, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`.
+- **Tests:** `tests/api/test_me_entity_endpoint.py` (8 tests — 401 no token on GET/PUT, 404 before save, PUT→GET round-trip, 422 bad ssm, per-owner isolation, upsert overwrites).
+
+### EP-2 — `/me/filings` CRUD (per-user filing records)
+
+- **`FilingRecordReq` + `MultiDeleteReq`** (`api/schemas.py`): request schemas for POST body and multi-delete body.
+- **`FilingRepository`** (`api/persistence.py`): `create(owner, rec)` / `list(owner)` / `get(owner, rec_id)` / `delete(owner, ids)`. New `filing_records` table (not the existing `filings` table — zero destructive alteration). In-memory `dict[str, list[dict]]` fallback; Neon path with lazy `CREATE TABLE IF NOT EXISTS`; any DB error falls through. `create()` always writes in-memory first.
+- **`_FILING_REPO = FilingRepository()`** at startup.
+- **Endpoints** (all `Depends(_owner)` → 401 without valid token):
+  - `POST /me/filings` → 200 + stored record with server-assigned `id`; 422 on bad body.
+  - `GET /me/filings` → list (newest first, per-owner).
+  - `GET /me/filings/{rec_id}` → full record or 404 if not owned/absent.
+  - `DELETE /me/filings/{rec_id}` → deletes or 404.
+  - `DELETE /me/filings` with `{ids:[...]}` body → multi-delete; foreign ids are silently skipped (no-op, never touch another owner's rows).
+- **Migration** (`migrations/neon_schema.sql`): additive `CREATE TABLE IF NOT EXISTS filing_records (id text PRIMARY KEY, user_id text NOT NULL, tin text, label text, computation jsonb, risk_flags jsonb, line_items jsonb, created_at timestamptz NOT NULL DEFAULT now())`.
+- **Tests:** `tests/api/test_me_filings_endpoint.py` (14 tests — 401 on all endpoints, create returns id, 422 bad body, list, get by id, 404 foreign id, delete, 404 re-get after delete, 404 delete foreign, multi-delete, multi-delete foreign is noop, list isolation, get-by-id isolation).
+
+### Test result
+
+`uv run pytest -q` → **158 passed** (was 129 before Wave 0; +29 new tests; 0 regressions).
+
+### Files touched
+
+- `backend/api/main.py` — constants, repos, `_owner` dep, 7 new endpoints
+- `backend/api/persistence.py` — `UserRepository.ensure_guest` + `id` arg; `UserEntityRepository`; `FilingRepository`
+- `backend/api/schemas.py` — `FilingRecordReq`, `MultiDeleteReq`
+- `backend/migrations/neon_schema.sql` — additive `user_entities` + `filing_records` tables
+- `backend/tests/api/test_guest_auth.py` (new, 7 tests)
+- `backend/tests/api/test_me_entity_endpoint.py` (new, 8 tests)
+- `backend/tests/api/test_me_filings_endpoint.py` (new, 14 tests)
+- `docs/plan.md` — EP-0/EP-1/EP-2 ticked `[x]`

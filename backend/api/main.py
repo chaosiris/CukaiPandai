@@ -27,15 +27,17 @@ from api.agents.documents import classify_line_items
 from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
-from api.persistence import EntityRepository, UserRepository, make_checkpointer
+from api.persistence import EntityRepository, FilingRepository, UserEntityRepository, UserRepository, make_checkpointer
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
     EntityCreateReq,
+    FilingRecordReq,
     FilingResumeReq,
     FormCReq,
     GoogleAuthReq,
     LoginReq,
+    MultiDeleteReq,
     ObligationsReq,
     SignupReq,
 )
@@ -75,6 +77,19 @@ _ENTITY_REPO = EntityRepository(_ENTITIES)
 # Auth users — Neon `users` table when DATABASE_URL is set, else a process-level in-memory store
 # (fallback-first, like the repos above). Holds password hashes only.
 _USER_REPO = UserRepository()
+
+# EP-0 — shared guest identity (single account; all guests share one JWT sub).
+# Data written under this sub is shared/public across all guest sessions by design.
+GUEST_USER_ID = "guest-shared"
+GUEST_EMAIL = "guest@cukaipandai.local"
+GUEST_NAME = "Guest"
+_USER_REPO.ensure_guest(GUEST_USER_ID, GUEST_EMAIL, GUEST_NAME)
+
+# EP-1 — per-user entity profiles (keyed by JWT sub; Neon when DATABASE_URL set, else in-memory).
+_USER_ENTITY_REPO = UserEntityRepository()
+
+# EP-2 — per-user filing records (keyed by JWT sub; fallback-first).
+_FILING_REPO = FilingRepository()
 
 # Single in-process HITL filing graph. The compute node is deterministic (no LLM), so no model
 # client is constructed here. BE-15: a durable Neon Postgres checkpointer is used when
@@ -175,6 +190,82 @@ def google_auth(req: GoogleAuthReq) -> dict:
 @app.get("/auth/me")
 def me(authorization: str | None = Header(default=None)) -> dict:
     return _public_user(_bearer_user(authorization))
+
+
+@app.post("/auth/guest")
+def guest_auth() -> dict:
+    """EP-0 — Issue a JWT for the single shared guest identity. No password required.
+    All guests share one sub; guest-owned data is shared/public across sessions by design."""
+    user = _USER_REPO.get_by_email(GUEST_EMAIL)
+    if user is None:
+        # Re-seed defensively (should not happen, but ensures the endpoint never 500s)
+        user = _USER_REPO.ensure_guest(GUEST_USER_ID, GUEST_EMAIL, GUEST_NAME)
+    token = auth.create_token(GUEST_USER_ID, GUEST_EMAIL, GUEST_NAME)
+    return {"token": token, "user": _public_user(user)}
+
+
+def _owner(authorization: str | None = Header(default=None)) -> str:
+    """Resolve the JWT `sub` from the Bearer token; 401 without a valid token."""
+    user = _bearer_user(authorization)
+    claims = auth.decode_token(authorization.split(" ", 1)[1].strip())  # type: ignore[union-attr]
+    return claims["sub"]
+
+
+@app.get("/me/entity")
+def get_my_entity(owner: str = Depends(_owner)) -> dict:
+    """EP-1 — Return the owner's saved EntityTaxProfile; 404 if none saved yet."""
+    data = _USER_ENTITY_REPO.get(owner)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No entity profile saved yet")
+    return data
+
+
+@app.put("/me/entity")
+def put_my_entity(req: EntityCreateReq, owner: str = Depends(_owner)) -> dict:
+    """EP-1 — Validate and upsert the owner's EntityTaxProfile. 422 on bad ssm."""
+    profile = _profile(req.ssm)
+    data = profile.model_dump(mode="json")
+    _USER_ENTITY_REPO.put(owner, data)
+    return data
+
+
+@app.post("/me/filings")
+def create_my_filing(req: FilingRecordReq, owner: str = Depends(_owner)) -> dict:
+    """EP-2 — Save a filing record for the owner; returns the record with its server-assigned id."""
+    rec = _FILING_REPO.create(owner, req.model_dump(mode="json"))
+    return rec
+
+
+@app.get("/me/filings")
+def list_my_filings(owner: str = Depends(_owner)) -> list:
+    """EP-2 — List the owner's filing records, newest first."""
+    return _FILING_REPO.list(owner)
+
+
+@app.get("/me/filings/{rec_id}")
+def get_my_filing(rec_id: str, owner: str = Depends(_owner)) -> dict:
+    """EP-2 — Return one filing record; 404 if not owned or absent."""
+    rec = _FILING_REPO.get(owner, rec_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Filing record not found")
+    return rec
+
+
+@app.delete("/me/filings/{rec_id}")
+def delete_my_filing(rec_id: str, owner: str = Depends(_owner)) -> dict:
+    """EP-2 — Delete one filing record; 404 if not owned or absent."""
+    rec = _FILING_REPO.get(owner, rec_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Filing record not found")
+    _FILING_REPO.delete(owner, [rec_id])
+    return {"deleted": rec_id}
+
+
+@app.delete("/me/filings")
+def multi_delete_my_filings(req: MultiDeleteReq, owner: str = Depends(_owner)) -> dict:
+    """EP-2 — Delete multiple filing records by id. Foreign/unknown ids are silently skipped."""
+    _FILING_REPO.delete(owner, req.ids)
+    return {"deleted": req.ids}
 
 
 @app.post("/entities")
