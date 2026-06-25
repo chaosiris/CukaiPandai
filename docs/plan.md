@@ -27,7 +27,7 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 - [ ] **Q3 (FE)** — Can the Vite + React console reach demo quality in the time left, or do we narrate a partial UI + lean on the API/tests? → decide at the **FE-1** confirm-scaffold gate (the scaffold already exists from R-FE-2, so the risk is feature-completeness/polish, not boot).
 - [ ] **Q4 (BE)** — Exact current-year MyInvois API paths + the SSM CSD field set (for the production upgrade). → `sdk.myinvois.hasil.gov.my/api`; SSM CSD plan is `[ROADMAP]`, **out of scope for the prelim**.
-- [ ] **Q5 (TD)** — Re-`⚠verify` all YA2026 rates/thresholds/deadlines before the deck (Budget/gazette can change them). → reconcile vs LHDN/RMCD; provenance file already cites sources. Owned by **TD-6** (final ⚠verify pass). _(Now also covers the expanded RAG corpus clauses — see BE-12's `[TD]` sub-part.)_
+- [x] **Q5 (TD)** — Re-`⚠verify` all YA2026 rates/thresholds/deadlines before the deck (Budget/gazette can change them). → reconcile vs LHDN/RMCD; provenance file already cites sources. Owned by **TD-6** (final ⚠verify pass). _(Now also covers the expanded RAG corpus clauses — see BE-12's `[TD]` sub-part.)_ **RESOLVED via the 2026-06-25 re-verify (TD-6) — figures/clauses confirmed, e-invoice enforcement corrected; human tax glance still advisable before the deck.**
 
 ### Open for Gate 1 — this cycle (Phase-2 FE re-scope; PL surfaces, PO decides)
 
@@ -568,7 +568,7 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Implementation:**
 
-- [ ] Re-`⚠verify` SME bands (15/17/24%), the RM1m e-invoice exemption, CP204/Form C deadlines, the seeded Acme `tax_payable RM31,000`, **and every clause added to the RAG corpus (text + section + page + URL)** vs current LHDN/RMCD/ITA sources; update the provenance file if anything moved → verify: each figure and each clause has a current, cited source; any change is reflected in `ya_2026.yaml` / `lawcorpus_seed.json` + provenance.
+- [x] Re-`⚠verify` SME bands (15/17/24%), the RM1m e-invoice exemption, CP204/Form C deadlines, the seeded Acme `tax_payable RM31,000`, **and every clause added to the RAG corpus (text + section + page + URL)** vs current LHDN/RMCD/ITA sources; update the provenance file if anything moved → verify: each figure and each clause has a current, cited source; any change is reflected in `ya_2026.yaml` / `lawcorpus_seed.json` + provenance. _(AI-assisted online re-verify 2026-06-25: all figures + 15 clauses + Acme golden confirmed; ONE correction — e-invoice ≤RM5m band penalty-free relaxation now to 31 Dec 2027 / full enforcement 1 Jan 2028, annotated in `ya_2026.yaml`. 4 clause descriptions are MATCH-but-imprecise, gate-safe, left as-is. **Human tax-professional glance still advisable for the formal sign-off.**)_
 
 **Acceptance criteria:** all demo-visible YA2026 figures **and** all RAG corpus clauses are re-verified current and cited before the deck/video; resolves **Q5**.
 

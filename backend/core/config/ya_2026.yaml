@@ -18,15 +18,22 @@ income_tax:
   # monthly instalment by the 15th; revise via CP204A in the 6th and/or 9th month.
   # Form C: file within 7 months after financial year-end.
 
-# VERIFIED (ClearTax/Sovos/VATupdate, Dec-2025 update)
+# VERIFIED (ClearTax/Sovos/VATupdate, Dec-2025) + RE-VERIFIED 2026-06-25 vs LHDN e-Invoice FAQ (5 May 2026).
 einvoice_phases:
   - { min_turnover: 100000000, max_turnover: null, mandatory_from: '2024-08-01' }
   - { min_turnover: 25000000, max_turnover: 100000000, mandatory_from: '2025-01-01' }
   - { min_turnover: 5000000, max_turnover: 25000000, mandatory_from: '2025-07-01' }
   - { min_turnover: 1000000, max_turnover: 5000000, mandatory_from: '2026-01-01' }
-# Exemption threshold raised to RM1,000,000 from 1 Jan 2026; the planned final phase
-# (RM150k-RM500k) was CANCELLED -> sub-RM1m turnover is voluntary.
+# Exemption threshold raised to RM1,000,000 from 1 Jan 2026 (Cabinet 6 Dec 2025); the planned final
+# phase (sub-RM1m / the old RM150k-RM500k band) was CANCELLED -> sub-RM1m turnover is voluntary.
 einvoice_exemption_below: 1000000
+# ENFORCEMENT NOTE (added 2026-06-25): the <=RM5m band's 1 Jan 2026 IMPLEMENTATION date stands, but LHDN
+# extended the penalty-free interim relaxation twice (PM Anwar 5 Jan 2026; Specific Guideline v4.7, 20 Apr
+# 2026) -> penalty-free to 31 Dec 2027, FULL ENFORCEMENT (penalties) from 1 Jan 2028. During the relaxation
+# these taxpayers may issue monthly CONSOLIDATED e-invoices with no penalty. Don't tell a sub-RM5m SME it is
+# hard-mandated from Jan 2026 without this caveat.
+einvoice_smallband_penalty_free_until: '2027-12-31'
+einvoice_smallband_enforcement_from: '2028-01-01'
 
 sst: # VERIFIED (RMCD/MOF; ClearTax; Wolters Kluwer)
   registration_threshold: 500000 # general (sales tax + most service tax)

@@ -39,6 +39,19 @@ The engine-critical figures in `core/config/ya_2026.yaml` are **verified correct
 - SST **per-category** thresholds (which services are RM1m vs RM500k) for a production SST module.
 - Re-confirm SME **common-control/foreign-shareholding** disqualifiers for the rate (edge cases).
 
+## Re-verification 2026-06-25 (TD-6 / Q5 — AI-assisted online re-audit)
+
+Full re-audit of every demo-visible YA2026 figure **and** all 15 RAG law-corpus clauses against LHDN/RMCD/MoF + the ITA 1967 (Act 53, AGC `lom.agc.gov.my`) + Big-4. Result: **figures and clause cites hold; one staleness corrected.**
+
+- **Corporate income tax (SME bands/conditions, non-SME 24%, CP204, Form C 7-mo):** ✅ all correct; unchanged in Budget 2026.
+- **CGT / Transfer Pricing / Withholding Tax:** ✅ all correct (CGT 1 Mar 2024, 10% net / 2% gross; TP RM30m+RM10m or RM50m; WHT 10/15/10, contractor 10+3).
+- **SST:** ✅ config values correct (RM500k / RM1m thresholds, 8% rate, SST-02, enforce 1 Jan 2026). Known simplification (not wrong): reality also has a **RM1.5m** threshold for construction/private-healthcare and some expanded services at **6%** — out of scope for the current SST model.
+- **e-Invoicing — ⚠ CORRECTED:** the RM1m–RM5m band's **1 Jan 2026 implementation date stands**, but LHDN extended the penalty-free interim relaxation twice (PM Anwar 5 Jan 2026; Specific Guideline **v4.7**, 20 Apr 2026) → **penalty-free to 31 Dec 2027, full enforcement 1 Jan 2028**. Added `einvoice_smallband_penalty_free_until: '2027-12-31'` + `einvoice_smallband_enforcement_from: '2028-01-01'` (+ comment) to `ya_2026.yaml`. Source: LHDN e-Invoice FAQ (5 May 2026); VATupdate v4.7 (23 Apr 2026); PKF MY (May 2026).
+- **Seeded Acme golden:** ✅ `tax_payable RM31,000` reproduces — chargeable 200,000 = Revenue 500,000 − expenses 300,000; 15%×150k (22,500) + 17%×50k (8,500) = 31,000 (asserted in `tests/test_computation.py`).
+- **15 RAG clauses:** ✅ all correctly numbered/cited (Act 53 = ITA 1967 confirmed; **PR-6/2019** number+title verified exact; s.140A is the correct TP section, not s.140). Four have minor description imprecisions (do NOT affect the citation gate; tightening would require a RAG-index rebuild): **s.39** (entertainment is a 50% restriction under s.39(1)(l), not a flat bar), **s.77A** (also covers LLPs/trust bodies/co-ops), **s.140A** (formal marginal note: "Power to substitute the price on certain transactions"), **s.33(1)** (section heading "Adjusted income generally"; the subsection cite is precise).
+
+**Net change:** `ya_2026.yaml` e-invoice enforcement annotation only — no computation value changed, golden tests unaffected. **Caveat:** this is an AI-assisted online re-verification — a human tax-professional glance before the final deck/video is still advisable for the formal TD-6 sign-off.
+
 ## References
 
 LHDN tax rate of company · PwC MY corporate income · Acclime · calculatormalaysia · ajobthing CP204 · gskassociates · arnifi Form C · info-tech · ClearTax e-invoice phases · Sovos · VATupdate · ClearTax SST · Wolters Kluwer SST · MOF SST press release · LHDN CGT guidelines (2025) · EY CGT · LHDN TP Guidelines 2024 · Crowe TP (URLs inline above).
