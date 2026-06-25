@@ -99,6 +99,7 @@ export function AppShell() {
             <div className="topbar-controls" ref={topbarControlsRef}>
               {isMock && (
                 <span
+                  className="topbar-mock-chip"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
@@ -124,6 +125,7 @@ export function AppShell() {
 
               {/* Entity switcher — styled select writing to the same PersonaContext */}
               <select
+                className="topbar-entity-select"
                 value={persona.tin}
                 onChange={(e) => {
                   const next = PERSONAS.find((p) => p.tin === e.target.value)

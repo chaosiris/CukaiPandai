@@ -38,7 +38,7 @@ interface Stage {
 type Phase =
   | { tag: 'idle' }
   | { tag: 'classifying' }
-  | { tag: 'classified'; classify: ClassifyResponse }
+  | { tag: 'classified' }
   | { tag: 'starting' }
   | { tag: 'pending_approval'; start: FilingStartResponse }
   | { tag: 'resuming'; start: FilingStartResponse }
@@ -727,7 +727,7 @@ export default function FilingStudio() {
       const result = await classifyTrialBalance(entity.tin, rawText)
       setClassifyResult(result)
       setLineItems(result.line_items)
-      setPhase({ tag: 'classified', classify: result })
+      setPhase({ tag: 'classified' })
     } catch (e) {
       setPhase({ tag: 'error', message: (e as Error).message })
     }
@@ -775,7 +775,7 @@ export default function FilingStudio() {
   }
 
   function handleReset() {
-    setPhase(classifyResult ? { tag: 'classified', classify: classifyResult } : { tag: 'idle' })
+    setPhase(classifyResult ? { tag: 'classified' } : { tag: 'idle' })
   }
 
   const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'starting' || phase.tag === 'resuming'
