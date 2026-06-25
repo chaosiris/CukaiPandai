@@ -1,29 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
-import { type ObligationCalendar, getObligations } from '../api/client'
+import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
 import { useEntity } from '../hooks/useEntity'
-
-const CARDS = [
-  {
-    to: '/obligations',
-    title: 'Obligation Calendar',
-    desc: 'YA2026 deadlines derived from your entity profile: Form C, CP204, SST, and more.',
-    kicker: 'Deterministic · LHDN-sourced'
-  },
-  {
-    to: '/filing',
-    title: 'Cited Form C Filing',
-    desc: 'Drop raw trial-balance text, classify line items, and step through the human-approval gate.',
-    kicker: 'HITL · ILMU nemo-super'
-  },
-  {
-    to: '/audit-defense',
-    title: 'Audit Defense',
-    desc: 'Build a citation-grounded defense pack. The deterministic gate rejects any fabricated clause.',
-    kicker: 'RAG · ground_citation gate'
-  }
-]
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -32,19 +11,22 @@ function greeting(): string {
   return 'Good evening.'
 }
 
-/** Compute a human-readable countdown from today to dueDate (ISO string). */
-function countdown(dueDate: string): { label: string; overdue: boolean } {
+/** Whole-day delta from today to dueDate (ISO string); negative means overdue. */
+function daysUntil(dueDate: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const due = new Date(dueDate)
   due.setHours(0, 0, 0, 0)
-  const diffMs = due.getTime() - today.getTime()
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
 
-  if (diffDays < 0) return { label: `${Math.abs(diffDays)}d overdue`, overdue: true }
-  if (diffDays === 0) return { label: 'Due today', overdue: false }
-  if (diffDays === 1) return { label: 'Due tomorrow', overdue: false }
-  return { label: `in ${diffDays}d`, overdue: false }
+/** Human-readable countdown from today to dueDate. */
+function countdown(dueDate: string): { label: string; overdue: boolean } {
+  const d = daysUntil(dueDate)
+  if (d < 0) return { label: `${Math.abs(d)}d overdue`, overdue: true }
+  if (d === 0) return { label: 'Due today', overdue: false }
+  if (d === 1) return { label: 'Due tomorrow', overdue: false }
+  return { label: `in ${d}d`, overdue: false }
 }
 
 function formatDate(iso: string): string {
@@ -56,32 +38,162 @@ function fmtRM(n: number): string {
   return `RM ${n.toLocaleString('en-MY')}`
 }
 
-// ---- Upcoming Deadlines panel ----
+const URGENT_WINDOW_DAYS = 30
 
-function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client').SsmProfile }) {
-  const [calendar, setCalendar] = useState<ObligationCalendar | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+function isUrgent(dueDate: string): boolean {
+  const d = daysUntil(dueDate)
+  return d >= 0 && d <= URGENT_WINDOW_DAYS
+}
 
-  useEffect(() => {
-    setLoading(true)
-    setError(null)
-    setCalendar(null)
-    getObligations(tin, ssm)
-      .then((c) => {
-        setCalendar(c)
-        setLoading(false)
-      })
-      .catch((err: Error) => {
-        setError(err.message)
-        setLoading(false)
-      })
-  }, [tin, ssm])
+/**
+ * Pick the single most-pressing obligation to lead the hero with.
+ * Overdue items win (most-overdue first); otherwise the nearest upcoming due date.
+ */
+function leadObligation(obligations: Obligation[]): Obligation | null {
+  if (obligations.length === 0) return null
+  const overdue = obligations.filter((o) => daysUntil(o.due_date) < 0)
+  if (overdue.length > 0) {
+    return [...overdue].sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
+  }
+  return [...obligations].sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
+}
 
-  const sorted = calendar ? [...calendar.obligations].sort((a, b) => a.due_date.localeCompare(b.due_date)) : []
+// ---- Primary action (hero) zone ----
+
+interface HeroProps {
+  lead: Obligation | null
+  overdueCount: number
+}
+
+/** The dominant, urgency-aware next-step card. Routes to the calendar (where deadlines live);
+ *  Form C leads additionally offer the Filing path. */
+function PrimaryAction({ lead, overdueCount }: HeroProps) {
+  if (!lead) {
+    return (
+      <div className="window dash-hero">
+        <div className="dash-hero-body">
+          <div className="dash-hero-kicker">Your next step</div>
+          <div className="dash-hero-headline">You are all caught up.</div>
+          <p className="dash-hero-sub">
+            No outstanding YA2026 obligations for this entity. Review the full calendar to confirm nothing was missed.
+          </p>
+          <Link to="/obligations" className="dash-cta">
+            Open Obligation Calendar →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const { label, overdue } = countdown(lead.due_date)
+  const urgent = overdue || isUrgent(lead.due_date)
+  const typeLabel = lead.obligation_type.replace(/_/g, ' ')
+  const isFormC = lead.form === 'C'
 
   return (
-    <div className="window" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className={`window dash-hero${urgent ? ' is-urgent' : ''}`}>
+      <div className="dash-hero-body">
+        <div className="dash-hero-kicker">
+          {overdue
+            ? overdueCount > 1
+              ? `${overdueCount} obligations overdue`
+              : 'Action overdue'
+            : 'Your nearest obligation'}
+        </div>
+
+        <div className="dash-hero-headline">
+          <span className="dash-hero-form">{lead.form}</span>
+          <span className="dash-hero-type">{typeLabel}</span>
+        </div>
+
+        <div className="dash-hero-when">
+          <span className={`dash-pill${overdue ? ' is-overdue' : urgent ? ' is-urgent' : ''}`}>{label}</span>
+          <span className="dash-hero-date">Due {formatDate(lead.due_date)}</span>
+        </div>
+
+        <p className="dash-hero-sub">
+          {overdue
+            ? `This ${typeLabel} filing is past its YA2026 deadline. Open the calendar to review every obligation and prioritise what to file first.`
+            : 'This is the soonest YA2026 deadline derived from your entity profile. Open the calendar to plan your filing.'}
+        </p>
+
+        <div className="dash-hero-actions">
+          <Link to="/obligations" className="dash-cta">
+            Review Obligation Calendar →
+          </Link>
+          {isFormC && (
+            <Link to="/filing" className="dash-cta-ghost">
+              Start Form C Filing →
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="dash-hero-rail">
+        <span className="dash-hero-rail-label">{lead.rule_id}</span>
+        <span className="dash-hero-rail-label">{lead.config_version}</span>
+      </div>
+    </div>
+  )
+}
+
+// ---- Quick-access consoles (with hierarchy) ----
+
+const PRIMARY_CONSOLE = {
+  to: '/filing',
+  title: 'Cited Form C Filing',
+  desc: 'Classify your trial balance and step through the human-approval gate to a cited Form C.',
+  kicker: 'HITL · ILMU nemo-super'
+}
+
+const SECONDARY_CONSOLES = [
+  {
+    to: '/obligations',
+    title: 'Obligation Calendar',
+    desc: 'Every YA2026 deadline derived from your entity profile.',
+    kicker: 'Deterministic · LHDN-sourced'
+  },
+  {
+    to: '/audit-defense',
+    title: 'Audit Defense',
+    desc: 'Build a citation-grounded defense pack; fabricated clauses are rejected.',
+    kicker: 'RAG · ground_citation gate'
+  }
+]
+
+function QuickAccess() {
+  return (
+    <div className="dash-consoles">
+      <div className="dash-consoles-head">What You Can Do</div>
+
+      <Link to={PRIMARY_CONSOLE.to} className="dash-console is-primary">
+        <div className="dash-console-title">{PRIMARY_CONSOLE.title}</div>
+        <p className="dash-console-desc">{PRIMARY_CONSOLE.desc}</p>
+        <div className="dash-console-kicker">{PRIMARY_CONSOLE.kicker}</div>
+      </Link>
+
+      {SECONDARY_CONSOLES.map((c) => (
+        <Link key={c.to} to={c.to} className="dash-console">
+          <div className="dash-console-title">{c.title}</div>
+          <p className="dash-console-desc">{c.desc}</p>
+          <div className="dash-console-kicker">{c.kicker}</div>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+// ---- Upcoming Deadlines panel ----
+
+function DeadlinesPanel({
+  calendar,
+  loading,
+  error
+}: { calendar: ObligationCalendar | null; loading: boolean; error: string | null }) {
+  const sorted = calendar ? [...calendar.obligations].sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date)) : []
+
+  return (
+    <div className="window dash-panel">
       <div className="titlebar">
         <span className="titlebar-title">Upcoming Deadlines</span>
         <span className="titlebar-meta">YA2026</span>
@@ -113,15 +225,7 @@ function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client'
         <ul className="req-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {sorted.map((ob) => {
             const { label, overdue } = countdown(ob.due_date)
-            const isUrgent =
-              !overdue &&
-              (() => {
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
-                const due = new Date(ob.due_date)
-                due.setHours(0, 0, 0, 0)
-                return (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 30
-              })()
+            const urgent = !overdue && isUrgent(ob.due_date)
 
             return (
               <li
@@ -137,7 +241,6 @@ function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client'
                     gap: 12
                   }}
                 >
-                  {/* Form badge — fixed-width column; long labels truncate with ellipsis */}
                   <span
                     style={{
                       fontFamily: 'var(--font-mono)',
@@ -156,7 +259,6 @@ function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client'
                     {ob.form}
                   </span>
 
-                  {/* Type + rule */}
                   <div>
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                       {ob.obligation_type.replace(/_/g, ' ')}
@@ -168,14 +270,12 @@ function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client'
                     </div>
                   </div>
 
-                  {/* Due date */}
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
                       {formatDate(ob.due_date)}
                     </div>
                   </div>
 
-                  {/* Countdown pill */}
                   <span
                     style={{
                       fontFamily: 'var(--font-mono)',
@@ -184,8 +284,8 @@ function DeadlinesPanel({ tin, ssm }: { tin: string; ssm: import('../api/client'
                       letterSpacing: '0.05em',
                       textTransform: 'uppercase',
                       padding: '3px 7px',
-                      border: `1px solid ${overdue ? 'var(--rust)' : isUrgent ? 'var(--mustard)' : 'var(--ink-soft)'}`,
-                      color: overdue ? 'var(--rust)' : isUrgent ? 'var(--mustard)' : 'var(--ink-soft)',
+                      border: `1px solid ${overdue ? 'var(--rust)' : urgent ? 'var(--mustard)' : 'var(--ink-soft)'}`,
+                      color: overdue ? 'var(--rust)' : urgent ? 'var(--mustard)' : 'var(--ink-soft)',
                       whiteSpace: 'nowrap'
                     }}
                   >
@@ -227,7 +327,6 @@ function SnapshotPanel() {
     ? [
         { label: 'Entity type', value: entity.entity_type.replace(/_/g, ' ').toUpperCase() },
         { label: 'MSIC code(s)', value: entity.msic_codes.join(', ') },
-        { label: 'Gross income', value: fmtRM(entity.gross_income) },
         { label: 'SST registered', value: entity.sst_registered ? 'Yes' : 'No' },
         {
           label: 'Basis period',
@@ -241,7 +340,7 @@ function SnapshotPanel() {
     : []
 
   return (
-    <div className="window" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="window dash-panel">
       <div className="titlebar">
         <span className="titlebar-title">Entity Snapshot</span>
         {entity && (
@@ -293,7 +392,7 @@ function SnapshotPanel() {
           </div>
 
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1 }}>
-            {rows.slice(1).map((row) => (
+            {rows.map((row) => (
               <li
                 key={row.label}
                 style={{
@@ -343,50 +442,31 @@ function SnapshotPanel() {
   )
 }
 
-// ---- Trust strip ----
+// ---- Status summary line (real counts) ----
 
-const TRUST_ITEMS = [
-  { tag: 'Sovereign', detail: 'ILMU nemo-super: 100% in-country inference, no data leaves Malaysia.' },
-  { tag: 'Cited', detail: 'Every figure traces to ITA 1967 rule_id + config_version; no invented numbers' },
-  { tag: 'Audit-ready', detail: 'ground_citation gate rejects fabricated clause IDs before they reach the FE' }
-]
+function StatusSummary({ calendar, loading }: { calendar: ObligationCalendar | null; loading: boolean }) {
+  if (loading || !calendar) return null
+  const total = calendar.obligations.length
+  const overdue = calendar.obligations.filter((o) => daysUntil(o.due_date) < 0).length
+  const upcoming = [...calendar.obligations]
+    .filter((o) => daysUntil(o.due_date) >= 0)
+    .sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
 
-function TrustStrip() {
   return (
-    <div
-      className="window"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 0
-      }}
-    >
-      {TRUST_ITEMS.map((item, i) => (
-        <div
-          key={item.tag}
-          style={{
-            padding: '14px 18px',
-            borderRight: i < TRUST_ITEMS.length - 1 ? 'var(--border)' : undefined
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: 'var(--denim)',
-              marginBottom: 5
-            }}
-          >
-            {item.tag}
-          </div>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
-            {item.detail}
-          </div>
-        </div>
-      ))}
+    <div className="dash-summary">
+      <span>
+        <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
+      </span>
+      <span className="dash-summary-sep">·</span>
+      <span className={overdue > 0 ? 'dash-summary-alert' : undefined}>
+        <strong>{overdue}</strong> overdue
+      </span>
+      {upcoming && (
+        <>
+          <span className="dash-summary-sep">·</span>
+          <span>next due {formatDate(upcoming.due_date)}</span>
+        </>
+      )}
     </div>
   )
 }
@@ -395,90 +475,48 @@ function TrustStrip() {
 
 export default function Dashboard() {
   const { persona } = useActivePersona()
+  const [calendar, setCalendar] = useState<ObligationCalendar | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    setCalendar(null)
+    getObligations(persona.tin, persona.ssm)
+      .then((c) => {
+        setCalendar(c)
+        setLoading(false)
+      })
+      .catch((err: Error) => {
+        setError(err.message)
+        setLoading(false)
+      })
+  }, [persona.tin, persona.ssm])
+
+  const obligations = calendar?.obligations ?? []
+  const lead = leadObligation(obligations)
+  const overdueCount = obligations.filter((o) => daysUntil(o.due_date) < 0).length
 
   return (
     <>
-      <div className="page-head">
+      <div className="dash-head">
         <h1>{greeting()}</h1>
-        <p className="page-kicker">CukaiPandai workspace · YA2026 · {persona.label}</p>
+        <p className="dash-orient">
+          Your YA2026 tax command center for <strong>{persona.label}</strong>. Track deadlines, file a cited Form C, and
+          build audit-ready defenses.
+        </p>
+        <StatusSummary calendar={calendar} loading={loading} />
       </div>
 
-      {/* Action cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 20,
-          marginTop: 8
-        }}
-      >
-        {CARDS.map((card) => (
-          <Link key={card.to} to={card.to} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-            <div
-              className="window"
-              style={{
-                height: '100%',
-                display: 'grid',
-                gridTemplateRows: 'auto 1fr auto',
-                transition: 'box-shadow 160ms'
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLDivElement).style.boxShadow = '4px 4px 0 rgba(0,0,0,0.22)'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'
-              }}
-            >
-              <div className="titlebar">
-                <span className="titlebar-title">{card.title}</span>
-                <span className="closebox" aria-hidden="true" />
-              </div>
-              <div
-                style={{
-                  padding: '20px 18px 12px',
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  color: 'var(--ink)'
-                }}
-              >
-                {card.desc}
-              </div>
-              <div
-                style={{
-                  padding: '10px 18px 14px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  color: 'var(--denim)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.07em',
-                  borderTop: 'var(--border)'
-                }}
-              >
-                {card.kicker}
-              </div>
-            </div>
-          </Link>
-        ))}
+      <div className="dash-primary-grid">
+        <PrimaryAction lead={lead} overdueCount={overdueCount} />
+        <QuickAccess />
       </div>
 
-      {/* Content section — 2-column layout */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr minmax(240px, 320px)',
-          gap: 20,
-          marginTop: 28,
-          alignItems: 'start'
-        }}
-      >
-        <DeadlinesPanel key={persona.tin} tin={persona.tin} ssm={persona.ssm} />
+      <div className="dash-overview-grid">
+        <DeadlinesPanel calendar={calendar} loading={loading} error={error} />
         <SnapshotPanel key={`snap-${persona.tin}`} />
-      </div>
-
-      {/* Trust strip */}
-      <div style={{ marginTop: 20 }}>
-        <TrustStrip />
       </div>
     </>
   )

@@ -1327,6 +1327,331 @@ a {
   }
 }
 
+/* ── Dashboard redesign (Wave D) — scoped, token-only ───────────────── */
+.dash-head {
+  padding: 44px 4px 26px;
+}
+
+.dash-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 5.5vw, 72px);
+  font-weight: 500;
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.dash-orient {
+  max-width: 640px;
+  margin-top: 14px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.dash-orient strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.dash-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dash-summary strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.dash-summary-sep {
+  opacity: 0.5;
+}
+
+.dash-summary-alert strong {
+  color: var(--rust);
+}
+
+/* primary zone: dominant hero + secondary console rail */
+.dash-primary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+  gap: 20px;
+  margin-top: 8px;
+  align-items: stretch;
+}
+
+/* the hero: the one visually dominant next-step card */
+.dash-hero {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  background: var(--denim);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 4px 4px 0 rgba(28, 27, 25, 0.22);
+}
+
+[data-theme="dark"] .dash-hero {
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+.dash-hero.is-urgent {
+  background: var(--rust);
+}
+
+.dash-hero-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 26px;
+}
+
+.dash-hero-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.dash-hero-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.dash-hero-form {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5vw, 58px);
+  font-weight: 600;
+  line-height: 0.95;
+}
+
+.dash-hero-type {
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 600;
+  text-transform: capitalize;
+  opacity: 0.92;
+}
+
+.dash-hero-when {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.dash-hero-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.dash-hero-sub {
+  max-width: 46ch;
+  margin-top: 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.92;
+}
+
+.dash-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+/* hero pill (countdown) — inverted to sit on the flooded hero */
+.dash-pill {
+  display: inline-block;
+  padding: 4px 9px;
+  border: 1px solid var(--paper);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* primary CTA — solid paper button on the flooded hero */
+.dash-cta {
+  display: inline-block;
+  padding: 11px 18px;
+  border: 1px solid var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-cta:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.28);
+}
+
+/* ghost CTA — outlined on the flooded hero */
+.dash-cta-ghost {
+  display: inline-block;
+  padding: 11px 18px;
+  border: 1px solid var(--paper);
+  background: transparent;
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background-color 140ms cubic-bezier(0.4, 0, 0.2, 1), color 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-cta-ghost:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* the all-caught-up hero CTA reuses .dash-cta on the denim flood */
+
+.dash-hero-rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 18px 16px;
+  border-left: 1px solid rgba(236, 231, 216, 0.28);
+}
+
+.dash-hero-rail-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* secondary console rail — clear hierarchy, not three flat cards */
+.dash-consoles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-consoles-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  margin-bottom: 2px;
+}
+
+.dash-console {
+  display: block;
+  padding: 13px 15px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--window);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 140ms cubic-bezier(0.4, 0, 0.2, 1), border-color
+    140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-console:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgba(28, 27, 25, 0.2);
+}
+
+[data-theme="dark"] .dash-console:hover {
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* the primary console gets a denim accent rail + heavier title */
+.dash-console.is-primary {
+  flex: 1;
+  border-left: 3px solid var(--denim);
+}
+
+.dash-console-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.dash-console.is-primary .dash-console-title {
+  font-size: 19px;
+}
+
+.dash-console-desc {
+  margin-top: 5px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.dash-console-kicker {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--denim);
+}
+
+/* overview row — balanced columns, equal heights */
+.dash-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+  gap: 20px;
+  margin-top: 22px;
+  align-items: stretch;
+}
+
+.dash-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .dash-primary-grid,
+  .dash-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-hero-rail {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
