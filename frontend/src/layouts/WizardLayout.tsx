@@ -20,6 +20,7 @@ interface WizardStep {
 
 const WIZARD_STEPS: WizardStep[] = [
   { route: '/start/obligations', label: 'Obligation Calendar', num: 1 },
+  // TODO(Wave 3): repoint to /start/filing/new once the new creation flow exists
   { route: '/start/filing', label: 'Cited Form C Filing', num: 2 },
   { route: '/start/audit-defense', label: 'Audit Defense Pack', num: 3 }
 ]

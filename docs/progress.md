@@ -1143,3 +1143,82 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `backend/tests/api/test_me_entity_endpoint.py` (new, 8 tests)
 - `backend/tests/api/test_me_filings_endpoint.py` (new, 14 tests)
 - `docs/plan.md` — EP-0/EP-1/EP-2 ticked `[x]`
+
+---
+
+## [26/06/26] — Wave 1: Quick UI Refinements + Tooltip + GR-1...GR-9 `[FE]`
+
+**Tasks:** UI-1, OB-1, GR-1, GR-2, GR-3, GR-4, GR-5, GR-6, GR-7, GR-8, GR-9
+
+### UI-1 — Reusable Tooltip + InfoTip
+
+- Created `frontend/src/components/Tooltip.tsx` with `Tooltip` (hover + focus-capture, ESC dismiss, fixed-positioned with edge-clamping, `aria-describedby`, `role="tooltip"`) and `InfoTip` (focusable `<button>` trigger, `aria-label`). Token-CSS only, z-index 200 (below z-300 walkthrough modal). No native `title=`, no new dependency.
+
+### OB-1 — Obligation Calendar (/obligations) refinements
+
+- Added entity-aware one-line page description under `<h1>`.
+- Replaced all calendar badge `title=` attributes with `<Tooltip>` (form + due date + obligation type shown in bubble).
+- Added `<InfoTip>` to both card titlebars: YA2026 Obligation Calendar (heading tooltip carries the live obligation summary: N total, M overdue, next due date + demo-clock note) and Filing Obligations (heading tooltip carries the full form-codes glossary).
+- Removed the inline `<details>` form-codes block; content moved into the Filing Obligations InfoTip.
+- Removed the `ObligationSummary` component from the page body; counts now live in the Calendar heading InfoTip.
+- Removed the Entity Snapshot left-column card (moving to `/entity` in Wave 2).
+- Removed `<WhatNext>` usage and import.
+
+### GR-1 — Dashboard: hide Journey strip when walkthrough done
+
+- `Dashboard.tsx`: `<JourneyStrip>` now gated on `!journeyDone`; absent when `cp_journey_done=1`.
+
+### GR-2 — Remove topbar entity selector
+
+- `AppShell.tsx`: removed the `<select>` topbar entity switcher. Entity selection is now exclusively in Settings / Workspace. Persona-switch side-effects (deadline re-seed + toast) remain intact since they trigger on `persona.tin` change from any source.
+
+### GR-3 — Remove drawer X close button
+
+- `AppShell.tsx`: removed `<button className="drawer-close">`. Backdrop-click and Escape remain the close affordances.
+
+### GR-4 — Walkthrough ? button: pin true bottom-right, scope to Workspace + Compliance
+
+- `AppShell.tsx`: ? button repositioned to `bottom: 20, right: 20` (was `bottom: 176`). Visibility gated via `useLocation()` + `isWalkthroughRoute()` helper: visible on `/dashboard`, `/analytics`, `/obligations`, `/filing/**`, `/audit-defense`, `/entity`; hidden on Essentials, marketing, auth, wizard.
+
+### GR-5 — Dashboard: remove StatusSummary + SnapshotPanel; single-column overview
+
+- `Dashboard.tsx`: removed `StatusSummary` component (demo-clock text), `SnapshotPanel` component, `fmtRM` helper, and `useEntity` import (all orphaned by removal). `dash-overview-grid` now holds only `DeadlinesPanel`; `QuickAccess` fills the freed primary-grid space.
+
+### GR-6 — Settings: remove About section; match reset-button colours
+
+- `Settings.tsx`: removed the About `<section>`. Applied `settings-reset-btn--full` to the "Reset all preferences" button to match "Reset all data".
+
+### GR-7 — Remove WhatNext from Filing + Audit Defense
+
+- `FilingStudio.tsx`: removed `<WhatNext>` usage and `WhatNext` import.
+- `AuditDefense.tsx`: removed `<WhatNext>` usage and `WhatNext` import.
+
+### GR-8 — Light theme as default
+
+- `useTheme.ts`: default changed from `systemTheme()` to `'light'` when no stored preference. Removed `systemTheme()` helper, `hasStoredTheme` state, and the system-preference media-query listener (all orphaned). Toggle + localStorage persistence unchanged.
+
+### GR-9 — Wizard sequence + non-destructive Reset All Data
+
+- `WizardLayout.tsx`: added `// TODO(Wave 3): repoint to /start/filing/new` comment on step 2; step still points to `/start/filing` (shippable; Wave 3 FM-2 repoints it).
+- `Settings.tsx`: `handleResetAllData` now clears ONLY `cukaipandai-theme` + `cp_journey_done` (the two local UI-pref keys). Removed the `DATA_PREFIXES` broad-sweep that was clearing business data keys. Button copy updated to clarify saved company/filings are not affected.
+- Welcome "Try sample data" and walkthrough modal "Yes, Show Me" already navigated to `/welcome` first (no change needed). `WizardLayout` `graduate()` already goes to `/dashboard` only at Finish/Skip.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **77 modules**, built in 2.08s
+- `bunx biome check frontend/src`: 0 errors (40 files checked)
+- Em-dash sweep: no em-dashes in user-facing copy (comments only)
+
+### Files touched
+
+- `frontend/src/components/Tooltip.tsx` (new)
+- `frontend/src/hooks/useTheme.ts`
+- `frontend/src/layouts/AppShell.tsx`
+- `frontend/src/layouts/WizardLayout.tsx`
+- `frontend/src/pages/Dashboard.tsx`
+- `frontend/src/pages/ObligationRadar.tsx`
+- `frontend/src/pages/FilingStudio.tsx`
+- `frontend/src/pages/AuditDefense.tsx`
+- `frontend/src/pages/Settings.tsx`
+- `docs/plan.md` — UI-1/OB-1/GR-1...GR-9 ticked `[x]`

@@ -15,7 +15,6 @@ import {
   uploadDocument
 } from '../api/client'
 import { SovereignBadge } from '../components/CitationPanel'
-import { WhatNext } from '../components/JourneyProgress'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
 
@@ -1127,13 +1126,6 @@ export default function FilingStudio() {
           )}
         </>
       )}
-
-      {/* JR-4: what next handoff */}
-      <WhatNext
-        nextLabel="Audit Defense Pack"
-        nextRoute="/audit-defense"
-        nextOutput="Build a citation-grounded defense pack. Fabricated clauses are deterministically rejected at the gate."
-      />
     </>
   )
 }

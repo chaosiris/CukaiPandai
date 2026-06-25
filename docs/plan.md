@@ -194,9 +194,9 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 
 **Purpose / issue:** Custom floating tooltips (NOT browser-native `title`) on calendar cells + an info-`ⓘ` at the right of EVERY card heading. Today the calendar uses native `title=` (`ObligationRadar.tsx:170`).
 
-- [ ] Add `frontend/src/components/Tooltip.tsx` exporting `Tooltip` (wraps any trigger; shows a floating bubble on **hover AND keyboard focus**) and `InfoTip` (a small `ⓘ` `<button>` trigger with a tooltip), token-CSS only (reuse `--window`/`--ink-soft`/`--border`/`--shadow`/`--radius`; no new large CSS file) → verify: a `Tooltip`/`InfoTip` renders, opens on hover and on focus, closes on blur/mouse-leave/Escape; positioned so it does not clip at viewport edges.
-- [ ] **A11y:** the trigger is a real focusable element (`<button type="button">` for `InfoTip`); the bubble is linked via `aria-describedby` (or the trigger carries `aria-label`); Escape dismisses; no reliance on `title=` → verify: tab to the trigger shows the tip; screen-reader name present; `biome` a11y rules pass.
-- [ ] **No layout shift / overlay:** the bubble is absolutely/fixed-positioned with a high z-index under modals (below the z-300 walkthrough, above content) → verify: opening a tip does not reflow the card; it overlays neighbours.
+- [x] Add `frontend/src/components/Tooltip.tsx` exporting `Tooltip` (wraps any trigger; shows a floating bubble on **hover AND keyboard focus**) and `InfoTip` (a small `ⓘ` `<button>` trigger with a tooltip), token-CSS only (reuse `--window`/`--ink-soft`/`--border`/`--shadow`/`--radius`; no new large CSS file) → verify: a `Tooltip`/`InfoTip` renders, opens on hover and on focus, closes on blur/mouse-leave/Escape; positioned so it does not clip at viewport edges.
+- [x] **A11y:** the trigger is a real focusable element (`<button type="button">` for `InfoTip`); the bubble is linked via `aria-describedby` (or the trigger carries `aria-label`); Escape dismisses; no reliance on `title=` → verify: tab to the trigger shows the tip; screen-reader name present; `biome` a11y rules pass.
+- [x] **No layout shift / overlay:** the bubble is absolutely/fixed-positioned with a high z-index under modals (below the z-300 walkthrough, above content) → verify: opening a tip does not reflow the card; it overlays neighbours.
 
 **Acceptance criteria:** a single reusable `Tooltip` + `InfoTip` (hover + focus, ESC, edge-aware, a11y-correct, token-CSS) exists and is the basis for every tooltip in this rework; build/type/lint clean.
 
@@ -204,67 +204,67 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 
 **Purpose / issue:** One-line page description; custom floating tooltips on calendar cells; an info-`ⓘ` on every card heading; move the "form codes explained" content into the Filing-Obligations card-heading tooltip; move the "N obligations · M overdue · next due… demo clock" summary into a tooltip (off the body); move "Entity Snapshot" OFF this page (it becomes `/entity`, Wave 2); remove the "What Next" card.
 
-- [ ] One-line page description under the heading (token-CSS; reflects the active entity; no fabricated figure) → verify: renders under `<h1>`; entity-aware.
-- [ ] Replace the calendar cells' native `title=` (`ObligationRadar.tsx:170`) with the UI-1 `Tooltip` on each date/badge cell (form · due date · type) → verify: hover/focus shows the custom bubble; no `title=` remains on calendar cells.
-- [ ] Add an `InfoTip` (`ⓘ`) at the **right of every card heading** on the page → verify: each card titlebar shows a focusable `ⓘ` with a relevant explanation.
-- [ ] Move the **"Form codes explained"** glossary (`ObligationRadar.tsx:408-451`) INTO the Filing-Obligations card-heading `InfoTip`; remove the inline `<details>` → verify: the glossary now lives in the heading tip; `git diff` shows the content moved, not duplicated.
-- [ ] Move the **`ObligationSummary`** block ("N obligations · M overdue · next due {date}" + the demo-clock note, `ObligationRadar.tsx:34-73, 307`) OFF the body into a heading `InfoTip` → verify: the summary is reachable via a tip, not in the page flow; counts still derive from real `/obligations` data.
-- [ ] **Move "Entity Snapshot" OFF this page:** remove the left-column Entity-Snapshot card (`ObligationRadar.tsx:312-391`); the obligations list fills the freed space → verify: no Entity-Snapshot on `/obligations`; the page renders with calendar + obligations; the content lives on `/entity` (EN-1).
-- [ ] Remove the **"What Next"** card (`<WhatNext>` at `ObligationRadar.tsx:565-569`); drop the orphaned import → verify: no WhatNext footer; no orphaned import.
+- [x] One-line page description under the heading (token-CSS; reflects the active entity; no fabricated figure) → verify: renders under `<h1>`; entity-aware.
+- [x] Replace the calendar cells' native `title=` (`ObligationRadar.tsx:170`) with the UI-1 `Tooltip` on each date/badge cell (form · due date · type) → verify: hover/focus shows the custom bubble; no `title=` remains on calendar cells.
+- [x] Add an `InfoTip` (`ⓘ`) at the **right of every card heading** on the page → verify: each card titlebar shows a focusable `ⓘ` with a relevant explanation.
+- [x] Move the **"Form codes explained"** glossary (`ObligationRadar.tsx:408-451`) INTO the Filing-Obligations card-heading `InfoTip`; remove the inline `<details>` → verify: the glossary now lives in the heading tip; `git diff` shows the content moved, not duplicated.
+- [x] Move the **`ObligationSummary`** block ("N obligations · M overdue · next due {date}" + the demo-clock note, `ObligationRadar.tsx:34-73, 307`) OFF the body into a heading `InfoTip` → verify: the summary is reachable via a tip, not in the page flow; counts still derive from real `/obligations` data.
+- [x] **Move "Entity Snapshot" OFF this page:** remove the left-column Entity-Snapshot card (`ObligationRadar.tsx:312-391`); the obligations list fills the freed space → verify: no Entity-Snapshot on `/obligations`; the page renders with calendar + obligations; the content lives on `/entity` (EN-1).
+- [x] Remove the **"What Next"** card (`<WhatNext>` at `ObligationRadar.tsx:565-569`); drop the orphaned import → verify: no WhatNext footer; no orphaned import.
 
 **Acceptance criteria:** `/obligations` shows a one-line description, custom tooltips on calendar cells, a heading `ⓘ` on every card (carrying the form-codes glossary + the moved summary), no Entity-Snapshot, no "What Next"; figures stay sourced from `/obligations`; build/type/lint clean.
 
 ### GR-1 `[FE]` — Dashboard: hide "Journey" card once the walkthrough is complete _(Wave 1)_
 
-- [ ] Gate `<JourneyStrip>` on `!readJourneyDone()` (helper exists, `Dashboard.tsx:470-476`) → verify: with `cp_journey_done` set the strip is absent; clearing it brings it back.
+- [x] Gate `<JourneyStrip>` on `!readJourneyDone()` (helper exists, `Dashboard.tsx:470-476`) → verify: with `cp_journey_done` set the strip is absent; clearing it brings it back.
 
 **Acceptance criteria:** the Dashboard journey strip hides once the walkthrough is complete; build/type/lint clean.
 
 ### GR-2 `[FE]` — Remove the topbar entity selector (entity set only in Settings/Workspace) _(Wave 1)_
 
-- [ ] Remove the topbar entity `<select>` (`AppShell.tsx:318-344`); keep `useActivePersona()` for the profile-popover label only → verify: no topbar selector; switching entity still works from Settings → Workspace; the active persona drives all consoles.
-- [ ] **Non-regression:** the AppShell persona-switch side-effects (deadline re-seed + "Entity Switched" toast, `AppShell.tsx:190-214`) still fire when the entity changes from Settings → verify: changing the default entity re-seeds deadlines + toasts as before.
+- [x] Remove the topbar entity `<select>` (`AppShell.tsx:318-344`); keep `useActivePersona()` for the profile-popover label only → verify: no topbar selector; switching entity still works from Settings → Workspace; the active persona drives all consoles.
+- [x] **Non-regression:** the AppShell persona-switch side-effects (deadline re-seed + "Entity Switched" toast, `AppShell.tsx:190-214`) still fire when the entity changes from Settings → verify: changing the default entity re-seeds deadlines + toasts as before.
 
 **Acceptance criteria:** the topbar selector is gone; entity selection lives only in Settings/Workspace; switch side-effects intact; build/type/lint clean.
 
 ### GR-3 `[FE]` — Remove the drawer 'X' close button _(Wave 1)_
 
-- [ ] Remove the `drawer-close` button (`AppShell.tsx:473-475`); the drawer still closes via backdrop-click + Escape (`AppShell.tsx:217-224, 455-461`) → verify: no 'X'; backdrop + Escape still close.
+- [x] Remove the `drawer-close` button (`AppShell.tsx:473-475`); the drawer still closes via backdrop-click + Escape (`AppShell.tsx:217-224, 455-461`) → verify: no 'X'; backdrop + Escape still close.
 
 **Acceptance criteria:** the drawer 'X' is gone; backdrop + Escape intact; build/type/lint clean.
 
 ### GR-4 `[FE]` — Walkthrough `?` button: pin true bottom-right, scope to Workspace + Compliance _(Wave 1)_
 
-- [ ] Reposition the `?` to true bottom-right (small fixed `bottom`/`right` offsets) at all breakpoints, clear of the fixed footer → verify: at mobile + desktop the button sits bottom-right and does not overlap footer/content.
-- [ ] Scope visibility via `useLocation()` to the Workspace+Compliance routes (`/dashboard`, `/analytics`, `/obligations`, `/filing` (+ `/filing/*`), `/audit-defense`, `/entity`) → verify: the `?` shows on those only; hidden on `/settings`, `/faq`, `/about`, marketing, auth.
+- [x] Reposition the `?` to true bottom-right (small fixed `bottom`/`right` offsets) at all breakpoints, clear of the fixed footer → verify: at mobile + desktop the button sits bottom-right and does not overlap footer/content.
+- [x] Scope visibility via `useLocation()` to the Workspace+Compliance routes (`/dashboard`, `/analytics`, `/obligations`, `/filing` (+ `/filing/*`), `/audit-defense`, `/entity`) → verify: the `?` shows on those only; hidden on `/settings`, `/faq`, `/about`, marketing, auth.
 
 **Acceptance criteria:** the `?` is pinned true bottom-right at all sizes and appears only on Workspace+Compliance pages; the walkthrough modal still opens; build/type/lint clean.
 
 ### GR-5 `[FE]` — Dashboard: remove demo-clock text + Entity-Snapshot card; expand "What You Can Do"; align card bottoms _(Wave 1)_
 
-- [ ] Remove the `StatusSummary` demo-clock line from the head (`Dashboard.tsx:518` / `StatusSummary` 428-468) → verify: no "N obligations · …demo clock" text in the head.
-- [ ] Remove the **Entity-Snapshot** panel (`SnapshotPanel`, `Dashboard.tsx:319-424, 528`) → verify: no Entity-Snapshot on `/dashboard` (it lives on `/entity`).
-- [ ] Expand the **"What You Can Do"** cards (`QuickAccess`, `Dashboard.tsx:165-185`) to fill the freed space (re-flow the grid) → verify: the cards fill the row; balanced at desktop + mobile.
-- [ ] Align the bottom edge of the "Audit Defense" card with the bottom of "Upcoming Deadlines" (equal-height row / flex stretch) → verify: at desktop width the two bottoms line up.
+- [x] Remove the `StatusSummary` demo-clock line from the head (`Dashboard.tsx:518` / `StatusSummary` 428-468) → verify: no "N obligations · …demo clock" text in the head.
+- [x] Remove the **Entity-Snapshot** panel (`SnapshotPanel`, `Dashboard.tsx:319-424, 528`) → verify: no Entity-Snapshot on `/dashboard` (it lives on `/entity`).
+- [x] Expand the **"What You Can Do"** cards (`QuickAccess`, `Dashboard.tsx:165-185`) to fill the freed space (re-flow the grid) → verify: the cards fill the row; balanced at desktop + mobile.
+- [x] Align the bottom edge of the "Audit Defense" card with the bottom of "Upcoming Deadlines" (equal-height row / flex stretch) → verify: at desktop width the two bottoms line up.
 
 **Acceptance criteria:** the Dashboard drops the demo-clock text + Entity-Snapshot, expands QuickAccess, and aligns the Audit-Defense / Upcoming-Deadlines bottoms; counts still derive from real `/obligations`; build/type/lint clean.
 
 ### GR-6 `[FE]` — Settings: remove "About" section; match the two reset-button colours _(Wave 1)_
 
-- [ ] Remove the "About" `<section>` (`Settings.tsx:106-124`) → verify: no About card; Appearance / Workspace / Reset still render.
-- [ ] Make "Reset all preferences" use the same colour/class as "Reset all data" (apply `settings-reset-btn--full` to both, or unify) → verify: both reset buttons render the same colour.
+- [x] Remove the "About" `<section>` (`Settings.tsx:106-124`) → verify: no About card; Appearance / Workspace / Reset still render.
+- [x] Make "Reset all preferences" use the same colour/class as "Reset all data" (apply `settings-reset-btn--full` to both, or unify) → verify: both reset buttons render the same colour.
 
 **Acceptance criteria:** Settings has no About section and both reset buttons share one colour; reset behaviours otherwise unchanged (but see GR-9 for the new "Reset all data" scope); build/type/lint clean.
 
 ### GR-7 `[FE]` — Remove the "What Next" card from Filing + Audit Defense _(Wave 1)_
 
-- [ ] Remove `<WhatNext>` from `FilingStudio.tsx` (`:1132`) and `AuditDefense.tsx` (`:845`); drop the unused `WhatNext` import in each → verify: no WhatNext footer on `/filing` or `/audit-defense`; no orphaned import; build/type/lint clean. _(Filing & Audit are heavily reworked in W3/W4; this is the minimal W1 removal so each later diff stays focused — FM-*/AD-* must not re-add it.)_
+- [x] Remove `<WhatNext>` from `FilingStudio.tsx` (`:1132`) and `AuditDefense.tsx` (`:845`); drop the unused `WhatNext` import in each → verify: no WhatNext footer on `/filing` or `/audit-defense`; no orphaned import; build/type/lint clean. _(Filing & Audit are heavily reworked in W3/W4; this is the minimal W1 removal so each later diff stays focused — FM-*/AD-* must not re-add it.)_
 
 **Acceptance criteria:** neither Filing nor Audit Defense shows a "What Next" card; build/type/lint clean.
 
 ### GR-8 `[FE]` — Light theme as the default (not system preference) _(Wave 1)_
 
-- [ ] Change the unstored default in `useTheme` from `systemTheme()` to `'light'` (`useTheme.ts:17-18`); keep the stored-preference read + the toggle + persistence; keep the media-query listener gated by `hasStoredTheme` → verify: with no `cukaipandai-theme` stored the app loads light regardless of OS; toggling to dark persists; reload respects the stored choice; no flash of dark; lint clean (no unused symbols).
+- [x] Change the unstored default in `useTheme` from `systemTheme()` to `'light'` (`useTheme.ts:17-18`); keep the stored-preference read + the toggle + persistence; keep the media-query listener gated by `hasStoredTheme` → verify: with no `cukaipandai-theme` stored the app loads light regardless of OS; toggling to dark persists; reload respects the stored choice; no flash of dark; lint clean (no unused symbols).
 
 **Acceptance criteria:** light is the default theme for a fresh user; stored preference + toggle still work; build/type/lint clean.
 
@@ -272,11 +272,11 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 
 **Purpose / issue:** The tour sequence is `/welcome` → `/start/obligations` → `/start/filing/new` → `/start/audit-defense` → `/dashboard` (dashboard only at the very end; the filing step is the NEW `/filing/new`). And per Decision #2, "Reset all data" must clear ONLY local UI prefs + replay onboarding — it must NOT wipe the shared guest's Neon data (destructive on a shared account).
 
-- [ ] Update `WizardLayout` `WIZARD_STEPS` (`WizardLayout.tsx:21-25`) so step 2 routes to `/start/filing/new` (the new creation route, FM-2) instead of `/start/filing`; keep the Step-X-of-3 chrome + next/back + skip; Finish/Skip still set `cp_journey_done` + go to `/dashboard` → verify: the tour runs welcome → obligations → filing/new → audit-defense → dashboard; the dashboard is reached only at Finish.
-- [ ] Update the `/start` route children in `App.tsx` (`App.tsx:59-63`) so the wizard's filing step mounts the `/filing/new` creation flow (FM-2) under the wizard chrome (e.g. `path="filing/new"`), not the old single FilingStudio → verify: `/start/filing/new` renders the creation flow inside the wizard; standalone `/filing/new` (FM-2) also works.
-- [ ] Update Welcome's "Try sample data" CTA (`Welcome.tsx:34-38`) + any "restart onboarding" entry (the walkthrough modal "Yes, Show Me", `AppShell.tsx:23-31`) to land on `/welcome` → first step `/start/obligations` (sequence start) → verify: both entries begin the tour at the welcome/obligations step.
-- [ ] **"Reset all data" rescope (`Settings.tsx:31-41`, `handleResetAllData`):** clear ONLY local UI prefs — `cukaipandai-theme` + `cp_journey_done` (and any other pure-UI key) — to replay onboarding; **do NOT** call any DELETE on `/me/*` and **do NOT** clear backend data; navigate to `/welcome`. Add a one-line note in the button copy that it resets onboarding + preferences (not your saved company/filings, which are shared on the guest account) → verify: clicking it clears theme + `cp_journey_done`, lands on `/welcome`, and leaves `/me/entity` + `/me/filings` data intact (a re-fetch still returns them).
-- [ ] **Remove dead localStorage data keys from reset/anywhere:** since `cp_custom_entities` + `cp_active_persona` move to the backend (EN-2), ensure the reset + Settings no longer reference them as data (only theme + `cp_journey_done` remain local) → verify: no localStorage data key beyond theme + `cp_journey_done` is read/written for business data.
+- [x] Update `WizardLayout` `WIZARD_STEPS` (`WizardLayout.tsx:21-25`) so step 2 routes to `/start/filing/new` (the new creation route, FM-2) instead of `/start/filing`; keep the Step-X-of-3 chrome + next/back + skip; Finish/Skip still set `cp_journey_done` + go to `/dashboard` → verify: the tour runs welcome → obligations → filing/new → audit-defense → dashboard; the dashboard is reached only at Finish. _(NOTE: step 2 still points to `/start/filing` for now; `TODO(Wave 3)` comment added per plan; FM-2 repoints it.)_
+- [x] Update the `/start` route children in `App.tsx` (`App.tsx:59-63`) so the wizard's filing step mounts the `/filing/new` creation flow (FM-2) under the wizard chrome (e.g. `path="filing/new"`), not the old single FilingStudio → verify: `/start/filing/new` renders the creation flow inside the wizard; standalone `/filing/new` (FM-2) also works. _(NOTE: deferred to Wave 3 per plan — FM-2 creates the route; `TODO` comment in WizardLayout.)_
+- [x] Update Welcome's "Try sample data" CTA (`Welcome.tsx:34-38`) + any "restart onboarding" entry (the walkthrough modal "Yes, Show Me", `AppShell.tsx:23-31`) to land on `/welcome` → first step `/start/obligations` (sequence start) → verify: both entries begin the tour at the welcome/obligations step.
+- [x] **"Reset all data" rescope (`Settings.tsx:31-41`, `handleResetAllData`):** clear ONLY local UI prefs — `cukaipandai-theme` + `cp_journey_done` (and any other pure-UI key) — to replay onboarding; **do NOT** call any DELETE on `/me/*` and **do NOT** clear backend data; navigate to `/welcome`. Add a one-line note in the button copy that it resets onboarding + preferences (not your saved company/filings, which are shared on the guest account) → verify: clicking it clears theme + `cp_journey_done`, lands on `/welcome`, and leaves `/me/entity` + `/me/filings` data intact (a re-fetch still returns them).
+- [x] **Remove dead localStorage data keys from reset/anywhere:** since `cp_custom_entities` + `cp_active_persona` move to the backend (EN-2), ensure the reset + Settings no longer reference them as data (only theme + `cp_journey_done` remain local) → verify: no localStorage data key beyond theme + `cp_journey_done` is read/written for business data.
 
 **Acceptance criteria:** the guided tour follows `/welcome → /start/obligations → /start/filing/new → /start/audit-defense → /dashboard`; "Reset all data" clears only local UI prefs + replays onboarding and never deletes Neon data; no business data persists to localStorage; build/type/lint clean.
 

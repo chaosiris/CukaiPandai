@@ -9,13 +9,9 @@ function readStoredTheme(): Theme | null {
   return stored === 'light' || stored === 'dark' ? stored : null
 }
 
-function systemTheme(): Theme {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => readStoredTheme() ?? systemTheme())
-  const [hasStoredTheme, setHasStoredTheme] = useState(() => readStoredTheme() !== null)
+  // GR-8: default to 'light' when no stored preference (do NOT follow prefers-color-scheme)
+  const [theme, setTheme] = useState<Theme>(() => readStoredTheme() ?? 'light')
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -25,25 +21,9 @@ export function useTheme() {
     }
   }, [theme])
 
-  useEffect(() => {
-    if (hasStoredTheme) return
-
-    const query = window.matchMedia('(prefers-color-scheme: dark)')
-    const updateSystemTheme = (event: MediaQueryListEvent) => {
-      setTheme(event.matches ? 'dark' : 'light')
-    }
-
-    query.addEventListener('change', updateSystemTheme)
-
-    return () => {
-      query.removeEventListener('change', updateSystemTheme)
-    }
-  }, [hasStoredTheme])
-
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
     window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
-    setHasStoredTheme(true)
     setTheme(nextTheme)
   }
 

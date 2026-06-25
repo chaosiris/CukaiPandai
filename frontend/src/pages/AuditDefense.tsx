@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { type AuditDefenseResponse, getAuditDefense } from '../api/client'
 import { CitationPanel, SovereignBadge, VerifiedBadge } from '../components/CitationPanel'
-import { WhatNext } from '../components/JourneyProgress'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
 
@@ -841,12 +840,6 @@ export default function AuditDefense() {
           </div>
         </>
       )}
-
-      <WhatNext
-        nextLabel="Dashboard"
-        nextRoute="/dashboard"
-        nextOutput="Your YA2026 command center: deadlines, entity snapshot, and the full compliance overview."
-      />
     </>
   )
 }
