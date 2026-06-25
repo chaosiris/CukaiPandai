@@ -5,7 +5,7 @@ export default function NotFound() {
     <div className="empty-window window" style={{ maxWidth: 560, margin: '40px auto 0' }}>
       <div className="titlebar">
         <span className="closebox" aria-hidden="true" />
-        <span className="titlebar-title">404 — Not Found</span>
+        <span className="titlebar-title">404: Not Found</span>
         <span className="titlebar-meta">LOST FILE</span>
       </div>
       <div className="empty-body" style={{ padding: '32px 24px', minHeight: 220 }}>

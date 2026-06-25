@@ -526,3 +526,58 @@ The hub deepens cleanly and non-regressively. The greeting + 3 action cards are 
 - **No orphaned imports:** `useEffect`/`useState`/`Link`/`useActivePersona`/`ObligationCalendar`/`getObligations`/`useEntity` are all used.
 
 **Return to PM:** **Approve.** Wave 2 is non-regressive and contract-clean — the live request path is byte-for-byte unchanged (the new per-persona obligations are gated entirely behind `MOCK_MODE`), the countdown math is correct at every boundary (no today/tomorrow off-by-one), both panels re-fetch on persona switch and show distinct data, no fabricated activity/timestamps leak in (only the allowed static trust strip), and no literal colors were added so dark mode holds. All three gates green (tsc 0 · build 53 modules · biome 0 errors); diff is exactly the 2 expected files. No Critical/Major/Minor findings — ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — Wave 3: Entry Journey (Marketing Landing + Auth/Guest Gate + Routing Restructure)
+
+**Verdict: APPROVE (with one minor advisory).**
+
+**Scope reviewed:** working-tree diff vs `main` for `frontend/`. New files `MarketingShell.tsx/.css`, `Landing.tsx/.css`, `LoginGate.tsx/.css`; modified `App.tsx` (route restructure) and `AppShell.tsx` (internal links `/` → `/dashboard`). Diff stat: only `App.tsx` (+11/-1) and `AppShell.tsx` (+8/-3) are tracked-file changes; the rest are new untracked files.
+
+### Verify gates — all GREEN
+
+- `bunx tsc --noEmit` → exit 0 (clean).
+- `bun run build` → green (`tsc -b && vite build`, 59 modules, built in 1.69s).
+- `bunx biome check frontend/src` → "Checked 22 files. No fixes applied." → 0 errors.
+- `git diff main --stat -- frontend/src/pages/Dashboard.tsx` → **EMPTY**. Hub content (deadlines/snapshot/cards/countdown/persona fetch) is byte-for-byte unchanged; it is simply served at `/dashboard` now. PASS.
+
+### Review focus — results
+
+1. **Non-regression — PASS.** `Dashboard.tsx`, `PersonaContext.tsx`, `hooks/useTheme.ts`, and `components/icons` are all unchanged vs `main` (empty diff stat). Dashboard hub fetch logic + PersonaContext untouched as required. The 3 consoles, persona switching, AppShell drawer/topbar/footer, in-shell 404, BE-18 money-shot, sovereign badge are all served under the unchanged `AppShell` — no functional regression. The only AppShell edits are the three internal `to="/"` → `to="/dashboard"` link targets (brand lockup x2 + drawer "Dashboard" NavLink).
+
+2. **Routing correctness — PASS.** `App.tsx:18-31`: `/` (`index`) and `/login` render under `<MarketingShell>` (no AppShell); `/dashboard`, `/obligations`, `/filing`, `/audit-defense`, and `*` render under `<AppShell>`. The two route groups are sibling, non-overlapping `<Route element>` blocks — no path renders under two shells. The `*` 404 stays inside the AppShell group (`:30`). Grep for `Navigate`/`navigate(` shows **no leftover `/`→hub or `/`→`/obligations` redirect** anywhere (the only `navigate()` is LoginGate's guest CTA → `/dashboard`). No route conflict.
+
+3. **No hard auth guard — PASS.** All app routes are plain `<Route>` elements with no guard wrapper / redirect-to-login. Deep-linking to `/dashboard`, `/obligations`, etc. works without authentication. `cp_entered_as_guest` (`LoginGate.tsx:10`) is **only written, never read** anywhere in `frontend/src` (grep confirms a single occurrence) — it does NOT gate any route. The guest CTA's `localStorage.setItem` is wrapped in try/catch and degrades gracefully if storage is unavailable.
+
+4. **Internal links — PASS.** AppShell brand lockup (topbar + drawer) and the drawer "Dashboard" NavLink now point to `/dashboard` (not `/`). Landing CTAs (`Landing.tsx:152`, `:232`) → `/login`; MarketingShell "Get Started" (`:28`) → `/login`; LoginGate guest CTA → `/dashboard`. MarketingShell brand lockup (`:14`) and LoginGate brand (`LoginGate.tsx:21`) point to `/` (the landing) — correct, since `/` is now the marketing landing, not the hub. **No dead links to the old `/` hub.**
+
+5. **Theming / literal colors — PASS (app-shell + tokens clean), with advisory.** `tokens.css` and `AppShell.css` are unchanged vs `main` — **no token-file or shared-shell pollution.** Literal hex appears only in the new marketing-page-scoped CSS (`Landing.css`, `LoginGate.css`), which is the lower-risk location flagged as acceptable. Build is green and the marketing CSS defines its own `[data-theme="dark"]` variants, so dark-mode legibility is not broken. **Advisory (non-blocking):** several literal hexes DUPLICATE existing tokens and should prefer the token for drift-resistance:
+   - `#1c1b19` = `--ink` (light) — `Landing.css:70,106,153,161,396,450,505,532`.
+   - `#e9edf3` = `--ink` (dark) — `Landing.css:111,169`; `LoginGate.css:50,60,74`.
+   - `#57534a` = `--ink-soft` (light) — `Landing.css:127`.
+   - `#97a3b6` = `--ink-soft` (dark) — `Landing.css:133`.
+   - `#41526e` = `--denim` (light) — `Landing.css:92,116`.
+   - `#93a7d6` = `--denim` (dark) — `Landing.css:97,120`.
+   - `#ece7d8` = `--paper` (light) — referenced in `Landing.css:454` (`#ece7d8`).
+   - `#1d2430` = `--window` (dark) — `Landing.css:576`.
+     Note `#1d2634` (`Landing.css:576`/`LoginGate.css:35`) is NOT a token (distinct from `--window` `#1d2430`) — that one is a genuine marketing-only shade, fine as a literal. **Fix (optional, low priority):** swap the duplicating literals above for their `var(--*)` token. Not a blocker — marketing-scoped, dark mode holds, build green.
+
+6. **Copy rules — PASS on Title Case; advisory on em-dashes.** Landing/Login headings are Title Case (`Every Tax Figure, Cited and Verified.`, `Three Consoles. One Sovereign Stack.`, `Built for Malaysia. Verified at Every Step.`, `Welcome`). **Advisory (non-blocking):** em-dashes (`—`) appear in Landing body/mock copy at `Landing.tsx:17,61,62,102,107`. The task brief asks for none in user-facing landing copy; however the **pre-existing codebase already uses em-dashes in user-facing copy** (e.g. the rendered `AppShell.tsx:27` "DEMO MODE — running on seeded fixtures" banner; Dashboard has 5). So this matches the established repo convention rather than introducing a new inconsistency. If the no-em-dash rule is to be enforced, apply it repo-wide (separate task); replacing here only would diverge from the live shell. Not a blocker.
+
+### Findings summary
+
+- **Critical / Major:** none.
+- **Minor (advisory, optional):**
+  - `Landing.css` / `LoginGate.css` (lines listed in focus #5) — literal hexes duplicating `--ink`/`--ink-soft`/`--denim`/`--paper`/`--window`; prefer the `var(--*)` token. Marketing-scoped, dark mode holds, not blocking.
+  - `Landing.tsx:17,61,62,102,107` — em-dashes in user-facing copy; consistent with existing repo convention (AppShell/Dashboard already use them). Address repo-wide if enforcing the rule, not piecemeal.
+- **Informational:** `MarketingShell.tsx:51` uses an inline `style={{...}}` on the footer meta — identical to the existing `AppShell.tsx:252` footer pattern (same markup), so it matches existing style, not a new smell.
+
+### Verified clean (no action)
+
+- Route groups are non-overlapping; `*` 404 stays under AppShell; no double-shell rendering; no leftover `/`→hub redirect.
+- No auth guard blocks deep-linking; guest flag is write-only.
+- All new imports used; `tsc`/`biome`/`build` all green.
+- `tokens.css` + `AppShell.css` untouched — no shared-surface color pollution.
+
+**Return to PM:** **Approve.** Wave 3 entry-journey is non-regressive — the dashboard hub and all consoles are byte-for-byte unchanged and simply relocated to `/dashboard`, routing is correct with two clean non-overlapping shell groups, there is no hard auth guard (guest flag is write-only, deep-linking works), and all internal links repoint correctly with no dead `/`-hub links. All three gates green (tsc 0 · build 59 modules · biome 0). The only findings are two **non-blocking advisories** — marketing-scoped literal hexes that duplicate existing tokens (prefer `var(--*)`), and em-dashes in landing copy that match the existing repo convention. Ready for Gate-2 commit authorization; the advisories can be folded into a follow-up polish task.

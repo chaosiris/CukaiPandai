@@ -283,6 +283,23 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 ---
 
+### Redesign Wave 3 — Entry Journey: Landing + Auth/Guest Gate `[FE]`
+
+**Purpose:** Add the public marketing front door (landing → guest gate → dashboard), mirroring Layak's entry journey and ProofRank's editorial style + 50:50 auth split.
+
+- [x] **Routing restructure:** `/` → public `Landing` under `MarketingShell` (no AppShell); `/login` → `LoginGate` under `MarketingShell`; `/dashboard` → Dashboard hub under AppShell; `/obligations`, `/filing`, `/audit-defense` remain under AppShell; in-shell `*` 404 stays.
+- [x] **`MarketingShell`** (`layouts/MarketingShell.tsx` + `MarketingShell.css`): sticky topbar with LogoMark + wordmark + theme toggle + "Get Started" → `/login` CTA; fixed denim footer (reuses `app-footer` visual via `.marketing-footer`); grid-paper background; light + dark mode.
+- [x] **`Landing`** (`pages/Landing.tsx` + `Landing.css`): pinned hero (gradient denim background, cream overlay left), "how it works" 3-step scrolling section keyed to the three consoles with live mock UI panels, sovereignty/trust section (fixed dark band, 4 trust cards: sovereign inference · deterministic gate · decision-support · YA2026-sourced), finale CTA to `/login`. No fabricated pricing, metrics, or testimonials.
+- [x] **`LoginGate`** (`pages/LoginGate.tsx` + `LoginGate.css`): 50:50 split — left denim hero (wordmark + tagline + Caveat script + mono footer), right cream form panel with "Continue as Guest →" (navigates to `/dashboard`, sets `localStorage` flag) + disabled/placeholder SSO + email fields labeled "coming soon". No real auth backend.
+- [x] **AppShell internal links updated:** brand-lockup topbar link `to="/"` → `to="/dashboard"`, drawer brand link `to="/"` → `to="/dashboard"`, drawer "Dashboard" NavLink `to="/"` → `to="/dashboard"`.
+- [x] **No hard auth guard** — all app routes (`/dashboard`, `/obligations`, `/filing`, `/audit-defense`) remain directly accessible for judges deep-linking; landing + login are the presented front door only.
+- [x] Verified: `bunx tsc --noEmit` clean, `bun run build` green (59 modules), `bunx biome check frontend/src` 0 errors.
+- [x] Dark mode: landing hero/sections use `[data-theme="dark"]` ramps; login gate denim panel adapts; all tokens only (no literal hex outside fixed dark-band sections that intentionally don't invert).
+
+**Acceptance criteria met:** `/` shows the landing; "Get Started" → `/login`; "Continue as Guest" → `/dashboard`; the three consoles + persona switching still work; drawer Dashboard link goes to `/dashboard`; bad URL hits in-shell 404; dark mode works across landing + auth + app.
+
+---
+
 ### FE-7 `[FE]` — Styling pass to the devkit design tokens _(polish; cut candidate)_
 
 **Implementation:**

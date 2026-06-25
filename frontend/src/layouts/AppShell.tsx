@@ -24,7 +24,7 @@ function DemoModeBanner() {
         letterSpacing: '0.04em'
       }}
     >
-      DEMO MODE — running on seeded fixtures (Acme · Sinar Digital · Selera Kita)
+      DEMO MODE: Running on Seeded Fixtures (Acme · Sinar Digital · Selera Kita)
     </div>
   )
 }
@@ -88,7 +88,7 @@ export function AppShell() {
             </button>
 
             {/* Brand lockup */}
-            <Link className="brand-lockup" to="/" aria-label="CukaiPandai dashboard">
+            <Link className="brand-lockup" to="/dashboard" aria-label="CukaiPandai dashboard">
               <LogoMark />
               <span className="topbar-wordmark">CukaiPandai</span>
             </Link>
@@ -173,7 +173,7 @@ export function AppShell() {
                       disabled
                       style={{ opacity: 0.4, cursor: 'default' }}
                     >
-                      Settings — Wave 2
+                      Settings (Wave 2)
                     </button>
                   </div>
                 )}
@@ -198,7 +198,12 @@ export function AppShell() {
         />
         <aside className="window nav-drawer" id="cp-drawer" aria-label="CukaiPandai navigation">
           <div className="drawer-head">
-            <Link className="brand-lockup drawer-brand" to="/" aria-label="CukaiPandai dashboard" onClick={closeDrawer}>
+            <Link
+              className="brand-lockup drawer-brand"
+              to="/dashboard"
+              aria-label="CukaiPandai dashboard"
+              onClick={closeDrawer}
+            >
               <LogoMark />
               <span className="drawer-wordmark">CukaiPandai</span>
             </Link>
@@ -223,10 +228,10 @@ export function AppShell() {
 
             <div className="drawer-section">
               <div className="drawer-section-title">Workspace</div>
-              <NavLink className={drawerLinkClass} to="/" end onClick={closeDrawer}>
+              <NavLink className={drawerLinkClass} to="/dashboard" end onClick={closeDrawer}>
                 Dashboard
               </NavLink>
-              <div className="drawer-placeholder">Settings — Wave 2</div>
+              <div className="drawer-placeholder">Settings (Wave 2)</div>
             </div>
           </nav>
         </aside>

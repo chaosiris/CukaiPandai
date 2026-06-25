@@ -8,7 +8,7 @@ const CARDS = [
   {
     to: '/obligations',
     title: 'Obligation Calendar',
-    desc: 'YA2026 deadlines derived from your entity profile — Form C, CP204, SST, and more.',
+    desc: 'YA2026 deadlines derived from your entity profile: Form C, CP204, SST, and more.',
     kicker: 'Deterministic · LHDN-sourced'
   },
   {
@@ -233,7 +233,7 @@ function SnapshotPanel() {
           label: 'Basis period',
           value: entity.basis_period_start
             ? `${formatDate(entity.basis_period_start)} – ${formatDate(entity.basis_period_end)}`
-            : '—'
+            : 'N/A'
         },
         { label: 'Employees', value: String(entity.employee_count) },
         { label: 'Paid-up capital', value: fmtRM(entity.paid_up_capital) }
@@ -346,7 +346,7 @@ function SnapshotPanel() {
 // ---- Trust strip ----
 
 const TRUST_ITEMS = [
-  { tag: 'Sovereign', detail: 'ILMU nemo-super — 100% in-country inference, no data leaves Malaysia' },
+  { tag: 'Sovereign', detail: 'ILMU nemo-super: 100% in-country inference, no data leaves Malaysia.' },
   { tag: 'Cited', detail: 'Every figure traces to ITA 1967 rule_id + config_version; no invented numbers' },
   { tag: 'Audit-ready', detail: 'ground_citation gate rejects fabricated clause IDs before they reach the FE' }
 ]
