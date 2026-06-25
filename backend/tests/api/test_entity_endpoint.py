@@ -18,3 +18,23 @@ def test_get_entity_returns_seeded_profile():
 def test_get_entity_unknown_tin_404():
     r = TestClient(app).get("/entities/C0000000000")
     assert r.status_code == 404
+
+
+def test_get_entity_sinar():
+    """FE-8 — Sinar Digital persona is reachable."""
+    r = TestClient(app).get("/entities/C7654321098")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tin"] == "C7654321098"
+    assert body["msic_codes"] == ["62010"]
+    assert body["gross_income"] == 380_000
+
+
+def test_get_entity_selera():
+    """FE-8 — Restoran Selera Kita persona is reachable."""
+    r = TestClient(app).get("/entities/C3219876540")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tin"] == "C3219876540"
+    assert body["msic_codes"] == ["56101"]
+    assert body["employee_count"] == 45

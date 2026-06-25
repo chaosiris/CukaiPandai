@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { type AuditDefenseResponse, getAuditDefense } from '../api/client'
 import { CitationPanel, SovereignBadge } from '../components/CitationPanel'
 import { useEntity } from '../hooks/useEntity'
@@ -17,6 +17,14 @@ export default function AuditDefense() {
   const [loading, setLoading] = useState(false)
   const [activeQuery, setActiveQuery] = useState<'demo' | 'fabrication' | null>(null)
   const [technicalOpen, setTechnicalOpen] = useState(false)
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
+  useEffect(() => {
+    setData(null)
+    setError(null)
+    setActiveQuery(null)
+    setTechnicalOpen(false)
+  }, [entity?.tin])
 
   const displayError = entityError ?? error
 

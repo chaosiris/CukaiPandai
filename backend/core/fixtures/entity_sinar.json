@@ -1,0 +1,12 @@
+{
+  "tin": "C7654321098",
+  "entity_type": "sdn_bhd",
+  "msic_codes": ["62010"],
+  "paid_up_capital": 100000,
+  "gross_income": 380000,
+  "employee_count": 3,
+  "sst_registered": false,
+  "basis_period_start": "2025-01-01",
+  "basis_period_end": "2025-12-31",
+  "commencement_date": "2022-04-01"
+}

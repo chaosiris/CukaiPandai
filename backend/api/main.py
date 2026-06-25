@@ -55,10 +55,14 @@ app.add_middleware(
 _CORPUS = LawCorpus.load(Path("core/fixtures/lawcorpus_seed.json"))
 
 # Seeded entity profiles, keyed by TIN (BE-8; BE-17 later moves this behind a Neon repository
-# with this fixture as the fallback). Extend with FE-8 personas as more fixtures land.
+# with this fixture as the fallback). FE-8 personas: Acme + Sinar + Selera.
 _ENTITIES: dict[str, dict] = {
     e["tin"]: e
-    for e in [json.loads(Path("core/fixtures/entity_acme.json").read_text(encoding="utf-8"))]
+    for e in [
+        json.loads(Path("core/fixtures/entity_acme.json").read_text(encoding="utf-8")),
+        json.loads(Path("core/fixtures/entity_sinar.json").read_text(encoding="utf-8")),
+        json.loads(Path("core/fixtures/entity_selera.json").read_text(encoding="utf-8")),
+    ]
 }
 # BE-17: reads from Neon when DATABASE_URL is set, else from the fixtures above (fallback).
 _ENTITY_REPO = EntityRepository(_ENTITIES)

@@ -1,12 +1,16 @@
 // Shared hook — all three consoles call this to get the active entity profile.
 // Replaces the divergent page-local DEMO_SSM stubs (FQ4 / [DRIFT] #3).
-// The canonical demo TIN is ACME_TIN from client.ts; the profile is fetched via getEntity
-// so mock and live modes agree on the seeded Acme values.
+// FE-8: reads the active persona's TIN from PersonaContext so switching the picker
+// re-renders all three consoles against the chosen entity.
 
 import { useEffect, useState } from 'react'
-import { ACME_TIN, type EntityTaxProfile, getEntity } from '../api/client'
+import { useActivePersona } from '../PersonaContext'
+import { type EntityTaxProfile, getEntity } from '../api/client'
 
-export function useEntity(tin: string = ACME_TIN) {
+export function useEntity(tin?: string) {
+  const { persona } = useActivePersona()
+  const resolvedTin = tin ?? persona.tin
+
   const [entity, setEntity] = useState<EntityTaxProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -14,7 +18,7 @@ export function useEntity(tin: string = ACME_TIN) {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    getEntity(tin)
+    getEntity(resolvedTin)
       .then((e) => {
         setEntity(e)
         setLoading(false)
@@ -23,7 +27,7 @@ export function useEntity(tin: string = ACME_TIN) {
         setError(err.message)
         setLoading(false)
       })
-  }, [tin])
+  }, [resolvedTin])
 
   return { entity, error, loading }
 }
