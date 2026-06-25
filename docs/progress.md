@@ -657,3 +657,17 @@ CukaiPandai/
 - **PersonaContext:** Exports `DEFAULT_PERSONA_KEY` constant; initial state reads from `localStorage` so persisted default survives reload.
 - **Build:** `bunx tsc --noEmit` clean; `bun run build` green (61 modules); `bunx biome check frontend/src` 0 errors (24 files checked).
 - **Files touched:** `frontend/src/PersonaContext.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/App.tsx`, `frontend/src/pages/Settings.tsx` (new), `frontend/src/pages/Settings.css` (new), `docs/progress.md`.
+
+---
+
+## [25/06/26] — Wave A auth rework: /sign-in, /sign-up, /privacy `[FE]`
+
+- **Routes:** Replaced `/login` → `/sign-in` + `/sign-up` (both standalone, outside MarketingShell so the 50:50 grid is truly full-screen with no constrained-padding wrapper). `/login` now redirects to `/sign-in` via `<Navigate replace>` so no dead links ever 404. `/privacy` added inside MarketingShell (public, topbar + footer).
+- **Split fix:** Root cause of the broken partition was the auth page rendering inside `.marketing-main` (constrained to `min(1440px, 100vw - 28px)` with 30px top padding and 144px bottom padding). Fix: auth routes are now **outside** MarketingShell entirely, matching ProofRank's pattern. `AuthScreen.tsx` + `Auth.css` own a clean `min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr` — no breakout hacks needed.
+- **New files:** `frontend/src/pages/AuthScreen.tsx` (shared component, `mode: 'sign-in' | 'sign-up'`), `frontend/src/pages/Auth.css`, `frontend/src/pages/SignIn.tsx`, `frontend/src/pages/SignUp.tsx`, `frontend/src/pages/Privacy.tsx`, `frontend/src/pages/Privacy.css`.
+- **SSO + email:** Both remain disabled "coming soon" placeholders. "Continue as Guest" sets `cp_entered_as_guest` and navigates to `/dashboard`.
+- **Privacy page:** CukaiPandai-appropriate copy (sovereign inference, fixture-only demo, citation gate, PDPA 2010 rights, decision-support disclaimer). Linked from auth screen "By continuing you agree to our Privacy Policy" and from marketing footer.
+- **Tagline removed from auth:** "YA2026 · decision-support, not legal advice." removed from auth screen (was `lg-legal`). It remains in the MarketingShell footer and Settings about section.
+- **Link updates:** Landing "Get Started" + "Open the Demo" → `/sign-in`; MarketingShell "Get Started" CTA → `/sign-in`; footer gains "Privacy" → `/privacy` link. Old `LoginGate.tsx`/`LoginGate.css` remain on disk (no longer imported or routed; can be cleaned up later).
+- **Dark mode:** `Auth.css` uses only design tokens (`--denim`, `--paper`, `--ink`, `--mustard`, `--window`, `--screen`, `--border`, `--shadow`, `--radius`, font vars). No literal hex. Tokens switch automatically under `[data-theme="dark"]`.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (65 modules); `bunx biome check frontend/src` 0 errors (30 files).

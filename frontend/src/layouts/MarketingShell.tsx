@@ -25,7 +25,7 @@ export function MarketingShell() {
               >
                 <ThemeIcon theme={theme} />
               </button>
-              <Link className="marketing-cta" to="/login">
+              <Link className="marketing-cta" to="/sign-in">
                 Get Started
               </Link>
             </div>
@@ -47,6 +47,7 @@ export function MarketingShell() {
             <a href="https://github.com/AlaskanTuna/CukaiPandai" target="_blank" rel="noreferrer">
               GitHub
             </a>
+            <Link to="/privacy">Privacy</Link>
           </nav>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, opacity: 0.7 }}>
             YA2026 · decision-support, not legal advice
