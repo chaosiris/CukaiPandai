@@ -106,6 +106,8 @@ test ─────────────────────────
 
 **Gitleaks false positive:** a `gitleaks` scan over full history is clean. The single `generic-api-key` hit at `docs/plan.md:292` is a verified false positive — it is prose referring to "psycopg/SQLAlchemy over the Postgres connection string", not a credential.
 
+**GitHub Environments:** the `deploy-frontend` and `deploy-backend` jobs target GitHub Environments (`production` → Vercel, `backend` → Render), so the repo's Deployments panel and Settings → Environments section populate automatically on each push-to-main deploy run.
+
 ---
 
 ## 5. Deployment
