@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { LogoMark, ProfileIcon, ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
@@ -35,6 +35,7 @@ export function AppShell() {
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona } = useActivePersona()
+  const navigate = useNavigate()
 
   // Close drawer on Escape
   useEffect(() => {
@@ -151,7 +152,7 @@ export function AppShell() {
                 ))}
               </select>
 
-              {/* Profile placeholder */}
+              {/* Profile */}
               <div className="topbar-control">
                 <button
                   className="icon-button topbar-control-button"
@@ -172,10 +173,23 @@ export function AppShell() {
                     <button
                       className="popover-action"
                       type="button"
-                      disabled
-                      style={{ opacity: 0.4, cursor: 'default' }}
+                      onClick={() => {
+                        setProfileOpen(false)
+                        navigate('/settings')
+                      }}
                     >
-                      Settings (Wave 2)
+                      Settings
+                    </button>
+                    <button
+                      className="popover-action"
+                      type="button"
+                      onClick={() => {
+                        setProfileOpen(false)
+                        window.localStorage.removeItem('cp_entered_as_guest')
+                        navigate('/')
+                      }}
+                    >
+                      Sign Out
                     </button>
                   </div>
                 )}
@@ -216,6 +230,13 @@ export function AppShell() {
 
           <nav className="drawer-nav">
             <div className="drawer-section">
+              <div className="drawer-section-title">Workspace</div>
+              <NavLink className={drawerLinkClass} to="/dashboard" end onClick={closeDrawer}>
+                Dashboard
+              </NavLink>
+            </div>
+
+            <div className="drawer-section">
               <div className="drawer-section-title">Compliance</div>
               <NavLink className={drawerLinkClass} to="/obligations" onClick={closeDrawer}>
                 Obligations
@@ -226,14 +247,6 @@ export function AppShell() {
               <NavLink className={drawerLinkClass} to="/audit-defense" onClick={closeDrawer}>
                 Audit Defense
               </NavLink>
-            </div>
-
-            <div className="drawer-section">
-              <div className="drawer-section-title">Workspace</div>
-              <NavLink className={drawerLinkClass} to="/dashboard" end onClick={closeDrawer}>
-                Dashboard
-              </NavLink>
-              <div className="drawer-placeholder">Settings (Wave 2)</div>
             </div>
           </nav>
         </aside>
