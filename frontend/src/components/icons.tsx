@@ -56,6 +56,20 @@ export function ThemeIcon({ theme }: { theme: Theme }) {
   )
 }
 
+export function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3a6 6 0 0 1 6 6v4l1.5 2.5H4.5L6 13V9a6 6 0 0 1 6-6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+      />
+      <path d="M10 18a2 2 0 0 0 4 0" fill="none" stroke="currentColor" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function ProfileIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">

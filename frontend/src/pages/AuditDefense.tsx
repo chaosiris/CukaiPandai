@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { type AuditDefenseResponse, getAuditDefense } from '../api/client'
 import { CitationPanel, SovereignBadge } from '../components/CitationPanel'
 import { useEntity } from '../hooks/useEntity'
+import { useNotifications } from '../notifications'
 
 const DEMO_QUERY = 'Justify your RM4,800 repairs deduction'
 const DEMO_EVIDENCE: [string, string][] = [['invoice', 'INV-2025-0042: Office plumbing repair RM4,800']]
@@ -17,6 +18,7 @@ export default function AuditDefense() {
   const [loading, setLoading] = useState(false)
   const [activeQuery, setActiveQuery] = useState<'demo' | 'fabrication' | null>(null)
   const [technicalOpen, setTechnicalOpen] = useState(false)
+  const { notify } = useNotifications()
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
   useEffect(() => {
@@ -41,6 +43,16 @@ export default function AuditDefense() {
       .then((res) => {
         setData(res)
         setLoading(false)
+        if (mode === 'fabrication') {
+          const rejected = res.citations.filter((c) => !c.verified)
+          if (rejected.length > 0) {
+            notify({
+              title: 'Fabricated Citation Rejected',
+              body: `Deterministic gate blocked ${rejected.length} unverified clause${rejected.length !== 1 ? 's' : ''}.`,
+              kind: 'error'
+            })
+          }
+        }
       })
       .catch((e: Error) => {
         setError(e.message)

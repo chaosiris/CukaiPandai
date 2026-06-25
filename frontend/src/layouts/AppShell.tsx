@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
-import { LogoMark, ProfileIcon, ThemeIcon } from '../components/icons'
+import { type SsmProfile, getObligations } from '../api/client'
+import { BellIcon, LogoMark, ProfileIcon, ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
+import { type NotifKind, useNotifications } from '../notifications'
 import { PERSONAS } from '../personas'
 
 const isMock = import.meta.env.VITE_API_MOCK === '1'
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === '1'
 
 const drawerLinkClass = ({ isActive }: { isActive: boolean }) => `drawer-link${isActive ? ' is-active' : ''}`
+
+type TopbarPopover = 'notifications' | 'profile' | null
 
 function DemoModeBanner() {
   if (!isDemoMode) return null
@@ -29,13 +33,61 @@ function DemoModeBanner() {
   )
 }
 
+function relativeTime(ts: number): string {
+  const seconds = Math.round((Date.now() - ts) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  return `${Math.round(minutes / 60)}h ago`
+}
+
+function kindDotColor(kind: NotifKind): string {
+  if (kind === 'error') return 'var(--rust)'
+  if (kind === 'warning') return 'var(--mustard)'
+  if (kind === 'success') return 'var(--mustard)'
+  return 'var(--denim)'
+}
+
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [activePopover, setActivePopover] = useState<TopbarPopover>(null)
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona } = useActivePersona()
   const navigate = useNavigate()
+  const { notifications, unreadCount, markAllRead, dismiss, seedDeadlines, notify } = useNotifications()
+
+  // Track previous persona TIN to detect genuine switches (not initial mount)
+  const prevTinRef = useRef<string | null>(null)
+  // Track whether we've seeded for the current TIN
+  const seededTinRef = useRef<string | null>(null)
+
+  // Seed deadline notifications when entity changes
+  useEffect(() => {
+    const tin = persona.tin
+    const ssm: SsmProfile = persona.ssm
+
+    // Fire persona-switch toast when TIN actually changes (not on mount)
+    if (prevTinRef.current !== null && prevTinRef.current !== tin) {
+      notify({ title: 'Entity Switched', body: `Now viewing ${persona.label}`, kind: 'info' })
+      // Clear seeded keys so the new persona's deadlines are fresh
+      ;(seedDeadlines as unknown as { _clearSeeds?: () => void })._clearSeeds?.()
+      seededTinRef.current = null
+    }
+    prevTinRef.current = tin
+
+    // Only seed once per TIN
+    if (seededTinRef.current === tin) return
+    seededTinRef.current = tin
+
+    getObligations(tin, ssm)
+      .then((cal) => {
+        seedDeadlines(cal.obligations)
+      })
+      .catch(() => {
+        // Silently ignore — don't spam toasts for network errors
+      })
+  }, [persona.tin, persona.label, persona.ssm, seedDeadlines, notify])
 
   // Close drawer on Escape
   useEffect(() => {
@@ -47,15 +99,15 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', handler)
   }, [drawerOpen])
 
-  // Close profile popover on Escape or outside click
+  // Close active popover on Escape or outside click
   useEffect(() => {
-    if (!profileOpen) return
+    if (!activePopover) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setProfileOpen(false)
+      if (e.key === 'Escape') setActivePopover(null)
     }
     const onOutside = (e: PointerEvent) => {
       if (e.target instanceof Node && !topbarControlsRef.current?.contains(e.target)) {
-        setProfileOpen(false)
+        setActivePopover(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -64,9 +116,24 @@ export function AppShell() {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('pointerdown', onOutside)
     }
-  }, [profileOpen])
+  }, [activePopover])
 
   const closeDrawer = () => setDrawerOpen(false)
+
+  function toggleNotifications() {
+    setActivePopover((prev) => {
+      const next = prev === 'notifications' ? null : 'notifications'
+      if (next === 'notifications') {
+        // Mark all read when the dropover opens
+        markAllRead()
+      }
+      return next
+    })
+  }
+
+  function toggleProfile() {
+    setActivePopover((prev) => (prev === 'profile' ? null : 'profile'))
+  }
 
   return (
     <>
@@ -74,7 +141,7 @@ export function AppShell() {
         <DemoModeBanner />
         <header className="topbar">
           <div className="topbar-inner">
-            {/* Hamburger — opens slide-in drawer */}
+            {/* Hamburger */}
             <button
               className="icon-button"
               type="button"
@@ -96,7 +163,7 @@ export function AppShell() {
 
             <span className="topbar-spacer" />
 
-            {/* Topbar controls: MOCK chip · theme toggle · entity switcher · profile */}
+            {/* Topbar controls */}
             <div className="topbar-controls" ref={topbarControlsRef}>
               {isMock && (
                 <span
@@ -124,7 +191,7 @@ export function AppShell() {
                 <ThemeIcon theme={theme} />
               </button>
 
-              {/* Entity switcher — styled select writing to the same PersonaContext */}
+              {/* Entity switcher */}
               <select
                 className="topbar-entity-select"
                 value={persona.tin}
@@ -152,19 +219,75 @@ export function AppShell() {
                 ))}
               </select>
 
+              {/* Bell notifications */}
+              <div className="topbar-control">
+                <button
+                  className="icon-button topbar-control-button"
+                  type="button"
+                  aria-label="Notifications"
+                  aria-expanded={activePopover === 'notifications'}
+                  aria-controls="cp-notifications-popover"
+                  onClick={toggleNotifications}
+                  style={{ position: 'relative' }}
+                >
+                  <BellIcon />
+                  {unreadCount > 0 && <span className="topbar-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                </button>
+
+                {activePopover === 'notifications' && (
+                  <div className="window topbar-popover" id="cp-notifications-popover">
+                    <div className="popover-title">
+                      <span>Notifications</span>
+                      {notifications.length > 0 && (
+                        <button
+                          type="button"
+                          className="popover-clear"
+                          onClick={() => {
+                            for (const n of notifications) dismiss(n.id)
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    {notifications.length === 0 ? (
+                      <div className="popover-empty">No notifications.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 0, maxHeight: 320, overflowY: 'auto' }}>
+                        {notifications.map((n) => (
+                          <div key={n.id} className="popover-item" style={{ opacity: n.read ? 0.6 : 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span
+                                className="notif-kind-dot"
+                                style={{ background: kindDotColor(n.kind) }}
+                                aria-hidden="true"
+                              />
+                              <strong>{n.title}</strong>
+                            </div>
+                            {n.body && <span className="popover-detail">{n.body}</span>}
+                            <span className="popover-time">{relativeTime(n.ts)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Profile */}
               <div className="topbar-control">
                 <button
                   className="icon-button topbar-control-button"
                   type="button"
                   aria-label="Profile"
-                  aria-expanded={profileOpen}
+                  aria-expanded={activePopover === 'profile'}
                   aria-controls="cp-profile-popover"
-                  onClick={() => setProfileOpen((o) => !o)}
+                  onClick={toggleProfile}
                 >
                   <ProfileIcon />
                 </button>
-                {profileOpen && (
+                {activePopover === 'profile' && (
                   <div className="window topbar-popover" id="cp-profile-popover">
                     <div className="profile-summary">
                       <strong>{persona.label}</strong>
@@ -174,7 +297,7 @@ export function AppShell() {
                       className="popover-action"
                       type="button"
                       onClick={() => {
-                        setProfileOpen(false)
+                        setActivePopover(null)
                         navigate('/settings')
                       }}
                     >
@@ -184,7 +307,7 @@ export function AppShell() {
                       className="popover-action"
                       type="button"
                       onClick={() => {
-                        setProfileOpen(false)
+                        setActivePopover(null)
                         window.localStorage.removeItem('cp_entered_as_guest')
                         navigate('/')
                       }}
@@ -224,7 +347,7 @@ export function AppShell() {
               <span className="drawer-wordmark">CukaiPandai</span>
             </Link>
             <button className="drawer-close" type="button" aria-label="Close navigation" onClick={closeDrawer}>
-              ×
+              x
             </button>
           </div>
 

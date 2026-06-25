@@ -660,6 +660,22 @@ CukaiPandai/
 
 ---
 
+## [25/06/26] — Wave B notification system: bell + toasts `[FE]`
+
+- **Provider (`frontend/src/notifications.tsx`):** `NotificationProvider` holds bell list (`AppNotification[]`) + transient toasts (`TransientToast[]`). Two public callsites: `notify()` pushes to the bell AND fires a 4s auto-dismiss toast; `toast()` fires a transient toast only (no bell entry). `markAllRead()` marks all unread, `dismiss(id)` removes from the list. `seedDeadlines()` accepts an obligations array and adds bell entries for overdue (`error`) and due-within-30d (`warning`) items, keyed by `form:due_date` to prevent re-fire on re-render. A `_clearSeeds` escape hatch resets the seeded keys when the persona changes. `unreadCount` is derived. `<ToastContainer>` renders inside the provider, fixed top-right, z-index 200. All colors are tokens (`var(--rust)`, `var(--mustard)`, `var(--denim)`).
+- **BellIcon (`frontend/src/components/icons.tsx`):** Added `BellIcon` SVG component matching devkit style.
+- **Toast CSS (`frontend/src/styles/tokens.css`):** Added `.toast-container`, `.toast-item` (left `3px` border accent), `.toast-header`, `.toast-kind`, `.toast-title`, `.toast-close`, `.toast-body`, `@keyframes toast-in`, `.notif-kind-dot`, `.popover-detail`. All token-only; legible in light + dark.
+- **App.tsx:** Wrapped `<BrowserRouter>` in `<NotificationProvider>` (inside `<ActivePersonaProvider>`).
+- **AppShell.tsx:** Replaced `profileOpen: boolean` with `activePopover: TopbarPopover` (`'notifications' | 'profile' | null`) so bell and profile popover are mutually exclusive. Bell button added between entity switcher and profile — `topbar-control-button`, `topbar-badge` for `unreadCount`. Notifications dropover lists items newest-first with a kind dot, title, optional body, relative time. "Clear all" dismisses all. Opening the dropover marks all read (badge clears). Escape + outside-click close both popovers. On mount, calls `getObligations` for the active persona and seeds deadline notifications (once per TIN). On persona switch, calls `notify()` for an "Entity Switched" toast, clears seeded keys, then re-seeds for the new persona. No toast loop: seeded-set guard + seededTinRef ensure exactly one seed call per TIN per session.
+- **FilingStudio.tsx:** `handleApprove(true)` calls `notify({ title: 'Filing Finalized', kind: 'success' })`; `handleApprove(false)` calls `notify({ title: 'Filing Returned', kind: 'warning' })`.
+- **AuditDefense.tsx:** After `getAuditDefense` resolves in `'fabrication'` mode, if any citations are unverified calls `notify({ title: 'Fabricated Citation Rejected', kind: 'error' })` — the deterministic gate trust money-shot surfaced as a toast.
+- **Settings.tsx:** `handleDefaultPersonaChange` calls `toast({ title: 'Default Entity Updated', kind: 'info' })` on save.
+- **Non-regression:** profile popover path preserved; entity switcher unchanged; AppShell guest flow unchanged; ObligationRadar, Dashboard, NotFound, Landing, Auth pages untouched.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (66 modules, 1.87s); `bunx biome check frontend/src` 0 errors (29 files checked).
+- **Files touched:** `frontend/src/notifications.tsx` (new), `frontend/src/components/icons.tsx`, `frontend/src/styles/tokens.css`, `frontend/src/App.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/pages/FilingStudio.tsx`, `frontend/src/pages/AuditDefense.tsx`, `frontend/src/pages/Settings.tsx`, `docs/progress.md`.
+
+---
+
 ## [25/06/26] — Wave A auth rework: /sign-in, /sign-up, /privacy `[FE]`
 
 - **Routes:** Replaced `/login` → `/sign-in` + `/sign-up` (both standalone, outside MarketingShell so the 50:50 grid is truly full-screen with no constrained-padding wrapper). `/login` now redirects to `/sign-in` via `<Navigate replace>` so no dead links ever 404. `/privacy` added inside MarketingShell (public, topbar + footer).
