@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
+import { JourneyStrip } from '../components/JourneyProgress'
 import { useEntity } from '../hooks/useEntity'
 
 function greeting(): string {
@@ -130,8 +131,8 @@ function PrimaryAction({ lead, overdueCount }: HeroProps) {
       </div>
 
       <div className="dash-hero-rail">
-        <span className="dash-hero-rail-label">{lead.rule_id}</span>
-        <span className="dash-hero-rail-label">{lead.config_version}</span>
+        <span className="dash-hero-rail-label">YA2026</span>
+        <span className="dash-hero-rail-label">LHDN-sourced</span>
       </div>
     </div>
   )
@@ -143,7 +144,7 @@ const PRIMARY_CONSOLE = {
   to: '/filing',
   title: 'Cited Form C Filing',
   desc: 'Classify your trial balance and step through the human-approval gate to a cited Form C.',
-  kicker: 'HITL · ILMU nemo-super'
+  kicker: 'Review and Approve · ILMU nemo-super'
 }
 
 const SECONDARY_CONSOLES = [
@@ -262,11 +263,6 @@ function DeadlinesPanel({
                   <div>
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
                       {ob.obligation_type.replace(/_/g, ' ')}
-                    </div>
-                    <div
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 2 }}
-                    >
-                      {ob.rule_id} · {ob.config_version}
                     </div>
                   </div>
 
@@ -423,21 +419,6 @@ function SnapshotPanel() {
           </ul>
         </>
       )}
-
-      <div
-        style={{
-          padding: '9px 18px',
-          borderTop: 'var(--border)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          color: 'var(--ink-soft)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.07em',
-          marginTop: 'auto'
-        }}
-      >
-        Seeded · BE-8 / getEntity
-      </div>
     </div>
   )
 }
@@ -453,28 +434,53 @@ function StatusSummary({ calendar, loading }: { calendar: ObligationCalendar | n
     .sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
 
   return (
-    <div className="dash-summary">
-      <span>
-        <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
-      </span>
-      <span className="dash-summary-sep">·</span>
-      <span className={overdue > 0 ? 'dash-summary-alert' : undefined}>
-        <strong>{overdue}</strong> overdue
-      </span>
-      {upcoming && (
-        <>
-          <span className="dash-summary-sep">·</span>
-          <span>next due {formatDate(upcoming.due_date)}</span>
-        </>
+    <div>
+      <div className="dash-summary">
+        <span>
+          <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
+        </span>
+        <span className="dash-summary-sep">·</span>
+        <span className={overdue > 0 ? 'dash-summary-alert' : undefined}>
+          <strong>{overdue}</strong> overdue
+        </span>
+        {upcoming && (
+          <>
+            <span className="dash-summary-sep">·</span>
+            <span>next due {formatDate(upcoming.due_date)}</span>
+          </>
+        )}
+      </div>
+      {overdue > 0 && (
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--ink-soft)',
+            marginTop: 4,
+            lineHeight: 1.5
+          }}
+        >
+          Dates shown are for the sample basis period. OVERDUE status reflects the demo clock.
+        </div>
       )}
     </div>
   )
+}
+
+function readJourneyDone(): boolean {
+  try {
+    return localStorage.getItem('cp_journey_done') === '1'
+  } catch {
+    return false
+  }
 }
 
 // ---- Dashboard ----
 
 export default function Dashboard() {
   const { persona } = useActivePersona()
+  const location = useLocation()
+  const journeyDone = readJourneyDone()
   const [calendar, setCalendar] = useState<ObligationCalendar | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -500,6 +506,9 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* JR-4: ①②③ journey progress strip */}
+      <JourneyStrip done={journeyDone} currentRoute={location.pathname} />
+
       <div className="dash-head">
         <h1>{greeting()}</h1>
         <p className="dash-orient">

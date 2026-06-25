@@ -65,7 +65,7 @@ export function Privacy() {
           </p>
           <p>
             This deterministic gate means the system's integrity is auditable, not probabilistic. Users can inspect
-            every rule_id and config_version that produced a figure.
+            every rule reference and version that produced a figure.
           </p>
         </section>
 

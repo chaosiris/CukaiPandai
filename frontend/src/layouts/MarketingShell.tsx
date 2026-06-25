@@ -1,5 +1,5 @@
 import { Link, Outlet } from 'react-router-dom'
-import { LogoMark, ThemeIcon } from '../components/icons'
+import { ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
 import './MarketingShell.css'
 
@@ -12,7 +12,7 @@ export function MarketingShell() {
         <header className="marketing-topbar">
           <div className="marketing-topbar-inner">
             <Link className="brand-lockup marketing-brand" to="/" aria-label="CukaiPandai home">
-              <LogoMark />
+              <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="topbar-wordmark">CukaiPandai</span>
             </Link>
             <div className="marketing-actions">
@@ -40,7 +40,7 @@ export function MarketingShell() {
       <footer className="marketing-footer">
         <div className="footer-inner">
           <div className="footer-brand">
-            <LogoMark />
+            <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
             <span className="footer-wordmark">CukaiPandai</span>
           </div>
           <nav className="footer-links" aria-label="CukaiPandai footer">

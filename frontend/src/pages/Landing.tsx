@@ -23,7 +23,7 @@ const STEPS: Step[] = [
     num: '02',
     label: 'Filing',
     title: 'Cite Every Figure, Every Time',
-    body: 'Paste your raw trial balance. The AI classifies line items, computes Form C, and traces every number to its ITA 1967 rule_id and config_version. You approve before anything is finalised.'
+    body: 'Paste your raw trial balance. The AI classifies line items, computes Form C, and traces every figure back to its ITA 1967 rule and version. You review and approve before anything is finalised.'
   },
   {
     num: '03',

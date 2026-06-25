@@ -732,6 +732,295 @@ CukaiPandai/
 
 ---
 
+## [26/06/26] — JR-1: PersonaContext runtime custom-entity + useEntity local-first resolution `[FE]`
+
+- **What changed:**
+  - `PersonaContext.tsx` extended: added `customPersonas: Persona[]` state seeded from `localStorage` key `cp_custom_entities`; `addCustomPersona(p)` (`useCallback`) upserts into the list, persists to localStorage, and sets the persona active; exposed derived `personas = [...PERSONAS, ...customPersonas]` via context alongside `customPersonas` and `addCustomPersona`. `useMemo` stabilises the context value object. `readDefaultPersona` now receives the merged list so a custom-TIN default survives reload.
+  - `hooks/useEntity.ts` updated: before calling `getEntity`, checks if `resolvedTin` matches any entry in `customPersonas`; if so, returns its `ssm` as `EntityTaxProfile` directly — no network call, no throw in mock mode, no 404 in live mode. Built-in TINs continue through `getEntity` unchanged. `customPersonas` added to the `useEffect` dependency array.
+  - `layouts/AppShell.tsx`: dropped `import { PERSONAS } from '../personas'`; destructures `personas` from `useActivePersona()`; the entity `<select>` `onChange` and `map` now use the context-provided merged list. Side-effects (Entity Switched toast, deadline re-seed) fire for custom entities identically to built-ins — `useEffect` keys on `persona.tin`/`persona.label`/`persona.ssm`, unchanged.
+  - `pages/Settings.tsx`: dropped `import { PERSONAS } from '../personas'`; destructures `personas` from `useActivePersona()`; the default-entity `<select>` and `handleDefaultPersonaChange` use the merged list.
+  - Dashboard: no change needed — uses `useEntity()` which already flows through the updated hook.
+- **JR-Q5 (Sign-Out):** confirmed `AppShell.tsx` Sign-Out only removes `cp_entered_as_guest`; `cp_custom_entities` is NOT cleared — custom entities persist across Sign-Out as decided.
+- **Custom-TIN no-white-screen reasoning:** `useEntity` short-circuits on `customPersonas` match before any `getEntity` call. In mock mode this avoids the `MOCK_ENTITIES` throw (`client.ts:488`); in live mode it avoids the `/entities/{tin}` 404 (`main.py:116-118`). Both the Obligations and Dashboard Entity Snapshot panels consume `useEntity()` — both safe. Filing Studio and Audit Defense pass `ssm` directly from `persona.ssm` (via `useActivePersona`) rather than through `useEntity`, so they are unaffected even without the hook short-circuit.
+- **Build:** `bunx tsc --noEmit` clean (0 errors); `bun run build` green (69 modules, 2.01s); `bunx biome check frontend/src` 0 errors (32 files).
+
+---
+
+## 2026-06-26 [BE] Wave J0 — BE-J1 POST /entities + BE-J2 POST .../documents/upload
+
+**BE-J1 — POST /entities (create + persist custom entity)**
+
+- Added `EntityRepository.create(data)` to `api/persistence.py`: writes to `_fixtures` (in-memory) unconditionally first, then best-effort upsert to Neon (`INSERT ... ON CONFLICT DO UPDATE`); DB errors silently swallowed; DB-down != demo-down guarantee preserved.
+- Added `POST /entities` route to `api/main.py`: validates `req["ssm"]` via existing `_profile()` helper (422 on bad input), calls `_ENTITY_REPO.create()`, returns normalised `EntityTaxProfile.model_dump(mode="json")`. Upsert-safe on duplicate TIN.
+- Tests: `tests/api/test_create_entity_endpoint.py` — 200 create, create->GET round-trip (in-memory fallback, no DATABASE_URL), 422 on bad SSM, upsert on duplicate TIN (4 tests).
+
+**BE-J2 — POST /entities/{tin}/documents/upload (multipart -> extract -> classify)**
+
+- Added `_extract_text(filename, bytes)` helper to `api/main.py`: CSV via stdlib `csv`, XLSX via `openpyxl`, PDF via `pypdf`; raises HTTP 415 on unsupported extension (in-process only, no foreign API).
+- Added `POST /entities/{tin}/documents/upload` route: reads `UploadFile` bytes -> 422 if empty -> `_extract_text` (415 on bad type) -> existing `classify_line_items` -> same `ClassifyResponse` shape as `POST .../documents/classify` including `route_info`; 502-guarded on unparseable model output via `_PARSE_ERRORS`.
+- Added deps to `backend/pyproject.toml`: `pypdf>=4.0`, `openpyxl>=3.1`, `python-multipart>=0.0.9`. Ran `uv lock` -- `uv.lock` updated (+4 packages: pypdf, openpyxl, et-xmlfile, python-multipart).
+- Fixtures: `tests/api/trial_balance.csv`, `tests/api/trial_balance.xlsx`, `tests/api/trial_balance.pdf` (tiny Acme-consistent files).
+- Tests: `tests/api/test_upload_endpoint.py` -- CSV/XLSX/PDF each return valid `ClassifyResponse`; unsupported format -> 415; empty file -> 422 (5 tests).
+
+**Files touched:** `backend/api/main.py`, `backend/api/persistence.py`, `backend/pyproject.toml`, `backend/uv.lock`, `backend/tests/api/test_create_entity_endpoint.py`, `backend/tests/api/test_upload_endpoint.py`, `backend/tests/api/trial_balance.{csv,xlsx,pdf}`.
+
+**pytest result:** 116 passed (was 107; +4 BE-J1 + 5 BE-J2; 0 regressions).
+
+---
+
+## 2026-06-26 [FE] Wave J2 — JR-2 Wizard Chrome + JR-3 Welcome + JR-4 Connective Tissue
+
+**JR-2 — Guided 3-step wizard chrome wrapping the existing consoles**
+
+- Added `frontend/src/layouts/WizardLayout.tsx`: renders INSIDE AppShell (full chrome visible). Mounts existing console components via `<Outlet/>` at `/start/obligations`, `/start/filing`, `/start/audit-defense`. Adds a Step X of 3 progress header (step circles + connector lines, active=mustard, done=denim) + active entity chip + "Skip the tour" inline. Footer has Back (or "Welcome" on step 1) / Skip / Next or "Finish" on step 3. Finish and Skip both set `cp_journey_done` and navigate to `/dashboard`.
+- Added wizard routes to `App.tsx` under `<AppShell/>`: `<Route path="/start" element={<WizardLayout/>}>` nesting `ObligationRadar`, `FilingStudio`, `AuditDefense` at their sub-paths. Standalone `/obligations`, `/filing`, `/audit-defense` routes unchanged.
+- Entity pinning (T2): `WizardLayout` reads `persona` at render; the wizard navigation (Back/Next links) does not change persona. The one acceptable reset is if the user manually switches the topbar entity picker mid-wizard, which is the same behaviour as today on standalone routes.
+
+**JR-3 — First-run welcome screen + journey routing/flags**
+
+- Added `frontend/src/pages/Welcome.tsx`: one-line payoff ("Sovereign, Citation-Grounded Tax Assurance for Malaysian SMEs."), ①②③ journey OUTPUT map (via `JourneyMap`), two on-ramps ("Try Sample Data" with persona picker -> `/start/obligations`; "Use My Own Company" stub with "coming soon" badge pointing to `/start/custom` as JR-6 placeholder), and "Skip to Dashboard" escape hatch (sets `cp_journey_done`, navigates `/dashboard`).
+- Added `/welcome` route to `App.tsx` under `<AppShell/>`.
+- Updated `AuthScreen.tsx` `continueAsGuest()`: checks `localStorage.getItem('cp_journey_done') === '1'`; first-run users (flag absent) navigate to `/welcome`; returning users go to `/dashboard`. `cp_entered_as_guest` unchanged. Sign-Out only clears `cp_entered_as_guest` (AppShell.tsx:310 unchanged) -- `cp_journey_done` survives Sign-Out per JR-Q5.
+
+**JR-4 — Connective tissue + Dashboard ①②③ progress**
+
+- Added `frontend/src/components/JourneyProgress.tsx` with three exports: `JourneyMap` (full step cards, used in Welcome and any future full-page context), `JourneyStrip` (compact ①②③ strip with step circles + arrows + links, used in Dashboard), and `WhatNext` (handoff footer card with label, output description, and CTA link).
+- Added `WhatNext` footer to `ObligationRadar.tsx` (-> `/filing`), `FilingStudio.tsx` (-> `/audit-defense`), and `AuditDefense.tsx` (-> `/dashboard`). Each is an additive append -- no console body modified.
+- Added `JourneyStrip` to `Dashboard.tsx` at the top of the return, reading `cp_journey_done` from localStorage; strip links go to standalone console routes if journey done, wizard routes otherwise.
+- Progress derivation is real-flags-only: `cp_journey_done` (single boolean) drives all states. No per-step tracking invented.
+- No hardcoded tax figures/rates/thresholds in any new copy.
+
+**Files touched:**
+
+- `frontend/src/components/JourneyProgress.tsx` (new)
+- `frontend/src/layouts/WizardLayout.tsx` (new)
+- `frontend/src/pages/Welcome.tsx` (new)
+- `frontend/src/App.tsx` (wizard routes + welcome route)
+- `frontend/src/pages/AuthScreen.tsx` (guest routing fork)
+- `frontend/src/pages/Dashboard.tsx` (JourneyStrip import + render)
+- `frontend/src/pages/ObligationRadar.tsx` (WhatNext footer)
+- `frontend/src/pages/FilingStudio.tsx` (WhatNext footer)
+- `frontend/src/pages/AuditDefense.tsx` (WhatNext footer)
+
+**Build results:** `bunx tsc --noEmit` clean; `bun run build` green (72 modules, was 69; +3 new modules); `bunx biome check frontend/src` 0 errors (35 files). No regressions to consoles, auth, notifications, settings, or AppShell.
+
+- **Files touched:** `frontend/src/PersonaContext.tsx`, `frontend/src/hooks/useEntity.ts`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/pages/Settings.tsx`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [26/06/26] — Wave J3: JR-5 Audit Defense rework + JR-6 Custom Company form + JR-7 File-upload UI `[FE]`
+
+### JR-5 — Audit Defense rework
+
+- Replaced the 2-button console with a **free-text query textarea** + 3 example **chips** (standard deduction query, depreciation query, and the labelled trust-demo fabrication chip that drives `inject_fabricated=true`). Chips auto-submit on click.
+- Added a **FE-simulated 4-stage pipeline** (Retrieve Law / Ground Claim / Verify Citations / Reject Fabrications) using `setInterval` to advance stage index during the single real network call, then resolving all stages when data returns. The fabrication chip flips stage 4 to BLOCKED/rust colour. Reuses `StageRow` pattern from FilingStudio.
+- Added a **pack-shape preview** (greyed skeleton: narrative placeholder bars, two citation slot previews with VERIFIED/REJECTED badges, exposure note bar) shown before any query runs, replaced by the real pack on response.
+- Elevated the **fabrication money-shot** to a headline `window` panel ("Trust Payoff: The AI Cannot Fabricate a Citation and Have It Pass") shown above the narrative, with the BLOCKED stamp and both the rejected + verified citation IDs highlighted. Added an upfront trust framing banner.
+- Preserved: two-tier trace, 502 handler, persona-switch reset effect, SovereignBadge, notify() on rejection, CitationPanel / VerifiedBadge. Zero backend change.
+- **Files touched:** `frontend/src/pages/AuditDefense.tsx` (full rewrite of the component).
+
+### JR-6 — Custom Company form
+
+- Created `frontend/src/pages/CustomCompany.tsx`: a sectioned form (Company Identity / Financial Profile / Basis Period) capturing all 10 `EntityTaxProfile` fields with inline required-field validation (TIN regex `[A-Z][0-9]{10}`, MSIC 4-5 digit code list, positive numeric coercion, required dates, optional commencement).
+- On submit: calls `addCustomPersona` (JR-1) immediately (localStorage + setActive), then fires `createEntity(ssm)` (best-effort BE write, `.catch` to inline warning) without awaiting, then navigates to `/start/obligations`. The local entity is always active regardless of server write outcome.
+- Added `createEntity(ssm)` to `frontend/src/api/client.ts` — mock branch echoes the SSM as EntityTaxProfile (no-op).
+- Added `/start/custom` route to `App.tsx` under AppShell (outside WizardLayout so it renders as a full page, not wizard-chrome).
+- Updated `Welcome.tsx`: removed "coming soon" badge and stub `<a>` link; replaced with a live `<button onClick={() => navigate('/start/custom')}>`; updated description copy to reflect the form is live.
+- **Files touched:** `frontend/src/pages/CustomCompany.tsx` (new), `frontend/src/api/client.ts` (+`createEntity`, +`uploadDocument`), `frontend/src/App.tsx` (+import +route), `frontend/src/pages/Welcome.tsx` (button update).
+
+### JR-7 — File-upload UI
+
+- Added `uploadDocument(tin, file): Promise<ClassifyResponse>` to `client.ts` using a raw `fetch` + `FormData` (no `post<T>()` JSON helper per T6; browser sets multipart boundary). Mock branch returns `MOCK_CLASSIFY`.
+- Added a **drag-and-drop zone** to the FilingStudio Stage-01 block (`FilingStudio.tsx`): a `<button>` element handling `onDragOver` / `onDragLeave` / `onDrop` / `onClick` (clicking opens the hidden `<input type="file" accept=".csv,.xlsx,.pdf">`). Extension guard before upload (4-5 char allow-list); upload error shows inline in `--rust` with a note to paste instead.
+- On successful upload: `classifyResult` and `lineItems` set exactly as paste does, phase transitions to `classified`, and a success toast fires.
+- On upload failure: inline `uploadError` shown, phase stays `idle` — paste textarea fully functional, never a white-screen.
+- Paste textarea + Classify button preserved unchanged; the two paths are separated by an "or paste below" divider.
+- **Files touched:** `frontend/src/pages/FilingStudio.tsx` (+`useRef` import, +`uploadDocument` import, +state, +`handleUpload`, +`handleDrop`, +drop-zone UI).
+
+### Hard gate results
+
+- `bunx tsc --noEmit` clean.
+- `bun run build` green: **73 modules** (was 72 pre-wave; +1 new CustomCompany page), 306 KB JS, 47 KB CSS, 1.87s.
+- `bunx biome check frontend/src` **0 errors** (36 files checked).
+- No backend changes; no regression to the 116-test backend suite.
+
+**Files touched this wave:**
+
+- `frontend/src/pages/AuditDefense.tsx`
+- `frontend/src/pages/CustomCompany.tsx` (new)
+- `frontend/src/pages/FilingStudio.tsx`
+- `frontend/src/pages/Welcome.tsx`
+- `frontend/src/api/client.ts`
+- `frontend/src/App.tsx`
+- `docs/plan.md` (JR-5/JR-6/JR-7 ticked)
+- `docs/progress.md` (this entry)
+
+---
+
+## [26/06/26] — Wave J4: JR-8 Obligations enrichment (calendar viz + payoff headline) `[FE]`
+
+### JR-8 — YA2026 calendar viz + payoff headline
+
+- Added `ObligationSummary` component (reuses `dash-summary` / `dash-summary-alert` CSS from Dashboard Wave-D): shows "N obligations · M overdue · next due {date}" derived entirely from `data.obligations`. Renders at the top of the console, above the `proof-grid`. Updates on persona/custom switch because it's keyed to `data` state (which re-fetches on entity change via the existing `useEffect`).
+- Added `ObligationCalendarViz` component: a `.window` with a 12-column month grid per year. Year span is derived from the obligations' actual `due_date` fields (not hardcoded). Each month cell shows form badges (rust for overdue, denim for upcoming) positioned by real `due_date`. A `title` attribute on each badge gives hover detail (form, date, obligation type). Legend at the bottom of the final year row. No fabricated dates or figures.
+- Refactored the inline `isUrgent` IIFE in the obligations list to use the new top-level `daysUntil()` function (my change; same logic, cleaner).
+- `Obligation` type added to the `client.ts` import (was `ObligationCalendar` only).
+
+### JR-9 — Deferred (cut-tolerant; grounding constraint)
+
+JR-9 was NOT shipped. Reason: the `computation.fields` returned by the API (`gross_income`, `adjusted_income`, `chargeable_income`, `tax_payable`) does NOT include explicit band breakdown figures (e.g. `band_1_tax`, `sme_rate_1`). The 15/17/24% band percentages are implicit in `ya_2026.yaml` on the backend but are not surfaced in the API response. Showing a band breakdown card would require either hardcoding the rate percentages (fabrication -- hard no per the grounding rule) or making an additional `/form-c` call (explicitly excluded by JR-Q4 = grounded/no-recompute). JR-9 sub-tasks remain unticked in `plan.md`. Follow-on option: extend the `FormComputation` response to include a `band_breakdown` array from the core so the FE can surface it without inventing numbers.
+
+### Hard gate results
+
+- `bunx tsc --noEmit` clean (0 errors)
+- `bun run build` green: **73 modules** (same count; no new modules), 309 KB JS, 47 KB CSS, 1.92s
+- `bunx biome check frontend/src` **0 errors** (36 files)
+- No backend changes; no regression to the 116-test backend suite.
+
+**Files touched:**
+
+- `frontend/src/pages/ObligationRadar.tsx` (added `ObligationSummary`, `ObligationCalendarViz`, `daysUntil`; simplified inline `isUrgent`; added `Obligation` import)
+- `docs/plan.md` (JR-8 all 3 sub-tasks ticked; JR-9 unticked)
+- `docs/progress.md` (this entry)
+
+---
+
+## [26/06/26] — Wave J5 Usability Polish (post-SUS 65/100) `[BE/FE/TD]`
+
+### P0 #3 — `createEntity` body-shape bug + 500 edge `[BE/FE]`
+
+- Added `EntityCreateReq(ssm: dict)` to `backend/api/schemas.py` so `POST /entities` is typed at the Pydantic boundary.
+- Updated `create_entity` in `backend/api/main.py` from `req: dict` to `req: EntityCreateReq`; reads `req.ssm` instead of `req.get("ssm", {})`.
+- Fixed `createEntity` in `frontend/src/api/client.ts` to send `{ ssm }` wrapped (was flat `ssm`), matching the BE contract.
+- Added 2 new tests in `backend/tests/api/test_create_entity_endpoint.py`: missing `ssm` key → 422; flat body → 422 (not 500).
+- **Test result: 118 passed** (was 116; 2 new tests added).
+
+### P0 #5 — Trust-Demo citation-ID consistency `[FE]`
+
+- `FABRICATION_QUERY` and `FABRICATION_EVIDENCE` in `frontend/src/pages/AuditDefense.tsx` updated to use canonical `ITA-1967-s999-FAKE` (was `ITA s99_ZZ`). One ID now flows through query text, BLOCKED banner, and rejected chip.
+- Backend `_FAKE_CLAUSE_ID = "ITA-1967-s999-FAKE"` is the authoritative source (`backend/api/agents/audit_defense.py:12`).
+
+### P0 #1 — Plain-language relabel + remove dev labels + de-emphasize machine IDs + glosses `[FE]`
+
+- Removed "Seeded · BE-8 / getEntity" footer from entity snapshot in `frontend/src/pages/Dashboard.tsx`.
+- Renamed "Start Filing (HITL)" → "File With Review" and "One-Shot (No Gate)" → "File Without Review" in `frontend/src/pages/FilingStudio.tsx`.
+- Replaced "HITL · ILMU nemo-super" kicker in `Dashboard.tsx` with "Review and Approve · ILMU nemo-super".
+- Updated WhatNext copy in `frontend/src/pages/ObligationRadar.tsx` to remove "HITL gate".
+- Removed always-visible `rule_id`/`config_version` from: Dashboard hero rail (now shows "YA2026" / "LHDN-sourced"); Dashboard obligation rows; ObligationRadar obligation rows; `FigureTraceRow` topline in `FilingStudio.tsx`; hero numeral sub-line in `FilingStudio.tsx`. All IDs remain inside existing `<details>` blocks.
+- Replaced `rule_id and config_version` in `frontend/src/pages/Landing.tsx` and `frontend/src/pages/Privacy.tsx` with plain-language copy.
+- Added "Form codes explained" `<details>` disclosure in ObligationRadar with plain-language glosses for Form C, CP204, SST-02, CP39, MyInvois.
+- Enhanced `hint` text in `frontend/src/pages/CustomCompany.tsx`: TIN (LHDN gloss), MSIC (full name), SST (Sales and Service Tax), Basis Period (financial year gloss in titlebar).
+
+### P0 #2 — Mock fidelity: per-persona classify line items `[FE/TD]`
+
+- Replaced static `MOCK_CLASSIFY` in `frontend/src/api/client.ts` with `MOCK_CLASSIFY_BY_TIN` (Acme/Sinar/Selera each have own line items with their own `gross_income` as revenue).
+- Added `makeMockClassify(tin, profile?)` that falls back to a `gross_income`-derived set for custom entities.
+- `classifyTrialBalance` and `uploadDocument` now call `makeMockClassify(tin, MOCK_ENTITIES[tin])` in mock mode.
+- Grounding: line items derive from the entity's own `gross_income`; no invented tax rates or thresholds.
+
+### P1 #4 — Soften first-run OVERDUE framing `[FE]`
+
+- Added context note below overdue count in `ObligationSummary` (`ObligationRadar.tsx`) and `StatusSummary` (`Dashboard.tsx`) when `overdueCount > 0`: "Dates shown are for the sample basis period. OVERDUE status reflects the demo clock."
+- Obligation logic and genuine overdue status unchanged.
+
+### Verify results `[TD]`
+
+| Check                           | Result                                 |
+| ------------------------------- | -------------------------------------- |
+| `uv run pytest -q`              | **118 passed** (was 116; +2 new tests) |
+| `bunx tsc --noEmit`             | **0 errors**                           |
+| `bun run build`                 | **73 modules, built in 1.91s**         |
+| `bunx biome check frontend/src` | **0 errors** (36 files)                |
+
+**Files touched:**
+
+- `backend/api/schemas.py` (added `EntityCreateReq`)
+- `backend/api/main.py` (typed `create_entity` request; import `EntityCreateReq`)
+- `backend/tests/api/test_create_entity_endpoint.py` (+2 tests)
+- `frontend/src/api/client.ts` (wrapped `createEntity` body; per-persona `makeMockClassify`)
+- `frontend/src/pages/AuditDefense.tsx` (citation ID consistency)
+- `frontend/src/pages/Dashboard.tsx` (remove dev label; rename HITL kicker; remove machine IDs; overdue context note)
+- `frontend/src/pages/FilingStudio.tsx` (rename HITL buttons; remove machine IDs from always-visible rows)
+- `frontend/src/pages/ObligationRadar.tsx` (remove machine IDs; add glossary disclosure; overdue context note; WhatNext copy)
+- `frontend/src/pages/CustomCompany.tsx` (enhanced hint glosses)
+- `frontend/src/pages/Landing.tsx` (plain-language copy)
+- `frontend/src/pages/Privacy.tsx` (plain-language copy)
+- `docs/plan.md` (Wave J5 section added, all tasks ticked)
+- `docs/progress.md` (this entry)
+
+## [26/06/26] — Brand logo + favicon wire-in `[FE]`
+
+- Replaced SVG `LogoMark` placeholder (ledger/document icon) with the panda brand logo (`/logo.png`) in all 5 brand lockup slots.
+- Added `frontend/public/favicon.ico`, `frontend/public/logo.png` (128×128), `frontend/public/apple-touch-icon.png` (180×180).
+- `frontend/index.html`: added `<link rel="icon" type="image/x-icon" href="/favicon.ico" />` and `<link rel="apple-touch-icon" href="/apple-touch-icon.png" />`.
+- Added `.brand-logo` CSS rule to `frontend/src/styles/tokens.css` (30×30, `border-radius: 24%`, `object-fit: contain`, `flex-shrink: 0`).
+- Removed orphaned `import { LogoMark }` from `AppShell.tsx`, `MarketingShell.tsx`, and `AuthScreen.tsx`. `LogoMark` definition remains in `icons.tsx` (now unreferenced externally).
+
+**Files touched:**
+
+- `frontend/public/favicon.ico` (new)
+- `frontend/public/logo.png` (new)
+- `frontend/public/apple-touch-icon.png` (new)
+- `frontend/index.html`
+- `frontend/src/styles/tokens.css`
+- `frontend/src/layouts/AppShell.tsx` (topbar + drawer head + footer: 3 slots)
+- `frontend/src/layouts/MarketingShell.tsx` (topbar + footer: 2 slots)
+- `frontend/src/pages/AuthScreen.tsx` (auth hero: 1 slot)
+- `docs/progress.md` (this entry)
+
+**Build status:**
+| Check | Result |
+|---|---|
+| `bunx tsc --noEmit` | 0 errors |
+| `bun run build` | 73 modules, built in 1.92s |
+
+---
+
+## [26/06/26] — Wave J5 Usability Fix-2: Custom-entity classify + active persona persistence `[FE]`
+
+Two targeted fixes surfaced by a post-SUS re-walk.
+
+### Fix 1 (HIGH) — Custom-entity classified figures reflect the entered gross income
+
+**Root cause (two parts):**
+
+1. `classifyTrialBalance(tin, raw_text)` and `uploadDocument(tin, file)` in `client.ts` called `makeMockClassify(tin, MOCK_ENTITIES[tin])`. For a custom TIN, `MOCK_ENTITIES[tin]` is `undefined`, so `makeMockClassify` fell back to `entityProfile?.gross_income ?? 1_000_000`, always returning RM 1,000,000 revenue regardless of the entered gross income.
+2. The TIN field placeholder in `CustomCompany.tsx` was `C2581234509` — identical to `ACME_TIN`. A user who copied the placeholder would silently route to Acme's RM 5,000,000 seed instead of their custom entity.
+
+**Fix:**
+
+- Added optional `profile?: EntityTaxProfile` parameter to `classifyTrialBalance` and `uploadDocument` in `client.ts`. Mock path now uses `profile ?? MOCK_ENTITIES[tin]`, so a custom entity's own `gross_income` is the revenue figure.
+- Updated `FilingStudio.tsx` callers: `classifyTrialBalance(entity.tin, rawText, entity)` and `uploadDocument(entity.tin, file, entity)` — `entity` is already resolved from `useEntity()` (includes the custom profile).
+- Changed the TIN field `placeholder` in `CustomCompany.tsx` from `C2581234509` to `C0000000001` (clearly non-colliding). Updated the inline validation error hint to match.
+
+### Fix 2 (LOW) — Persist active entity across reload / direct nav
+
+**Root cause:** `PersonaContext` initialized the active persona from `readDefaultPersona` (reads `cp_default_persona`) on every load. An in-session selection was held only in React state — a reload or direct URL nav reset to Acme.
+
+**Fix:**
+
+- Added `ACTIVE_PERSONA_KEY = 'cp_active_persona'` and `readActivePersona(allPersonas, fallback)` in `PersonaContext.tsx`.
+- Extracted `setPersona` as a stable `useCallback` that writes `cp_active_persona` to localStorage on every call before updating state.
+- Init now uses `readActivePersona(allPersonas, readDefaultPersona(allPersonas))` — resolves against the merged list (built-in + custom personas), so a custom entity survives reload.
+- Falls back to the existing `cp_default_persona` / `DEFAULT_PERSONA` if the stored TIN is missing or no longer exists.
+- `addCustomPersona` dependency array updated to `[setPersona]`; `useMemo` deps updated to include `setPersona`. Biome formatting applied.
+
+**Files touched:**
+
+- `frontend/src/api/client.ts` — optional `profile?` param on `classifyTrialBalance` + `uploadDocument`
+- `frontend/src/pages/FilingStudio.tsx` — pass `entity` to both calls
+- `frontend/src/pages/CustomCompany.tsx` — placeholder changed from `C2581234509` → `C0000000001`; validation hint updated
+- `frontend/src/PersonaContext.tsx` — `ACTIVE_PERSONA_KEY`, `readActivePersona`, `setPersona` as stable callback with localStorage write
+- `docs/progress.md` (this entry)
+
+**Build status:**
+| Check | Result |
+|---|---|
+| `bunx tsc --noEmit` | 0 errors |
+| `bun run build` | 73 modules, built in 1.99s |
+| `bunx biome check frontend/src` | 0 errors |
+| `bunx biome check frontend/src` | 0 errors (36 files) |
+
 ## [25/06/26] — TD-6 / Q5 YA2026 figure + RAG-clause re-verify (AI-assisted online audit) `[TD]`
 
 - **Scope:** re-audited every demo-visible YA2026 figure in `core/config/ya_2026.yaml` AND all 15 RAG law-corpus clauses (`core/fixtures/lawcorpus_seed.json`) against LHDN/RMCD/MoF + the ITA 1967 (Act 53, AGC `lom.agc.gov.my`) + Big-4, via parallel research subagents.

@@ -673,3 +673,365 @@ The surface is exactly the four files claimed plus docs. ObligationRadar is a fa
 **Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean** · `bun run build` (`tsc -b && vite build`) → **59 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` (from root) → **"Checked 22 files, no fixes applied", exit 0** · `git diff main --stat -- frontend/` → 4 files (AppShell +2 / tokens +17 / ObligationRadar +237/−70 / FilingStudio +3/−3), no sprawl · added-line em-dash scan → 0 · added-line hex-literal scan (480px block) → 0 · `phase.classify` access → 0 · all `entity.*`/`ob.*` fields exist on `EntityTaxProfile`/`Obligation` · tokens used by the rewrite (`--rust`,`--denim`,`--mustard`,`--ink`,`--ink-soft`,`--font-display`,`--font-mono`,`--font-body`,`--border`) all defined.
 
 **Return to PM:** **Approve.** The diff is exactly the four claimed files + docs, no sprawl. ObligationRadar is a faithful presentational rewrite — the fetch (`useEntity` + `getObligations` spreading `entity.*`) and persona-repaint wiring are byte-identical to `main`, it consumes only real `EntityTaxProfile`/`Obligation` fields (no invented data), all `oblig.*` rule_ids + config_versions are still shown, and the new countdown/overdue logic is correct (midnight-normalized, `Math.round`ed, urgent-pill threshold consistent). The tokens.css change is additive and scoped to a new `@media (max-width:480px)` block — no existing rule/token altered, no desktop impact, tokens-only (no hex, no em-dash). The FilingStudio union-field removal leaves no `phase.classify` reference and doesn't orphan the `ClassifyResponse` import; the stepper reads `classifyResult`. All three gates green (tsc / 59-module build / biome 22 files). No Critical/Major/Minor. Ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — Settings page (`/settings`) + profile popover + drawer reorder + persona-default persistence `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). Changed: `frontend/src/{App.tsx,PersonaContext.tsx,layouts/AppShell.tsx}` + new `frontend/src/pages/{Settings.tsx,Settings.css}` + `docs/progress.md`.
+
+**Verdict:** Approve with comments
+
+The highest-priority concern — the `PersonaContext` initial-state change — is **SAFE**, verified against every failure mode (missing key, invalid/stale TIN, type-narrowing). No regression to persona switching or any console consuming `useActivePersona`. Settings genuinely persists (theme via existing `useTheme`; default entity to `cp_default_persona` + `setPersona`; Reset clears both keys + reloads). Profile popover, Sign Out, drawer reorder, and route placement all behave as specified. All three gates green. One Minor copy nit (em-dash in user-visible prose) and one Minor UX note (Reset full-page reload) — neither blocks the commit.
+
+### #1 — PersonaContext non-regression (highest priority — VERIFIED SAFE)
+
+- **Missing key:** `window.localStorage.getItem('cp_default_persona')` returns `null` → `if (tin)` is false → `readDefaultPersona()` returns `DEFAULT_PERSONA` (`PersonaContext.tsx:9-16`). No crash.
+- **Invalid / stale TIN (the key case the brief flags):** a stored TIN no longer in `PERSONAS` → `PERSONAS.find(p => p.tin === tin)` returns `undefined` → `if (found)` false → falls through to `DEFAULT_PERSONA`. Clean fallback, **no crash**, and the return type stays `Persona` (never `undefined`) so the `useState<Persona>` initializer is sound.
+- **No SSR/`window` hazard:** this is a Vite SPA; `readDefaultPersona` runs at provider mount, exactly mirroring the pre-existing `useTheme.readStoredTheme()` (`useTheme.ts:7-10`) which already reads `window.localStorage` at init. No new SSR surface introduced.
+- **Lazy initializer is correct:** `useState<Persona>(readDefaultPersona)` passes the function reference (lazy init), so it runs once at mount — not on every render. Not `useState(readDefaultPersona())`. Correct React idiom.
+- **Switching unchanged:** `setPersona` is still the raw `useState` setter shared via context. The topbar entity switcher (`AppShell.tsx:128-153`) and Settings (`Settings.tsx:17`) both call the same `setPersona`; all consoles read `useActivePersona().persona`. The only behavioral delta vs `main` is the **initial** value now honoring a persisted default — switching, repaint, and consumer wiring are byte-identical. Verified `useActivePersona` consumers (ObligationRadar/FilingStudio/AuditDefense via `useEntity`/persona) are untouched (`git status` shows no console files modified).
+- **Default-vs-session split is intentional and correct:** the topbar switcher writes ONLY to context (session-scoped); Settings writes context **and** `cp_default_persona` (persists across reloads). This matches the design — a topbar switch shouldn't permanently change the startup default.
+
+### #2 — Settings persists (VERIFIED, no fabricated/backend settings)
+
+- **Theme:** uses the existing `useTheme()` hook and its `cukaipandai-theme` key (`useTheme.ts:3,45`); the checkbox reflects `theme === 'dark'` and calls `toggleTheme` (`Settings.tsx:58`), which persists + applies instantly. No new theme key invented.
+- **Default entity:** `handleDefaultPersonaChange` guards `PERSONAS.find` (no-op on unknown TIN), writes `cp_default_persona`, and calls `setPersona` so the change is both persisted and live (`Settings.tsx:13-18`).
+- **Reset:** clears exactly the two real keys (`PREF_KEYS = ['cukaipandai-theme', 'cp_default_persona']`) then `window.location.reload()` (`Settings.tsx:7,20-25`). Reload is needed because clearing the keys doesn't retroactively reset the in-memory `theme`/`persona` state — the reload makes both re-derive from the (now-empty) storage. Correct, if blunt (see Minor).
+- **No backend dependency:** Settings imports only `PersonaContext`, `useTheme`, `PERSONAS` — pure client-side prefs. The About block is static copy + a GitHub link. No tax figure, rate, or citation introduced (citation discipline N/A here).
+
+### #3 — Profile popover + Sign Out (VERIFIED)
+
+- **Sign Out** clears `cp_entered_as_guest` (the only writer is `LoginGate.tsx:10`; this is the matching clear) and `navigate('/')` (`AppShell.tsx:186-190`) — closes the popover first. Routing to `/` lands on the public Landing (MarketingShell), consistent with a sign-out.
+- **Settings** action closes the popover and `navigate('/settings')` (`AppShell.tsx:176-179`).
+- **Outside-click / Escape close is pre-existing** (`AppShell.tsx:51-67`, `pointerdown` + `keydown` on the `topbarControlsRef` container) — unchanged by this diff; both new buttons live inside that ref so the handler still applies.
+- **Settings reachable ONLY via the popover:** confirmed no `/settings` `NavLink` in the drawer (the old "Settings (Wave 2)" placeholder is removed). `grep` for `/settings` in the drawer block → none. The catch-all `*` route is correctly ordered AFTER `/settings` in `App.tsx:31-32`, so `/settings` resolves to the page, not NotFound.
+- Both popover buttons reuse the pre-existing `.popover-action` class (`styles/tokens.css:334`), so Sign Out is styled, not bare.
+
+### #4 — Drawer order (VERIFIED)
+
+- Drawer now renders **Workspace (Dashboard)** above **Compliance (Obligations / Filing / Audit Defense)** (`AppShell.tsx:229-256`). The old order (Compliance-first, Workspace+placeholder last) is gone. No Settings item in the drawer. The `drawer-placeholder` "Settings (Wave 2)" div was removed cleanly (no orphaned class usage left in this file).
+
+### #5 — Hygiene (VERIFIED)
+
+- **`/settings` under AppShell:** the route sits inside `<Route element={<AppShell />}>` (`App.tsx:26-33`), so the Settings page gets the full shell chrome (topbar, drawer, banner).
+- **Tokens-only colors:** `Settings.css` has 34 `var(--…)` references and **zero** literal `#`/`rgb`/`hsl`/named colors. Clean.
+- **Title Case headings:** `Settings`, `Workspace Preferences` (kicker), and the card heads `Appearance` / `Workspace` / `About` / `Reset` are all Title Case / single-word. OK.
+- **Consoles, shell, theme toggle untouched:** `git status` shows only the 3 edited files + 2 new Settings files + `docs/progress.md`. No console/`useEntity`/`useTheme`/`tokens.css` edits — no sprawl.
+
+### Findings
+
+**Critical:** none. **Major:** none.
+
+**Minor (non-blocking):**
+
+- `frontend/src/pages/Settings.tsx:98` — [minor, copy] The About prose contains a literal em-dash: `"… cited Form C filing, and audit-defense — every figure traceable …"`. The task's hygiene bar says "no em-dashes," and this is the ONLY em-dash in **user-visible rendered text** across the FE (all other em-dashes in the tree are in code comments, an existing convention). → Fix: replace `—` with `; ` or a period: `"… and audit-defense. Every figure is traceable to a verified YA2026 source."`. Cosmetic; does not affect runtime or gates.
+- `frontend/src/pages/Settings.tsx:24` — [minor, UX note only] Reset uses `window.location.reload()` to re-derive `theme`/`persona` from cleared storage. It works correctly, but a full-page reload is a heavier UX than calling the in-memory setters (e.g. `setPersona(DEFAULT_PERSONA)` + reset theme). Acceptable for a prefs reset; the reload guarantees a clean re-derive of every persisted bit. Leave as-is unless the PM wants a softer reset. Not blocking.
+
+**Informational (no action):**
+
+- The topbar entity switcher remains **session-only** (writes context, not `cp_default_persona`), so switching the entity in the topbar does NOT change the persisted startup default — only Settings does. This is the intended split, called out here so it isn't mistaken for an inconsistency.
+- `DEFAULT_PERSONA_KEY` is exported from `PersonaContext` and re-imported by `Settings.tsx:1` (single source of truth for the key string) — good, no string duplication.
+
+### Verified clean (no action)
+
+- **Surgical:** every changed line traces to the task (route add, lazy-init persona read, popover actions, drawer reorder, new Settings page/CSS). No tax figures, citations, core math, or backend touched. No console files modified.
+- **No AI attribution:** `git diff main -- frontend/ && (untracked Settings files) | grep -iE 'co-authored|generated with|claude code|noreply@anthropic|🤖'` → 0 matches.
+
+**Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean** · `bun run build` (`tsc -b && vite build`) → **61 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` → **"Checked 24 files, no fixes applied", exit 0** · `git diff main --stat -- frontend/` → 3 tracked files (App +2 / PersonaContext +13/−2 / AppShell +26/−13) + 2 new Settings files, no console sprawl · `cp_entered_as_guest` writers/clearers → set by LoginGate, cleared by Sign Out only · Settings.css hex/rgb/hsl scan → 0 · user-visible em-dash scan → 1 (Settings.tsx:98) · `.popover-action`/`.topbar-popover`/`.profile-summary` all defined in tokens.css.
+
+**Return to PM:** **Approve with comments.** The PersonaContext initial-state change (the flagged priority) is safe end-to-end: missing key, invalid/stale TIN, and type-narrowing all fall back to `DEFAULT_PERSONA` with no crash; the lazy `useState(readDefaultPersona)` initializer runs once; persona switching and all `useActivePersona` consumers are byte-identical to `main`. Settings persists real prefs only (theme key `cukaipandai-theme`, default entity `cp_default_persona`, Reset clears both + reloads) — nothing fabricated or backend-dependent. Profile popover Settings→`/settings` and Sign Out→clears `cp_entered_as_guest`+routes `/` both correct; outside-click/Escape close is pre-existing; Settings is popover-only (no drawer item). Drawer reordered Workspace-above-Compliance, `/settings` is under AppShell. All gates green (tsc / 61-module build / biome 24 files), no sprawl into consoles. Two Minor non-blockers: one user-visible em-dash (Settings.tsx:98) and the Reset full-page reload (works, slightly heavy). No Critical/Major. Ready for Gate-2 commit authorization; the em-dash fix is a trivial optional follow-up.
+
+---
+
+## [25/06/26] — Wave A: auth rework (`/sign-in`, `/sign-up`, `/privacy`; `/login` redirect) `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). 3 tracked modified (`App.tsx`, `layouts/MarketingShell.tsx`, `pages/Landing.tsx`) + 6 new (`pages/AuthScreen.tsx`, `pages/Auth.css`, `pages/SignIn.tsx`, `pages/SignUp.tsx`, `pages/Privacy.tsx`, `pages/Privacy.css`) + docs.
+
+**Verdict:** Approve with comments
+
+Routing is correct, the prior clip bug is fixed (auth pages render full-screen OUTSIDE MarketingShell), the guest flow is a byte-identical non-regression of the old LoginGate, the tagline is gone from auth, Privacy copy is honest, and hygiene holds (tokens-only, no user-facing em-dashes). All three gates green. One Minor non-blocker: the old `LoginGate.tsx`/`LoginGate.css` remain on disk as orphaned dead code (self-acknowledged by PG) and a stale comment in `MarketingShell.css:1` still references LoginGate. No Critical/Major.
+
+### Review focus (all PASS)
+
+1. **No dead links / routing correctness — PASS.**
+   - `grep -rn "/login" frontend/src` → the ONLY hit is the redirect target `App.tsx:32` (`<Route path="/login" element={<Navigate to="/sign-in" replace />} />`) + its comment at `:31`. No CTA still points to `/login`.
+   - All CTAs repointed: `Landing.tsx:149` ("Get Started") + `Landing.tsx:229` ("Open the Demo") + `MarketingShell.tsx:28` ("Get Started") all → `/sign-in`. Verified by diff.
+   - Sign-in↔sign-up cross-links work: `AuthScreen.tsx:97` (`/sign-up` from sign-in) and `:101` (`/sign-in` from sign-up), gated on `isSignIn`. `SignIn`/`SignUp` are thin wrappers over the shared `AuthScreen` with `mode` prop — so both render identical, correct cross-links.
+   - **"Continue as Guest" on BOTH `/sign-in` and `/sign-up`** → since both use `AuthScreen`, `continueAsGuest` (`AuthScreen.tsx:9-16`) sets `localStorage.cp_entered_as_guest='1'` then `navigate('/dashboard', {replace:true})` — present on both routes. Confirmed.
+   - `/privacy` reachable: footer link `MarketingShell.tsx:50` + auth legal link `AuthScreen.tsx:107` (`<Link to="/privacy">`). Route registered under MarketingShell (`App.tsx:24`), renders in `.marketing-main` Outlet (topbar + footer present).
+   - **`LoginGate` fully de-wired:** `App.tsx` has no LoginGate import; `grep -rl LoginGate src --include=*.tsx --include=*.ts | grep -v LoginGate.tsx` → no importers (orphaned). Confirmed NOT in the build graph (65 modules; LoginGate excluded).
+
+2. **Tagline removed from auth — PASS.** `AuthScreen.tsx` contains no "YA2026 · decision-support, not legal advice." line (the old `lg-legal` is gone). The string still lives in `MarketingShell.tsx:53` (footer) and `AppShell.tsx:268` — explicitly allowed.
+
+3. **Guest flow non-regression — PASS (byte-identical).** `AuthScreen.continueAsGuest` (`:9-16`) is character-for-character the old `LoginGate.continueAsGuest` (`LoginGate.tsx:8-15`): same key, same value, same `navigate('/dashboard', {replace:true})`, same try/catch. `AppShell.tsx:188` reads/removes `cp_entered_as_guest` on Sign Out only; AppShell does NOT gate or redirect on the flag, so `/dashboard` stays directly reachable. No regression.
+
+4. **Privacy content is honest — PASS.** No fabricated legal/compliance claims. Production-scope statements are conditional ("would process…", "In a real deployment…"); prototype statements are factual (fixture-only, no persistence beyond browser session). Sovereignty claim is correctly scoped to _inference_ ("No data is sent outside Malaysia **for inference**", `Privacy.tsx:25-27`) — consistent with the plan's Q9 caveat that only the (not-yet-deployed, fixture-fallback) Neon persistence layer is SG-region; the prototype processes no real data, so no overclaim. PDPA 2010 reference is generic and accurate; decision-support disclaimer present (`:54`). No certifications invented.
+
+5. **Hygiene — PASS.**
+   - User-facing em-dashes: none. The only `—` hits are in `Auth.css` comments (`:1,119,184`) — not rendered copy.
+   - Tokens-only colors: `grep -nE '#[0-9a-fA-F]{3,8}' Auth.css Privacy.css` → 0. Both stylesheets use only `var(--…)` tokens; dark mode switches automatically.
+   - Title Case headings: "Welcome Back" / "Create Account" / "Privacy Policy" / "Sovereign Inference" / "What We Collect" / "Citation Gate" / "Your PDPA Rights" — all Title Case.
+   - Full-screen render (the prior bug): auth routes are registered OUTSIDE the MarketingShell route group (`App.tsx:28-29` vs the `<Route element={<MarketingShell />}>` block at `:22-25`); `Auth.css:3-7` `.auth` is `min-height:100vh; display:grid; grid-template-columns:1fr 1fr` — a true full-viewport 50:50 split, NOT clipped inside `.marketing-main`'s constrained/padded container. Bug fixed.
+
+6. **No app regressions — PASS.** `git diff main --stat -- frontend/` = exactly `App.tsx` (+13/−4), `MarketingShell.tsx` (+2/−1), `Landing.tsx` (+2/−2) plus the 6 new auth/privacy files. AppShell/consoles/Dashboard/Settings/ObligationRadar/FilingStudio/AuditDefense untouched. Landing still builds and routes.
+
+### Findings
+
+**Critical:** none. **Major:** none.
+
+**Minor (non-blocking):**
+
+- `frontend/src/pages/LoginGate.tsx` + `frontend/src/pages/LoginGate.css` — [minor, dead code] No longer imported or routed (orphaned; not in the build graph). PG self-flagged this as "can be cleaned up later." Per Karpathy/surgical convention, pre-existing-but-now-orphaned files MAY be left, but since these were orphaned _by this change_ removing them would be the cleaner close. → Optional fix: delete both files in this PR (or a fast follow). Not blocking — they do not ship in the bundle and cannot 404 (no route).
+- `frontend/src/layouts/MarketingShell.css:1` — [trivial, stale comment] Header comment still reads "standalone layout for Landing + LoginGate (no AppShell)" though LoginGate is no longer routed through MarketingShell (and the auth pages are now outside it). → Optional: update to "Landing + Privacy". Cosmetic.
+
+**Informational (no action):**
+
+- SSO + email/password inputs are intentionally `disabled aria-disabled` "coming soon" placeholders; "Continue as Guest" is the one live action. Matches the prelim scope (no real auth backend). Correct.
+- `AuthScreen.tsx:107` privacy link uses RR `<Link>` (client-side); footer GitHub link correctly uses a raw `<a target=_blank rel=noreferrer>`. Consistent.
+
+### Verified clean (no action)
+
+- **Surgical:** every changed line traces to the task (route table, CTA hrefs, footer privacy link, new auth/privacy files). No tax figures, citations, core math, or backend touched. No console files modified.
+- **No AI attribution:** scan of the diff + new files for `co-authored|generated with|claude code|noreply@anthropic|🤖` → 0 matches.
+- **progress.md** entry (`[25/06/26] — Wave A auth rework`) is accurate and honestly records the LoginGate orphan + the clip-bug root cause.
+
+**Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean** · `bun run build` (`tsc -b && vite build`) → **65 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` → **"Checked 30 files, no fixes applied", exit 0** · `grep -rn "/login" frontend/src` → only the `App.tsx:32` redirect (+comment) · `grep -rl LoginGate` → no importers (orphaned) · em-dash scan of new files → CSS comments only, 0 in copy · hex scan of `Auth.css`/`Privacy.css` → 0 · `git diff main --stat -- frontend/` → 3 tracked + 6 new auth/privacy files, no console sprawl.
+
+**Return to PM:** **Approve with comments.** Routing is correct — `/login` survives only as the `<Navigate to="/sign-in" replace>` redirect, every CTA repoints to `/sign-in`, sign-in↔sign-up cross-links and "Continue as Guest" both work on both auth routes, and `/privacy` is reachable from the footer and the auth legal line. The prior clip bug is fixed: auth pages render full-screen via a `100vh` 50:50 grid OUTSIDE MarketingShell. The guest flow is a byte-identical non-regression (sets `cp_entered_as_guest`, routes to `/dashboard`; AppShell doesn't gate on it). The auth tagline is removed; Privacy copy is honest (inference-scoped sovereignty, fixture-only, generic PDPA, decision-support disclaimer — no fabricated claims). Hygiene holds (tokens-only, Title Case, no user-facing em-dashes). All gates green (tsc / 65-module build / biome 30 files); no sprawl into the app shell/consoles. Two Minor non-blockers: orphaned `LoginGate.tsx`/`.css` (recommend deleting in this PR) and a stale `MarketingShell.css:1` comment. No Critical/Major. Ready for Gate-2 commit authorization.
+
+---
+
+## [25/06/26] — Wave B: notification system (bell list + transient toasts) `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). 7 tracked modified (`App.tsx`, `components/icons.tsx`, `layouts/AppShell.tsx`, `pages/{AuditDefense,FilingStudio,Settings}.tsx`, `styles/tokens.css`) **+ 1 NEW UNTRACKED file `src/notifications.tsx`** (does not appear in `git diff main` — see note below).
+
+**Verdict:** Approve with comments
+
+No toast/render loops exist — every fire path is guarded and the effect deps are stable. The AppShell popover refactor is a clean non-regression: profile (Settings/Sign Out), bell, mutual exclusion, outside-click + Escape, entity switcher, theme, drawer, and brand links all work. Triggers tie to real events/data only (deadline seeds derive from `getObligations`; no fabricated content). All three gates green. No Critical/Major. Findings are one process note (the new file is untracked, so `git diff main` reviews an incomplete surface — it MUST be `git add`-ed before commit) plus a few Minor hygiene items.
+
+### Process note (must address before commit — NOT a code defect)
+
+- `frontend/src/notifications.tsx` is **untracked (`??`)**, so `git diff main -- frontend/` shows only 7 files and **omits the entire 208-line provider**. `git diff main --stat` therefore under-reports the surface. The file builds (it is imported by `App.tsx`/`AppShell.tsx`/the 3 pages and the build resolves it), so this is purely a staging gap. → **Before the Gate-2 commit, `git add frontend/src/notifications.tsx`** or it will be left out of the PR and `main` will not compile. I reviewed it by reading the working-tree file directly.
+
+### #1 — No toast/render loops (highest priority — VERIFIED, no loop path)
+
+- **All context callbacks have stable identity.** `dismissToast` (`useCallback []`), `pushToast` (`[dismissToast]`), `notify` (`[pushToast]`), `toast` (`[pushToast]`), `markAllRead` (`[]`), `dismiss` (`[]`), `seedDeadlines` (`[]`) — every dep chain bottoms out at a stable callback, so none change across renders (`notifications.tsx:52-142`).
+- **The AppShell seeding effect re-runs ONLY on a genuine persona change.** Deps are `[persona.tin, persona.label, persona.ssm, seedDeadlines, notify]` (`AppShell.tsx:90`). `persona` is always one of the module-constant `PERSONAS` objects (`PersonaContext.tsx:29` lazy-init + `setPersona(PERSONAS.find(...))` at `AppShell.tsx:199`), so `persona.ssm`/`persona.label` keep **referential identity** between renders unless the persona actually switches. No new object identity per render → the effect does not re-fire on re-render.
+- **Persona-switch toast fires only on a real TIN change, never on mount.** `prevTinRef` starts `null`; the toast is gated `if (prevTinRef.current !== null && prevTinRef.current !== tin)` (`AppShell.tsx:71`) — `null` on first run suppresses the mount toast; it is set to `tin` at `:77`. Correct.
+- **Seeding fires exactly once per TIN per session.** `seededTinRef` guards `if (seededTinRef.current === tin) return` then sets it (`AppShell.tsx:80-81`); the provider's `seededRef` Set additionally dedupes per `form:due_date` key (`notifications.tsx:106,126`). On persona switch both are reset (`_clearSeeds()` + `seededTinRef = null`, `AppShell.tsx:74-75`). No re-seed on re-render.
+- **Action toasts fire only in user-initiated async resolve handlers, never in a render-phase effect.** FilingStudio `notify` is inside the `handleApprove` try-block after `await` (`FilingStudio.tsx` approve/reject branch); AuditDefense `notify` is inside the `.then()` of the defense fetch and gated on `mode === 'fabrication'` + `rejected.length > 0`; Settings `toast` is inside the `onChange` handler `handleDefaultPersonaChange`. None run during render.
+- **The two intentional reset effects** in FilingStudio/AuditDefense carry a `biome-ignore useExhaustiveDependencies` and key off persona — pre-existing pattern, they do not call `notify`/`toast`.
+
+### #2 — AppShell popover refactor non-regression (VERIFIED)
+
+- **`profileOpen: boolean` → `activePopover: 'notifications'|'profile'|null` is mutually exclusive by construction** — a single state holding one of three values; opening one (`toggle*` sets the other-or-null) cannot leave both open (`AppShell.tsx:53,123-136`).
+- **Profile popover still works.** Settings button → `setActivePopover(null)` + `navigate('/settings')` (`:299-302`); Sign Out → `setActivePopover(null)` + `localStorage.removeItem('cp_entered_as_guest')` + `navigate('/')` (`:306-313`) — byte-identical guest-flow logout to the prior version.
+- **Outside-click + Escape close both popovers.** One effect keyed on `activePopover` adds `keydown`(Escape→null) + `pointerdown`(outside `topbarControlsRef`→null) and cleans both up on change/unmount (`:103-119`). Because both the bell and profile live inside the same `topbarControlsRef` container (`:167`), a click on either button is "inside" and handled by the button's own `toggle`, while a click anywhere else closes. Correct.
+- **Bell opens → `markAllRead()`** inside the click handler (`:126-129`) so the unread badge clears on view; this is user-initiated, not a render effect.
+- **Entity switcher, theme toggle, drawer, brand links intact.** The `<select>` (`:195-220`), theme button (`:184-192`), hamburger/drawer (`:145-156,330-376`), and brand `<Link to="/dashboard">` (`:159,340`) are unchanged from `main` except for living beside the new bell. Drawer Escape effect (`:93-100`) is separate and unchanged.
+
+### #3 — Triggers tie to real events/data only (VERIFIED)
+
+- **Deadline seeds derive from real obligations.** `getObligations(tin, ssm)` (`AppShell.tsx:83`, signature `client.ts:495`) → `seedDeadlines(cal.obligations)`; each notification's kind/body is **computed** from the real `status` field + `diffDays` arithmetic against `due_date` (`notifications.tsx:104-134`). Overdue→error, ≤30d→warning, further-out→skipped (noise control). No hardcoded notification content; titles/bodies interpolate the real `form`/`due_date`.
+- **Action triggers fire on actual events.** Filing finalize/return on the real HITL approve/reject resolution; fabrication-rejection only when the **computed** `verified=false` row is present (`AuditDefense.tsx:44-52`) — consistent with the deterministic-gate honesty invariant from the prior BE-18/FE-6 verdicts; default-entity change on the real Settings `onChange`. Network errors are swallowed silently (`AppShell.tsx:87-89`) so a failed fetch does not spam toasts.
+
+### #4 — State hygiene (VERIFIED)
+
+- **IDs are stable + unique.** `nextId()` = `` `${Date.now()}-${counter++}` `` (`notifications.tsx:40-41`); a module-level monotonic `counter` guarantees uniqueness even within the same millisecond (the prior batch-seed loop adds several in one tick). **No array-index keys** — every list/toast uses `key={n.id}`/`key={t.id}` (`AppShell.tsx:258`, `notifications.tsx:187`).
+- **`unreadCount`/`markAllRead`/`dismiss` correct.** `unreadCount = notifications.filter(n => !n.read).length` (`:149`); `markAllRead` maps `read:true`; `dismiss` filters by id; "Clear all" iterates `dismiss(n.id)` (`AppShell.tsx:246`). Badge caps at `9+` (`:234`).
+- **Lists are bounded** — both `notify` and `seedDeadlines` `.slice(0, 30)` (`:71,138`).
+- **No timer leak of consequence, but see Minor.** Toast auto-dismiss uses `setTimeout(() => dismissToast(id), 4000)` (`:60`); manual dismiss filters the toast out so the later timeout is a harmless no-op (filter on an absent id). See Minor M1 re: not clearing timers on unmount.
+
+### #5 — Non-regression elsewhere + hygiene (VERIFIED)
+
+- **Provider placement is safe.** `<NotificationProvider>` wraps `<BrowserRouter>` inside `<ActivePersonaProvider>` (`App.tsx`), so `useNotifications` is available to every routed page incl. consoles/dashboard/guest flow; the `ToastContainer` renders once at the provider root (`notifications.tsx:156`). Guest flow (`/dashboard` reachable, Sign Out clears the flag) unchanged.
+- **Tokens-only colors.** `grep -nE '#[0-9a-fA-F]{3,8}'` over `notifications.tsx`/`AppShell.tsx`/`icons.tsx` → 0; added `tokens.css` lines → 0 hex. `kindColor`/`kindDotColor` map to `var(--mustard|--rust|--denim)` only.
+- **No user-facing em-dashes** in the new strings (titles/bodies use hyphens); the only `—` occurrences are in code comments.
+- **Title Case titles.** "Entity Switched", "Fabricated Citation Rejected", "Filing Finalized", "Filing Returned", "Default Entity Updated", "{form} Deadline" — all Title Case.
+- **No AI attribution** in the diff (grep → 0).
+
+### Findings
+
+**Critical:** none. **Major:** none.
+
+**Minor (non-blocking):**
+
+- `frontend/src/notifications.tsx:60` — [minor, timer hygiene] The toast `setTimeout` handle is never stored or cleared. On `NotificationProvider` unmount (in this SPA the provider lives for the whole session, so it never actually unmounts — hence not Major) any in-flight 4s timeouts fire after teardown and call `setState` on an unmounted tree → a benign React "state update on unmounted component" warning in the worst case. → Optional fix: keep a `Set<timeoutId>` ref, clear it in a `useEffect(() => () => timers.forEach(clearTimeout), [])`, and `clearTimeout` in `dismissToast`. Not blocking for the prelim (single long-lived provider).
+- `frontend/src/notifications.tsx:145-147` — [minor, code smell] `_clearSeeds` is monkey-patched onto the `seedDeadlines` callback via `as unknown as { _clearSeeds }` and reassigned on every provider render, then reached through another `as unknown` cast in `AppShell.tsx:74`. It is functionally correct and loop-safe (the callback identity is stable; the reassignment just swaps the closure), but it hides a side-channel through a function object's property. → Optional cleaner shape: expose `clearSeeds` as its own `useCallback` in the context value (alongside `seedDeadlines`) rather than attaching it to the callback. Cosmetic; no behavior change.
+- `frontend/src/notifications.tsx:98` — [trivial, dead param] `seedDeadlines` declares a second param `_tinKey?: string` that is never used (and the caller passes only `cal.obligations`). Underscore-prefixed so biome is quiet. → Optional: drop the unused param. Harmless.
+- `frontend/src/notifications.tsx:171` vs `:169` — [trivial, design note] `warning` and `success` both map to `var(--mustard)` in `kindColor`/`kindDotColor`, so a warning and a success toast are color-indistinguishable (they differ only by the `WARN`/`OK` text label). Intentional within the 4-token palette; note only.
+
+**Informational (no action):**
+
+- `notify()` opening the bell does NOT auto-open the popover — it only increments the badge + fires a toast; the user opens the bell to read history. Matches the spec (`notify` = bell+toast). Correct.
+- The persona-switch uses `notify` (bell+toast, persists in history) while Settings default-change uses `toast` (transient only) — a deliberate, sensible split (a switch is a stateful event worth logging; a pref change is ephemeral feedback).
+
+### Verified clean (no action)
+
+- **Surgical:** every changed line traces to the notification feature — provider, bell UI + popover refactor, 4 trigger sites, icon, and CSS. No tax figures, citations, core math, backend, or unrelated console logic touched. Routing table unchanged except the provider wrap.
+- **Build graph:** `notifications.tsx` is imported and resolved (build = 66 modules, up from 65); no orphan.
+
+**Smoke test:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean** · `bun run build` (`tsc -b && vite build`) → **66 modules transformed, dist/ emitted, exit 0** · `bunx biome check frontend/src` → **"Checked 29 files, no fixes applied", exit 0** · `git status` → `notifications.tsx` **untracked** + 7 tracked modified (no sprawl) · hex scan of new/changed TSX + added CSS → **0** · em-dash scan of new strings → **0 in copy** (comments only) · AI-attribution scan → **0** · `getObligations(tin, ssm)` signature matches the AppShell call · loop trace → all fire paths guarded (stable callbacks, ref-guarded effect, user-initiated handlers).
+
+**Return to PM:** **Approve with comments.** Priority #1 (loops): clean — all context callbacks are stable `useCallback`s, the seeding effect's deps are module-constant persona references so it re-runs only on a genuine switch, the persona-switch toast is `prevTinRef`-gated against mount, seeding is double-guarded (`seededTinRef` + per-key `seededRef` Set), and every action toast fires inside a user-initiated async handler — no path re-fires on re-render. Priority #2 (popover refactor): clean non-regression — `activePopover` makes bell/profile mutually exclusive, profile Settings/Sign Out work (logout byte-identical), one effect closes both on Escape + outside-click, and the entity switcher/theme/drawer/brand links are untouched. Triggers tie to real `getObligations` data and real events (no fabricated content); IDs are unique and never array-index; colors are tokens-only; titles Title Case; no AI attribution. All gates green (tsc / 66-module build / biome 29 files). **One must-do before commit: `git add frontend/src/notifications.tsx` — it is currently untracked, so the diff under-reports the surface and `main` would fail to compile without it.** Four Minor/trivial non-blockers (toast timers not cleared on unmount; `_clearSeeds` monkey-patch smell; unused `_tinKey` param; warning/success share `--mustard`). No Critical/Major. Ready for Gate-2 once the new file is staged.
+
+---
+
+## [25/06/26] — Wave C: Landing Hero Image + FAQ (items 1 + 6)
+
+**Scope:** `frontend/` — new `faqData.ts` (21 Q/A, 5 categories, 5 featured), `pages/Faq.tsx`+`Faq.css`, `public/marketing/hero-background.webp`; modified `Landing.tsx`/`Landing.css` (hero bg + scrim, featured-FAQ section), `App.tsx` (`/faq` route), `layouts/AppShell.tsx` (FAQ nav link).
+
+**Verdict:** Approve
+
+The diff is clean, honest, and surgical. Content-honesty (#2) and untracked-files (#1) — the two priority checks — both pass. No blocking findings.
+
+### Hard gates (all PASS)
+
+- **tsc:** `cd frontend && bunx tsc --noEmit` → exit 0, clean.
+- **build:** `bun run build` → `tsc -b && vite build` green (69 modules, dist emitted; `dist/marketing/hero-background.webp` copied).
+- **biome:** `bunx biome check frontend/src` → 32 files, **0 errors**.
+
+### #1 Staging trap (CONFIRMED — action for PM)
+
+`git status` confirms **4 untracked paths** that MUST be staged or `main` breaks (TS won't compile — `Faq.tsx`/`faqData.ts` are imported by `App.tsx` and `Landing.tsx`; `/faq` 404s without the route's component; hero loses its image):
+
+- `frontend/src/faqData.ts`
+- `frontend/src/pages/Faq.tsx`
+- `frontend/src/pages/Faq.css`
+- `frontend/public/marketing/hero-background.webp` (untracked under `frontend/public/` — `git status` shows the dir, not the file)
+
+The `.webp` is a valid `RIFF/WebP VP8 1672x941` image, 74.9 KB. All four are imports/assets of already-modified tracked files, so a partial stage would break the build — stage the full set together.
+
+### #2 FAQ content honesty (PASS — priority)
+
+Read all 21 answers. **No fabricated rates, thresholds, prices, statistics, or legal guarantees.** Sovereignty is correctly scoped to _inference/processing_ throughout, never an unqualified "all data stays in Malaysia" storage claim (matches spec §7.3 honest framing — persistence is on Neon SG, only inference is in-country):
+
+- `faqData.ts:52` ("Where Does the AI Inference Run?") — "your tax data is **reasoned over** within Malaysia" → scoped to inference. Correct.
+- `faqData.ts:57` ("What Does Sovereign Inference Mean Here?") — "sensitive financial figures are **processed** under Malaysian jurisdiction" → scoped. Correct.
+- `faqData.ts:131` ("How Is My Data Handled?") — "designed to keep sensitive tax data **processed** in-country via sovereign inference" → no storage/residency claim; adds demo-fixtures caveat. Correct.
+- `faqData.ts:91` ("What Year Are the Figures Based On?") — explicitly "We do not publish invented rates in this FAQ" → exemplary; cites YA2026 as the assessment year (matches spec) without inventing a number.
+- `faqData.ts:104`/`108`/`62`/`67`/`75`/`81` — "decision support, not an auto-filer", "not legal or tax advice", deterministic-core-owns-the-math, citation-gate-rejects-fabrications: all align with `docs/trd.md` / spec, no overclaim.
+
+### #3 Search + filter (PASS)
+
+`Faq.tsx:11-18` — filters by `q`+`a`, case-insensitive (`.toLowerCase()`); category chips filter; combined search+category via `&&`; empty query short-circuits (`!needle`) so no crash; count `filtered.length` with correct singular/plural (`:85`); empty state + Clear Filters renders (`:88-94`). `key={item.q}` is stable. Correct.
+
+### #4 Routing / nav (PASS)
+
+`App.tsx:40` — `/faq` is nested under the `<AppShell />` parent route (gets shell chrome). `AppShell.tsx:360-362` — "FAQ" `NavLink` is in the **Workspace** drawer section. `Landing.tsx` "See All Questions" `Link to="/faq"` (`Link` already imported `:2`). Featured set derived from `FAQ_ITEMS.filter(featured)` (5 items). Correct.
+
+### #5 Hero legibility (PASS)
+
+`Landing.css` — hero composites a per-theme scrim gradient over `url("/marketing/hero-background.webp") center / cover`. Light: paper-tone `rgba(236,231,216,0.86)`; dark: ink `rgba(16,20,28,0.9)` / inline `0.97→0.12` directional. Text keeps `var(--ink)`, so no white-on-white / black-on-dark. rgba scrims over the image are acceptable per brief.
+
+### #6 Hygiene / non-regression (PASS)
+
+- **No em-dashes** in `faqData.ts` / `Faq.tsx` copy (grep clean).
+- **Title Case** headings throughout (FAQ questions, "Straight Answers, No Fabrication.", "See All Questions", "Clear Filters").
+- **Tokens elsewhere:** new dark-theme `.lp-faq { background: #161d29 }` (`Landing.css:688`) is a literal hex, but it matches the file's **pre-existing** dark tonal-ramp pattern (`.lp-how #1d2634`, `.lp-trust/.lp-finale #0c1018`) — no `--window`-dark token exists, so this is consistent with existing style, not a regression. Note only, no fix required.
+- Landing's other sections, AppShell chrome, and the three consoles are untouched (diff is additive: +36 tsx, +139 css).
+
+**Smoke test:** `bunx tsc --noEmit` (exit 0) · `bun run build` (green, webp copied to dist) · `bunx biome check frontend/src` (0 errors).
+
+---
+
+## [25/06/26] — Wave D · Dashboard Redesign (data-driven hero · quick-access rail · balanced overview) `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). Surface: `frontend/src/pages/Dashboard.tsx` (restructured) + `frontend/src/styles/tokens.css` (+325 additive `.dash-*` block) + docs (`progress.md`, `test.md`). `git diff main --stat -- frontend/` confirms exactly these two FE files — **no sprawl** into other pages/shell/consoles.
+
+**Verdict:** Approve
+
+The redesign is data-faithful end-to-end: every figure on the page (hero, status summary, deadlines, snapshot) derives from a real `getObligations(persona.tin, persona.ssm)` + `getEntity` call. No fabricated activity, metrics, or timestamps. `leadObligation()` is correct (most-overdue wins, else nearest-upcoming), the countdown/overdue math reuses the prior-correct `daysUntil`, persona switch cleanly re-fetches + repaints, the all-caught-up and empty/error states all render without crashing, and the tokens.css change is purely additive + scoped + token-only. All three gates green. No Critical/Major findings; a couple of Minor notes below are non-blocking. Recommend authorizing the commit.
+
+### Hard gates (all PASS)
+
+- **tsc --noEmit:** exit 0, clean.
+- **bun run build:** green — `tsc -b && vite build`, 69 modules transformed, `dist/` emitted in 2.33s.
+- **biome check frontend/src:** 32 files, **0 errors**.
+
+### Review focus — findings
+
+**1. Real data only (priority) — VERIFIED.**
+
+- Hero (`PrimaryAction`) renders only from `lead: Obligation | null` + `overdueCount` (both computed from the live `calendar.obligations`). The rail shows `lead.rule_id` / `lead.config_version` — real provenance, not invented (`Dashboard.tsx:132-135`).
+- `StatusSummary` (`:447-471`): `total`, `overdue`, `next due` all computed from `calendar.obligations` — returns `null` while loading/null so no placeholder numbers flash.
+- `DeadlinesPanel` (`:188-319`): maps real `calendar.obligations`, sorted by `daysUntil`.
+- `SnapshotPanel` (`:323-443`): every row from a real `entity` field (`entity_type`, `msic_codes`, `sst_registered`, `basis_period_*`, `employee_count`, `paid_up_capital`, `gross_income`, `tin`) via `useEntity`/`getEntity`. No invented KPIs.
+- `leadObligation()` (`:52-59`): overdue items filtered (`daysUntil < 0`), most-overdue sorted first; else nearest-upcoming by ascending `daysUntil`. Correct.
+- Countdown/overdue math (`daysUntil`/`countdown`, `:15-30`) normalises both dates to local midnight before the day-delta — same correct logic as the prior slice. No fabrication anywhere.
+
+**2. Persona switch non-regression — VERIFIED.** The fetch effect is keyed on `[persona.tin, persona.ssm]` (`:482-495`) and clears `calendar` + sets `loading` before each fetch, so no stale paint. `persona` is selected from the static module-level `PERSONAS` array (`PersonaContext.tsx` reads from `./personas`), so `persona.ssm` is a **stable reference per persona** — the effect fires exactly once per switch (no miss, no over-fire). `SnapshotPanel` additionally carries `key={`snap-${persona.tin}`}` (`:519`) forcing a remount; redundant with `useEntity`'s own `resolvedTin`-keyed effect but harmless. Hero/summary/deadlines/snapshot all repaint on switch.
+
+**3. tokens.css additive + scoped + token-only — VERIFIED.** Diff is `+325 / -0` (raw `grep -cE '^\-[^-]'` → 0 removed lines); file grew 1348 → 1673. The new block (`:1330-1653`) is inserted _before_ the pre-existing `@media (prefers-reduced-motion)` block, which is carried through unchanged as context (NOT duplicated — only one reduced-motion block exists in the file). All selectors are `.dash-*` / scoped descendants — no existing class or `:root` token altered. Colors use tokens throughout (`--denim`, `--rust`, `--paper`, `--ink`, `--ink-soft`, `--mustard`, `--window`, `--border`, `--shadow`, `--radius`, fonts); the only literal colors are `rgba(...)` shadow/border opacities (e.g. `4px 4px 0 rgba(28,27,25,.22)`, `border-left: 1px solid rgba(236,231,216,.28)`) — no opaque hex duplicating a named token. All inline styles in the panels (`:204-438`) likewise reference token vars only.
+
+**4. Loading / empty / error — VERIFIED.** The obligations fetch has explicit `loading` + `error` state; `DeadlinesPanel` renders distinct loading (barber + "Loading obligations…"), error (`--rust` message), and empty ("No obligations found.") branches and never indexes into an undefined list (`calendar ? […] : []`, `:193`). The all-caught-up hero (`lead === null`) renders its own copy + "Open Obligation Calendar →" CTA without crashing (`:71-86`). `obligations = calendar?.obligations ?? []` (`:497`) guards the null-calendar case so `leadObligation([])` returns `null` cleanly. No crash on empty.
+
+**5. Non-regression + hygiene — VERIFIED.** Surface = Dashboard.tsx + tokens.css (+docs) only. No em-dashes in any user-visible copy (em-dashes appear solely in tokens.css comment headers, matching the file's pre-existing house style). Headings are Title Case ("What You Can Do", "Upcoming Deadlines", "Entity Snapshot"). All links resolve to real routes — hero/quick-access target `/obligations`, `/filing`, `/audit-defense`, each present in `App.tsx:41-43`; deadlines/calendar footer link → `/obligations`.
+
+### Minor notes (non-blocking)
+
+- `Dashboard.tsx:519` — [trivial] The `key={`snap-${persona.tin}`}` remount of `SnapshotPanel` is redundant with `useEntity`'s `resolvedTin`-keyed effect (the panel would re-fetch on switch regardless). Harmless; leaving it is fine.
+- `Dashboard.tsx:204-438` — [minor, style] The two overview panels use extensive inline `style={{…}}` objects rather than scoped `.dash-*` classes like the hero/console rail. All values are token-backed so there's no token-discipline or theming issue, but it's a stylistic inconsistency with the rest of the new block. Out of scope for this slice (visual polish owned by the later ui-ux pass) — note only, no fix required.
+- `SnapshotPanel` footer "Seeded · BE-8 / getEntity" (`:439`) is a provenance label, not fabricated data — correct and honest about the source.
+
+### Verified clean (no action)
+
+- **No invented data:** grepped the new render paths — every number/string traces to a real `Obligation` or `EntityTaxProfile` field. No hardcoded activity feed, fake timestamps, or placeholder metrics.
+- **Layout:** grids use `minmax(0, 1.55fr) minmax(260px, 1fr)` with `min-width:0` on flex/grid children and `overflow:hidden`/`text-overflow:ellipsis` on the form badge (`:253-256`), so no overflow on long type labels; `@media (max-width:900px)` collapses both grids to single-column and hides the vertical hero rail. No visible broken-grid/overflow bug in code.
+- **No removed/altered existing CSS:** `-0` lines; pre-existing reduced-motion block intact.
+
+**Return to PM:** **Approve.** Dashboard redesign is data-faithful (real `getObligations`+`getEntity` only — zero fabrication), persona switch re-fetches without stale paint, and the tokens.css change is purely additive + scoped + token-only. All three gates green (tsc clean · build 69 modules · biome 0 errors); empty/loading/error/all-caught-up states all handled; routes correct; no sprawl. No Critical/Major findings — recommend authorizing the commit.
+
+**Smoke test:** `bunx tsc --noEmit` (exit 0) · `bun run build` (green, 69 modules) · `bunx biome check frontend/src` (0 errors).
+
+---
+
+## [26/06/26] — USABILITY + END-TO-END JOURNEY REWORK (Waves J0–J4: BE-J1/J2, JR-1…JR-8) `[BE]` `[FE]`
+
+**Branch:** `main` (working tree, uncommitted). 19 modified + 9 untracked. Reviewed: `backend/api/{main,persistence}.py`, `backend/pyproject.toml`, `backend/uv.lock`, new `backend/tests/api/test_{create_entity,upload}_endpoint.py` + `trial_balance.{csv,xlsx,pdf}`; `frontend/src/{App.tsx,PersonaContext.tsx,api/client.ts,hooks/useEntity.ts}`, `frontend/src/layouts/{AppShell,WizardLayout}.tsx`, `frontend/src/pages/{AuditDefense,AuthScreen,Dashboard,FilingStudio,ObligationRadar,Settings,CustomCompany,Welcome}.tsx`, new `frontend/src/components/JourneyProgress.tsx`.
+
+**Verdict: APPROVE WITH COMMENTS** — Gate-2 PASS for the demo. One **major** FE↔BE contract mismatch (`createEntity` body shape) defeats live BE persistence but is fully masked by the fallback-first design (custom entities work end-to-end from localStorage); one **minor** uncaught-500 edge on `POST /entities` not reachable through the UI. Neither blocks the demo. Both should be fixed before relying on live `POST /entities`. All hard gates green.
+
+### Per-area PASS/FAIL
+
+| Area                                                    | Verdict                          | Notes                                                                                                                                                                                                             |
+| ------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BE-J1 `POST /entities` (create/upsert/persist)          | **PASS w/ comments**             | 200+echo, 422 on bad ssm, upsert-safe, in-memory fallback never crashes. See M1 (FE body mismatch) + m1 (non-dict ssm → 500).                                                                                     |
+| BE-J2 `POST …/documents/upload` (file→text→classify)    | **PASS**                         | CSV/XLSX/PDF extract in-process (csv/openpyxl/pypdf), 415/422/502 guards correct, identical `ClassifyResponse` shape, no foreign API. `tin` not looked up → custom TIN never 404s.                                |
+| Deps + uv.lock                                          | **PASS**                         | `pypdf`, `openpyxl`, `python-multipart` added to pyproject; `uv.lock` +592 lines incl. pypdf/openpyxl/python-multipart/et-xmlfile. `python-multipart` correctly present (FastAPI `UploadFile` requires it).       |
+| JR-1 white-screen invariant (custom TIN resolution)     | **PASS**                         | `useEntity` resolves `customPersonas` match BEFORE `getEntity` — no mock throw, no live 404. Every former `PERSONAS` static reader (AppShell, Settings, Dashboard) now uses context `personas`.                   |
+| JR-2 wizard chrome (reuse, no fork)                     | **PASS**                         | `WizardLayout` mounts the real consoles via `<Outlet/>`; no copied console bodies. Entity-pin is "intent-documented" not enforced (acceptable known limit — don't switch persona mid-wizard).                     |
+| JR-3 welcome + flags/routing                            | **PASS**                         | `cp_journey_done` gates `/welcome` vs `/dashboard`; both on-ramps + skip wired; `/start/custom` route exists (no dead-end).                                                                                       |
+| JR-4 connective tissue (JourneyProgress)                | **PASS**                         | Single shared component (JourneyMap/JourneyStrip/WhatNext) reused in 3 places, no divergent copies; footers appended additively; progress derives from the real flag only.                                        |
+| JR-5 Audit-Defense rework                               | **PASS**                         | Free-text + 3 chips + FE-simulated 4-stage pipeline + pack-shape preview + elevated fabrication money-shot. Two-tier trace, 502 handler, persona-reset, SovereignBadge, `notify()` all preserved.                 |
+| JR-6 custom-company form                                | **PASS w/ comments**             | Captures all `EntityTaxProfile` fields, `addCustomPersona` (localStorage) + best-effort `createEntity` (non-blocking), 422 surfaced as friendly note. Live BE write currently always 422s — see M1.               |
+| JR-7 file-upload UI + paste fallback                    | **PASS**                         | `uploadDocument` uses `FormData` with NO JSON content-type; drop zone + browse + paste all functional; upload error reverts to idle with friendly message (no white-screen).                                      |
+| JR-8 Obligations calendar + payoff                      | **PASS**                         | Calendar + headline derived entirely from `data.obligations`; year span computed from real `due_date`s; overdue flagged `--rust`. No fabricated rate/threshold/amount.                                            |
+| JR-9 (deferred)                                         | **PASS (correctly NOT shipped)** | Plan box left `[ ]`; grep for band rates / "how this was taxed" / what-if → 0 hits. No half-built band card.                                                                                                      |
+| Sign-Out / flag correctness (JR-Q5)                     | **PASS**                         | Sign-Out removes ONLY `cp_entered_as_guest`; KEEPS `cp_journey_done` and does NOT clear `cp_custom_entities` — matches the brief.                                                                                 |
+| Grounding / citation discipline                         | **PASS**                         | No fabricated tax figure/rate/threshold in any new FE. Example-query strings (RM4,800 etc.) are user-typed labels into a free-text box, not asserted figures; all verdicts/citations/exposure come from API data. |
+| Non-regression (consoles/HITL/badge/notifications/auth) | **PASS**                         | Filing stepper/HITL/96px hero/FigureTrace/one-shot/badge, Audit two-tier/502, Obligations list/snapshot, notifications, auth/guest, Settings all intact. Wizard reuses consoles.                                  |
+| AI attribution                                          | **PASS**                         | `git diff HEAD` grep for co-authored/generated-with/claude-code/noreply@anthropic/🤖 → 0.                                                                                                                         |
+
+### Findings
+
+**Major (fix before relying on live `POST /entities`; NOT a demo blocker):**
+
+- `frontend/src/api/client.ts:567` (`createEntity`) ↔ `backend/api/main.py:116` (`create_entity`) — [major] **Body-shape contract mismatch.** FE does `post('/entities', ssm)` → sends the SSM fields **flat** as the JSON body. BE does `req.get("ssm", {})` → expects `{ssm: {...}}`. Verified empirically: flat body → **422**, wrapped body → **200**. So in LIVE mode every custom-company server write returns 422 and the user sees the "could not save to server" note (`CustomCompany.tsx:199-201`). The demo is unaffected because the design is fallback-first (`addCustomPersona` runs first, local entity stays fully usable, consoles thread the inline `ssm`), and in MOCK mode `createEntity` is a no-op echo — but JR-6's acceptance criterion "with BE up it also lands via `POST /entities`" is NOT met. → Fix EITHER: change FE to `post('/entities', { ssm })`, OR change BE to accept a flat body (e.g. `_profile(req)` directly, or type the endpoint with a `{ssm: dict}` schema). Pick one and align. (The PG flagged "verify createEntity hits the same path" — path is correct; the **body shape** is the mismatch.)
+
+**Minor (non-blocking):**
+
+- `backend/api/main.py:117` (`_profile` via `create_entity`) — [minor] **Uncaught 500 on non-dict `ssm`.** `EntityTaxProfile(**ssm)` raises `TypeError` (not `ValidationError`) when `ssm` is a string/list/number, and the 422 handler only catches `ValidationError` → `POST /entities {"ssm":"x"}` returns **500**. Not reachable via the FE (which always sends an object), and the other endpoints are immune because their typed Pydantic request models reject a non-dict `ssm` with 422 before `_profile` runs — `/entities` is the only endpoint taking `req: dict` untyped. → Fix: add `TypeError` to the caught tuple in `_profile`, or type the endpoint with a Pydantic model (`class CreateEntityReq(BaseModel): ssm: dict`), which also fixes M1's contract ambiguity at the same time.
+
+- `frontend/src/layouts/WizardLayout.tsx:44-63` — [minor, accepted] The "entity pin" is documentation-of-intent (a `useRef` that is never read) rather than an enforced guard; if a user switches persona via the topbar mid-wizard, `FilingStudio` will still reset (its own `persona.tin` effect fires). Acceptable per the plan ("the real protection is: don't switch persona mid-wizard"); the empty `useEffect` at `:60-63` is dead but harmless. Note only.
+
+### Smoke test
+
+- `cd backend && uv run pytest -q` → **116 passed, 1 warning** (pre-existing Starlette/httpx deprecation). Matches the expected count; the 9 new BE-J1/J2 tests (5 upload + 4 create) all green; existing suite unregressed.
+- `cd frontend && bunx tsc --noEmit` → **exit 0, clean.**
+- `cd frontend && bun run build` → **`tsc -b && vite build`, 73 modules transformed, dist/ emitted, exit 0.**
+- `bunx biome check frontend/src` (from repo root) → **"Checked 36 files. No fixes applied", exit 0.**
+- Empirical contract probes: flat `/entities` body → 422; wrapped `{ssm}` → 200; non-dict `ssm` → 500 (m1); upload `tin` not looked up (no 404 on custom TIN); `uv.lock` shows pypdf/openpyxl/python-multipart/et-xmlfile.
+
+**Return to PM:** **APPROVE WITH COMMENTS (Gate-2 PASS).** The journey rework is contract-faithful and demo-safe: the JR-1 white-screen invariant holds (custom TIN resolves from local state before any network call), every former static-PERSONAS reader uses the context list, the wizard reuses consoles with no forked logic, all non-regression surfaces (HITL/badge/two-tier trace/502/notifications/auth) are intact, and grounding is clean (no fabricated figures; JR-9 correctly deferred with no half-built artifact). Gates all green: pytest **116**, tsc clean, build 73 modules, biome 0 errors. **One major** (`createEntity` sends a flat body but BE-J1 expects `{ssm}` → live persistence silently 422s; masked by fallback-first localStorage, so the demo works) and **one minor** (non-dict `ssm` → uncaught 500, unreachable via UI). A single fix — typing `/entities` with a `{ssm: dict}` Pydantic model and sending `{ ssm }` from the FE — closes both. Neither blocks the live demo; recommend approving the commit with the two-line fix as a fast follow before depending on live `POST /entities`.

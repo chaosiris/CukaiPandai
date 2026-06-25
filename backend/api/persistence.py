@@ -112,3 +112,23 @@ class EntityRepository:
             except Exception:
                 pass  # fall through to fixtures — DB-down ≠ demo-down
         return self._fixtures.get(tin)
+
+    def create(self, data: dict) -> None:
+        """Upsert an entity profile. Writes to Neon when DATABASE_URL is set; always writes to the
+        in-memory fixtures dict so GET round-trips without a live DB (DB-down ≠ demo-down)."""
+        import json as _json
+
+        tin = data["tin"]
+        # Always store in-memory so in-process GETs see the new entity regardless of DB state.
+        self._fixtures[tin] = data
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    conn.execute(
+                        "INSERT INTO entities (tin, data) VALUES (%s, %s::jsonb) "
+                        "ON CONFLICT (tin) DO UPDATE SET data = EXCLUDED.data",
+                        (tin, _json.dumps(data)),
+                    )
+            except Exception:
+                pass  # fallback already written in-memory above; never crash on DB error
