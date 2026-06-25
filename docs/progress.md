@@ -429,3 +429,19 @@ CukaiPandai/
 - **Headings/subheadings Title-Cased**, e.g. `"Building defense pack…"` → `"Building Defense Pack…"`, `"DETERMINISTIC GATE — fabricated citation REJECTED"` → `"Deterministic Gate: Fabricated Citation Rejected"`. Acronyms preserved (LHDN, RM, MSIC, TIN, HITL, RAG, Form C).
 - **Left untouched (out of scope):** 34 em-dashes in code/CSS comments (JSDoc, `//`, `tokens.css`) — not user-facing; backend-contract literals (clause IDs, field names, routes) byte-for-byte.
 - `tsc --noEmit` clean; `bun run build` green; `biome check frontend/src` 0 errors. A later ui-ux-pro-max pass still owns the full visual redesign.
+
+---
+
+## [25/06/26] — DO-5: Gated CI/CD deploy pipeline `[DO]`
+
+- **Consolidated `.github/workflows/deploy.yml`** replacing and deleting the old `ci.yml`. Single workflow, four jobs:
+  - `test`: backend (`uv sync --extra dev` + `uv run pytest -q`, working-directory `backend`) then frontend (`bun install --frozen-lockfile`, `bunx tsc --noEmit`, `bun run build`, `bunx biome check frontend/src`) — both must pass; runs on every PR + push.
+  - `docker-build`: smoke-build `./backend` Docker image (`needs: test`).
+  - `deploy-backend`: curl the Render deploy hook (`needs: [test, docker-build]`; push to `main` only). Uses `secrets.RENDER_DEPLOY_HOOK_URL`; `-fsS -X POST` fails the job if the hook call fails.
+  - `deploy-frontend`: `vercel pull --yes --environment=production` → `vercel build --prod` → `vercel deploy --prebuilt --prod` (`needs: test`; push to `main` only). Uses `secrets.VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`. Production env vars (`VITE_API_BASE_URL`, `VITE_API_MOCK`) are already set in the Vercel project and pulled by `vercel pull` — not hardcoded in the workflow.
+- **YAML validated:** `yaml.safe_load` parses cleanly; `if:` guards confirmed (deploy jobs skipped on PRs; no secrets needed for PR builds).
+- **`ci.yml` deleted:** no duplicate test workflow remains.
+- **`docs/runbook.md`** — new §4 CI/CD subsection: 4-job graph, required GitHub secrets with sources (`RENDER_DEPLOY_HOOK_URL`, `VERCEL_TOKEN`, `VERCEL_ORG_ID=team_CwktsdBSB9TLrdwdCV3dZRbg`, `VERCEL_PROJECT_ID=prj_0KnVQwxUPBqML8k4KjgPQv1iaYTE`), live URLs (`https://cukaipandai.vercel.app`, `https://cukaipandai-api.onrender.com`), note that Render native auto-deploy must be turned OFF after the first green pipeline run, manual CLI fallback documented.
+- **`docs/plan.md`** — DO-5 added under Phase 3 with agent-done bullets ticked and human-gated bullets (add secrets, confirm green run, turn off Render auto-deploy) left unticked.
+- **Remaining human-gated steps:** add the 4 secrets in GitHub → Settings → Secrets → Actions; push to `main`; confirm the first green run in the Actions tab; turn off Render native auto-deploy.
+- **Files touched:** `.github/workflows/deploy.yml` (new), `.github/workflows/ci.yml` (deleted), `docs/runbook.md`, `docs/plan.md`, `docs/progress.md`.
