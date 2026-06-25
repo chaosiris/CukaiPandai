@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
 import { JourneyStrip } from '../components/JourneyProgress'
-import { useEntity } from '../hooks/useEntity'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -33,10 +32,6 @@ function countdown(dueDate: string): { label: string; overdue: boolean } {
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function fmtRM(n: number): string {
-  return `RM ${n.toLocaleString('en-MY')}`
 }
 
 const URGENT_WINDOW_DAYS = 30
@@ -314,159 +309,6 @@ function DeadlinesPanel({
   )
 }
 
-// ---- Entity Snapshot panel ----
-
-function SnapshotPanel() {
-  const { entity, loading, error } = useEntity()
-
-  const rows: Array<{ label: string; value: string }> = entity
-    ? [
-        { label: 'Entity type', value: entity.entity_type.replace(/_/g, ' ').toUpperCase() },
-        { label: 'MSIC code(s)', value: entity.msic_codes.join(', ') },
-        { label: 'SST registered', value: entity.sst_registered ? 'Yes' : 'No' },
-        {
-          label: 'Basis period',
-          value: entity.basis_period_start
-            ? `${formatDate(entity.basis_period_start)} – ${formatDate(entity.basis_period_end)}`
-            : 'N/A'
-        },
-        { label: 'Employees', value: String(entity.employee_count) },
-        { label: 'Paid-up capital', value: fmtRM(entity.paid_up_capital) }
-      ]
-    : []
-
-  return (
-    <div className="window dash-panel">
-      <div className="titlebar">
-        <span className="titlebar-title">Entity Snapshot</span>
-        {entity && (
-          <span className="titlebar-meta" style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-            {entity.tin}
-          </span>
-        )}
-        <span className="closebox" aria-hidden="true" />
-      </div>
-
-      {loading && (
-        <div style={{ padding: '16px 18px' }}>
-          <div className="barber" style={{ marginTop: 0 }} />
-        </div>
-      )}
-
-      {error && (
-        <div style={{ padding: '16px 18px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--rust)' }}>
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && entity && (
-        <>
-          <div style={{ padding: '14px 18px 10px', borderBottom: 'var(--border)' }}>
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 20,
-                fontWeight: 600,
-                color: 'var(--ink)',
-                lineHeight: 1.1
-              }}
-            >
-              {fmtRM(entity.gross_income)}
-            </div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-soft)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.07em',
-                marginTop: 3
-              }}
-            >
-              Gross income · YA2026
-            </div>
-          </div>
-
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1 }}>
-            {rows.map((row) => (
-              <li
-                key={row.label}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 8,
-                  padding: '8px 18px',
-                  borderBottom: 'var(--border)',
-                  alignItems: 'center'
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--ink-soft)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em'
-                  }}
-                >
-                  {row.label}
-                </span>
-                <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink)', textAlign: 'right' }}>
-                  {row.value}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ---- Status summary line (real counts) ----
-
-function StatusSummary({ calendar, loading }: { calendar: ObligationCalendar | null; loading: boolean }) {
-  if (loading || !calendar) return null
-  const total = calendar.obligations.length
-  const overdue = calendar.obligations.filter((o) => daysUntil(o.due_date) < 0).length
-  const upcoming = [...calendar.obligations]
-    .filter((o) => daysUntil(o.due_date) >= 0)
-    .sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
-
-  return (
-    <div>
-      <div className="dash-summary">
-        <span>
-          <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
-        </span>
-        <span className="dash-summary-sep">·</span>
-        <span className={overdue > 0 ? 'dash-summary-alert' : undefined}>
-          <strong>{overdue}</strong> overdue
-        </span>
-        {upcoming && (
-          <>
-            <span className="dash-summary-sep">·</span>
-            <span>next due {formatDate(upcoming.due_date)}</span>
-          </>
-        )}
-      </div>
-      {overdue > 0 && (
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--ink-soft)',
-            marginTop: 4,
-            lineHeight: 1.5
-          }}
-        >
-          Dates shown are for the sample basis period. OVERDUE status reflects the demo clock.
-        </div>
-      )}
-    </div>
-  )
-}
-
 function readJourneyDone(): boolean {
   try {
     return localStorage.getItem('cp_journey_done') === '1'
@@ -506,8 +348,8 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* JR-4: ①②③ journey progress strip */}
-      <JourneyStrip done={journeyDone} currentRoute={location.pathname} />
+      {/* GR-1: hide the journey strip once the walkthrough is complete */}
+      {!journeyDone && <JourneyStrip done={false} currentRoute={location.pathname} />}
 
       <div className="dash-head">
         <h1>{greeting()}</h1>
@@ -515,7 +357,6 @@ export default function Dashboard() {
           Your YA2026 tax command center for <strong>{persona.label}</strong>. Track deadlines, file a cited Form C, and
           build audit-ready defenses.
         </p>
-        <StatusSummary calendar={calendar} loading={loading} />
       </div>
 
       <div className="dash-primary-grid">
@@ -523,9 +364,9 @@ export default function Dashboard() {
         <QuickAccess />
       </div>
 
+      {/* GR-5: Entity Snapshot removed (lives on /entity). Deadlines + Audit Defense align at bottom. */}
       <div className="dash-overview-grid">
         <DeadlinesPanel calendar={calendar} loading={loading} error={error} />
-        <SnapshotPanel key={`snap-${persona.tin}`} />
       </div>
     </>
   )

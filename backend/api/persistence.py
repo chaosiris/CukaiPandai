@@ -166,10 +166,10 @@ class UserRepository:
                 pass  # fall through to in-memory — DB-down ≠ demo-down
         return self._mem.get(email)
 
-    def create(self, email: str, name: str, password_hash: str | None, provider: str = "password") -> dict:
+    def create(self, email: str, name: str, password_hash: str | None, provider: str = "password", id: str | None = None) -> dict:
         email = email.lower()
         user = {
-            "id": uuid.uuid4().hex,
+            "id": id if id is not None else uuid.uuid4().hex,
             "email": email,
             "name": name,
             "password_hash": password_hash,
@@ -191,6 +191,165 @@ class UserRepository:
         self._mem[email] = user
         return user
 
+    def ensure_guest(self, guest_id: str = "", guest_email: str = "", guest_name: str = "") -> dict:
+        """Idempotently seed the shared guest user with a fixed id. Safe to call multiple times."""
+        existing = self.get_by_email(guest_email)
+        if existing is not None:
+            return existing
+        return self.create(guest_email, guest_name, password_hash=None, provider="guest", id=guest_id)
+
     def upsert_oauth(self, email: str, name: str, provider: str = "google") -> dict:
         """Link/create an SSO user — return the existing row if present, else create one (no password)."""
         return self.get_by_email(email) or self.create(email, name, password_hash=None, provider=provider)
+
+
+class UserEntityRepository:
+    """Per-user entity profiles, keyed by the JWT ``sub`` (owner).
+
+    Neon table ``user_entities(user_id text PRIMARY KEY, data jsonb)`` when DATABASE_URL is set;
+    falls back to an in-memory dict per fallback-first pattern. Any DB error → in-memory.
+    """
+
+    def __init__(self):
+        self._mem: dict[str, dict] = {}  # owner (sub) -> profile dict
+
+    def get(self, owner: str) -> dict | None:
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    conn.execute(
+                        "CREATE TABLE IF NOT EXISTS user_entities "
+                        "(user_id text PRIMARY KEY, data jsonb NOT NULL)"
+                    )
+                    row = conn.execute(
+                        "SELECT data FROM user_entities WHERE user_id=%s", (owner,)
+                    ).fetchone()
+                    return row["data"] if row else None
+            except Exception:
+                pass
+        return self._mem.get(owner)
+
+    def put(self, owner: str, data: dict) -> None:
+        import json as _json
+
+        self._mem[owner] = data
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    conn.execute(
+                        "CREATE TABLE IF NOT EXISTS user_entities "
+                        "(user_id text PRIMARY KEY, data jsonb NOT NULL)"
+                    )
+                    conn.execute(
+                        "INSERT INTO user_entities (user_id, data) VALUES (%s, %s::jsonb) "
+                        "ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data",
+                        (owner, _json.dumps(data)),
+                    )
+            except Exception:
+                pass  # already stored in-memory above; never crash on DB error
+
+
+class FilingRepository:
+    """Per-user filing records, keyed by the JWT ``sub`` (owner).
+
+    Uses a new ``filing_records`` table (additive; does NOT alter the existing ``filings`` table).
+    Falls back to an in-memory dict when DATABASE_URL is unset or unreachable.
+    """
+
+    def __init__(self):
+        # owner (sub) -> list of record dicts (newest first after insert)
+        self._mem: dict[str, list[dict]] = {}
+
+    def _ensure_table(self, conn) -> None:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS filing_records ("
+            "id text PRIMARY KEY, user_id text NOT NULL, tin text, label text, "
+            "computation jsonb, risk_flags jsonb, line_items jsonb, "
+            "created_at timestamptz NOT NULL DEFAULT now())"
+        )
+
+    def create(self, owner: str, rec: dict) -> dict:
+        import json as _json
+        from datetime import datetime, timezone
+
+        record = {
+            **rec,
+            "id": uuid.uuid4().hex,
+            "user_id": owner,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # Always write to in-memory first
+        self._mem.setdefault(owner, []).insert(0, record)
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    conn.execute(
+                        "INSERT INTO filing_records (id, user_id, tin, label, computation, risk_flags, line_items) "
+                        "VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb)",
+                        (
+                            record["id"], owner,
+                            rec.get("tin"), rec.get("label"),
+                            _json.dumps(rec.get("computation")),
+                            _json.dumps(rec.get("risk_flags", [])),
+                            _json.dumps(rec.get("line_items")),
+                        ),
+                    )
+            except Exception:
+                pass
+        return record
+
+    def list(self, owner: str) -> list[dict]:
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    rows = conn.execute(
+                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at "
+                        "FROM filing_records WHERE user_id=%s ORDER BY created_at DESC",
+                        (owner,),
+                    ).fetchall()
+                    return [dict(r) for r in rows]
+            except Exception:
+                pass
+        return list(self._mem.get(owner, []))
+
+    def get(self, owner: str, rec_id: str) -> dict | None:
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    row = conn.execute(
+                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at "
+                        "FROM filing_records WHERE id=%s AND user_id=%s",
+                        (rec_id, owner),
+                    ).fetchone()
+                    return dict(row) if row else None
+            except Exception:
+                pass
+        for rec in self._mem.get(owner, []):
+            if rec["id"] == rec_id:
+                return rec
+        return None
+
+    def delete(self, owner: str, ids: list[str]) -> None:
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    for rec_id in ids:
+                        conn.execute(
+                            "DELETE FROM filing_records WHERE id=%s AND user_id=%s",
+                            (rec_id, owner),
+                        )
+            except Exception:
+                pass
+        # Always apply to in-memory (may be the only store if DB is down)
+        if owner in self._mem:
+            self._mem[owner] = [r for r in self._mem[owner] if r["id"] not in ids]

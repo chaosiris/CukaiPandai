@@ -1,14 +1,13 @@
-// JR-6 — "Use my own company" form.
-// EN-2: now calls addCustomPersona (which does PUT /me/entity) instead of the old
-// localStorage addCustomPersona + createEntity path.
-// On success, navigates to /start/obligations so the user immediately sees their data.
-// Fully open in guest mode (PO decision JR-Q2).
+// EN-1 — Entity page (/entity).
+// Views and edits the active company's full EntityTaxProfile.
+// Edits write to the backend via PUT /me/entity (EN-2); seeds stay pristine.
+// Reuses the CustomCompany field set, validation helpers, and token-CSS styles.
 
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
-import type { SsmProfile } from '../api/client'
-import type { Persona } from '../personas'
+import { type SsmProfile, putMyEntity } from '../api/client'
+import { InfoTip } from '../components/Tooltip'
+import { useEntity } from '../hooks/useEntity'
 
 const ENTITY_TYPES = [
   { value: 'sdn_bhd', label: 'Sdn Bhd' },
@@ -31,18 +30,7 @@ interface FormValues {
   commencement_date: string
 }
 
-const INITIAL: FormValues = {
-  tin: '',
-  entity_type: 'sdn_bhd',
-  msic_codes: '',
-  paid_up_capital: '',
-  gross_income: '',
-  employee_count: '',
-  sst_registered: false,
-  basis_period_start: '2025-01-01',
-  basis_period_end: '2025-12-31',
-  commencement_date: ''
-}
+type FieldErrors = Partial<Record<keyof FormValues, string>>
 
 function required(v: string): string | null {
   return v.trim() ? null : 'Required'
@@ -69,11 +57,9 @@ function validateMsic(v: string): string | null {
     .filter(Boolean)
   if (parts.length === 0) return 'Enter at least one MSIC code'
   const invalid = parts.filter((p) => !/^\d{4,5}$/.test(p))
-  if (invalid.length > 0) return `Invalid MSIC code(s): ${invalid.join(', ')} — must be 4-5 digits`
+  if (invalid.length > 0) return `Invalid MSIC code(s): ${invalid.join(', ')}. Must be 4-5 digits`
   return null
 }
-
-type FieldErrors = Partial<Record<keyof FormValues, string>>
 
 function validate(v: FormValues): FieldErrors {
   return {
@@ -138,13 +124,69 @@ const inputErrorStyle: React.CSSProperties = {
   borderColor: 'var(--rust)'
 }
 
-export default function CustomCompany() {
-  const navigate = useNavigate()
-  const { addCustomPersona } = useActivePersona()
+function fmt(n: number): string {
+  return `RM ${n.toLocaleString('en-MY')}`
+}
 
-  const [values, setValues] = useState<FormValues>(INITIAL)
+export default function Entity() {
+  const { persona, activateCustomPersona, entityReady } = useActivePersona()
+  const { entity, loading } = useEntity()
+
+  const [values, setValues] = useState<FormValues | null>(null)
   const [touched, setTouched] = useState<Partial<Record<keyof FormValues, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Pre-fill form when the entity resolves.
+  useEffect(() => {
+    if (!entity) return
+    setValues({
+      tin: entity.tin,
+      entity_type: entity.entity_type,
+      msic_codes: entity.msic_codes.join(', '),
+      paid_up_capital: String(entity.paid_up_capital),
+      gross_income: String(entity.gross_income),
+      employee_count: String(entity.employee_count),
+      sst_registered: entity.sst_registered,
+      basis_period_start: entity.basis_period_start,
+      basis_period_end: entity.basis_period_end,
+      commencement_date: entity.commencement_date ?? ''
+    })
+    setTouched({})
+    setSubmitted(false)
+    setSaveStatus('idle')
+    setSaveError(null)
+  }, [entity])
+
+  if (!entityReady || loading) {
+    return (
+      <>
+        <header className="page-head">
+          <div>
+            <h1>Entity</h1>
+            <div className="page-kicker">Loading company profile…</div>
+          </div>
+        </header>
+      </>
+    )
+  }
+
+  if (!values || !entity) {
+    return (
+      <>
+        <header className="page-head">
+          <div>
+            <h1>Entity</h1>
+            <div className="page-kicker">No company profile loaded.</div>
+          </div>
+        </header>
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-soft)', padding: '0 0 24px' }}>
+          Select a company in Settings or use your own company to get started.
+        </p>
+      </>
+    )
+  }
 
   const errors = validate(values)
   const visibleErrors: FieldErrors = {}
@@ -153,7 +195,7 @@ export default function CustomCompany() {
   }
 
   function set(field: keyof FormValues, value: string | boolean) {
-    setValues((v) => ({ ...v, [field]: value }))
+    setValues((v) => (v ? { ...v, [field]: value } : v))
   }
 
   function touch(field: keyof FormValues) {
@@ -163,7 +205,7 @@ export default function CustomCompany() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitted(true)
-    if (hasErrors(errors)) return
+    if (!values || hasErrors(errors)) return
 
     const msicList = values.msic_codes
       .split(',')
@@ -183,62 +225,123 @@ export default function CustomCompany() {
       ...(values.commencement_date ? { commencement_date: values.commencement_date } : {})
     }
 
-    const persona: Persona = {
-      tin: ssm.tin,
-      label: `My Company (${ssm.tin})`,
-      ssm,
-      demoRawText: ''
-    }
+    setSaveStatus('saving')
+    setSaveError(null)
 
-    // EN-2: addCustomPersona does PUT /me/entity (best-effort) + sets active.
-    // Navigate immediately — entity is active in context even if the BE write is still in flight.
-    addCustomPersona(persona)
-    navigate('/start/obligations', { replace: true })
+    try {
+      await putMyEntity(ssm)
+      // EN-2: update context (no second PUT — putMyEntity was already awaited above).
+      activateCustomPersona(ssm)
+      setSaveStatus('saved')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Save failed'
+      setSaveError(msg)
+      setSaveStatus('error')
+    }
   }
 
+  const isSeed = ['C2581234509', 'C7654321098', 'C3219876540'].includes(persona.tin)
+
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 0 80px' }}>
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-soft)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            marginBottom: 8
-          }}
-        >
-          CukaiPandai · Custom Company
+    <>
+      <header className="page-head">
+        <div>
+          <h1>Entity</h1>
+          <div className="page-kicker">Active Company Profile and Tax Configuration</div>
         </div>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(24px, 4vw, 36px)',
-            fontWeight: 600,
-            lineHeight: 1.2,
-            color: 'var(--ink)',
-            marginBottom: 8
-          }}
-        >
-          Use My Own Company
-        </h1>
-        <p style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
-          Enter your SSM profile. Your obligations, Form C filing, and audit defense will be grounded in your actual
-          figures. Your company profile is saved to your session.
-        </p>
+      </header>
+
+      <p
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: 14,
+          color: 'var(--ink-soft)',
+          marginBottom: 20,
+          lineHeight: 1.5
+        }}
+      >
+        View and edit your active company's SSM profile. Saved changes apply across all compliance consoles.
+      </p>
+
+      {/* Snapshot card */}
+      <div className="window" style={{ marginBottom: 16 }}>
+        <div className="titlebar">
+          <span className="titlebar-title">{persona.label}</span>
+          <span style={{ marginLeft: 'auto' }}>
+            <InfoTip
+              label="About this snapshot"
+              content="These figures drive your obligation calendar, Form C computation, and audit-defense evidence. Edit below to update."
+            />
+          </span>
+        </div>
+        <div style={{ padding: '16px 18px', display: 'grid', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            <SnapRow label="TIN" value={entity.tin} />
+            <SnapRow
+              label="Entity Type"
+              value={entity.entity_type.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+            />
+            <SnapRow label="MSIC Codes" value={entity.msic_codes.join(', ')} />
+            <SnapRow label="Gross Income" value={fmt(entity.gross_income)} />
+            <SnapRow label="Paid-Up Capital" value={fmt(entity.paid_up_capital)} />
+            <SnapRow label="Employees" value={String(entity.employee_count)} />
+            <SnapRow label="SST Registered" value={entity.sst_registered ? 'Yes' : 'No'} />
+            <SnapRow label="Basis Period" value={`${entity.basis_period_start} to ${entity.basis_period_end}`} />
+            {entity.commencement_date && <SnapRow label="Commenced" value={entity.commencement_date} />}
+          </div>
+        </div>
       </div>
+
+      {isSeed && (
+        <div
+          className="window"
+          style={{ marginBottom: 16, borderColor: 'var(--mustard)', background: 'rgba(224,169,59,0.06)' }}
+        >
+          <div style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
+            You are viewing a seed demo entity. Editing below will save your own profile as "My Company" and switch the
+            active entity. The seed remains selectable from Settings.
+          </div>
+        </div>
+      )}
+
+      {saveStatus === 'saved' && (
+        <div
+          className="window"
+          style={{ marginBottom: 16, borderColor: 'var(--denim)', background: 'rgba(45,91,152,0.06)' }}
+        >
+          <div style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
+            Profile saved. Your company is now active across all consoles.
+          </div>
+        </div>
+      )}
+
+      {saveStatus === 'error' && saveError && (
+        <div
+          className="window"
+          style={{ marginBottom: 16, borderColor: 'var(--rust)', background: 'rgba(180,60,60,0.06)' }}
+        >
+          <div style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--rust)' }}>
+            {saveError}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="window" style={{ marginBottom: 16 }}>
           <div className="titlebar">
             <span className="titlebar-title">Company Identity</span>
+            <span style={{ marginLeft: 'auto' }}>
+              <InfoTip
+                label="About company identity"
+                content="Your TIN is issued by LHDN. MSIC codes identify your business activity for tax classification."
+              />
+            </span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
             <Field
               label="Tax Identification Number (TIN)"
               error={visibleErrors.tin}
-              hint="Your company's tax ID issued by LHDN (Inland Revenue Board). Format: one letter + 10 digits"
+              hint="Format: one letter + 10 digits (e.g. C0000000001)"
             >
               <input
                 type="text"
@@ -267,7 +370,7 @@ export default function CustomCompany() {
             <Field
               label="MSIC Codes"
               error={visibleErrors.msic_codes}
-              hint="Malaysia Standard Industrial Classification — your business activity code(s). Comma-separated, e.g. 46900, 62010"
+              hint="Malaysia Standard Industrial Classification codes. Comma-separated, e.g. 46900, 62010"
             >
               <input
                 type="text"
@@ -284,6 +387,12 @@ export default function CustomCompany() {
         <div className="window" style={{ marginBottom: 16 }}>
           <div className="titlebar">
             <span className="titlebar-title">Financial Profile (YA2026)</span>
+            <span style={{ marginLeft: 'auto' }}>
+              <InfoTip
+                label="About the financial profile"
+                content="Gross income determines e-invoice obligations (threshold: RM 1,000,000). Paid-up capital determines the SME tax rate (threshold: RM 2,500,000)."
+              />
+            </span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
             <Field
@@ -305,7 +414,7 @@ export default function CustomCompany() {
             <Field
               label="Gross Income (RM)"
               error={visibleErrors.gross_income}
-              hint="e-invoice threshold: RM 1,000,000"
+              hint="e-Invoice threshold: RM 1,000,000"
             >
               <input
                 type="number"
@@ -331,7 +440,7 @@ export default function CustomCompany() {
               />
             </Field>
 
-            <Field label="SST Registered" hint="Sales and Service Tax — check if your company is registered for SST">
+            <Field label="SST Registered" hint="Sales and Service Tax registration status">
               <label
                 style={{
                   display: 'flex',
@@ -358,15 +467,11 @@ export default function CustomCompany() {
         <div className="window" style={{ marginBottom: 16 }}>
           <div className="titlebar">
             <span className="titlebar-title">Basis Period</span>
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-soft)',
-                letterSpacing: '0.04em'
-              }}
-            >
-              your financial year for YA2026
+            <span style={{ marginLeft: 'auto' }}>
+              <InfoTip
+                label="About the basis period"
+                content="Your financial year for YA2026. Form C due date is calculated from the last day of your basis period plus 7 months."
+              />
             </span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
@@ -391,7 +496,7 @@ export default function CustomCompany() {
               </Field>
             </div>
 
-            <Field label="Commencement Date (optional)" hint="Leave blank if not applicable">
+            <Field label="Commencement Date (Optional)" hint="Leave blank if not applicable">
               <input
                 type="date"
                 value={values.commencement_date}
@@ -414,13 +519,14 @@ export default function CustomCompany() {
               borderRadius: 'var(--radius)'
             }}
           >
-            Please fix the errors above before submitting.
+            Please fix the errors above before saving.
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="submit"
+            disabled={saveStatus === 'saving'}
             style={{
               padding: '10px 24px',
               border: 'none',
@@ -430,26 +536,11 @@ export default function CustomCompany() {
               fontFamily: 'var(--font-mono)',
               fontSize: 13,
               fontWeight: 700,
-              cursor: 'pointer'
+              cursor: saveStatus === 'saving' ? 'wait' : 'pointer',
+              opacity: saveStatus === 'saving' ? 0.7 : 1
             }}
           >
-            Add My Company and Start →
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/welcome', { replace: true })}
-            style={{
-              padding: '10px 16px',
-              border: 'var(--border)',
-              borderRadius: 'var(--radius)',
-              background: 'transparent',
-              color: 'var(--ink-soft)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              cursor: 'pointer'
-            }}
-          >
-            Back
+            {saveStatus === 'saving' ? 'Saving…' : 'Save Company Profile'}
           </button>
         </div>
 
@@ -462,9 +553,30 @@ export default function CustomCompany() {
             lineHeight: 1.5
           }}
         >
-          YA2026 · decision-support, not legal advice
+          YA2026 · decision-support, not legal advice · edits never overwrite the built-in seed entities
         </p>
       </form>
+    </>
+  )
+}
+
+function SnapRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'grid', gap: 2 }}>
+      <span
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: 'var(--ink-soft)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.07em'
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink)', wordBreak: 'break-word' }}>
+        {value}
+      </span>
     </div>
   )
 }

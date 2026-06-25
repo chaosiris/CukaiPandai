@@ -1,265 +1,212 @@
+// AD-1 + AD-2 — Conversational Audit Assistant tied to a saved filing record.
+// AD-1: filing-record picker ("Defend This Filing") + empty state linking to /filing/new.
+// AD-2: multi-turn chat with suggested questions seeded from the selected filing's figures;
+//        each message → one getAuditDefense() call (figures passed as evidence);
+//        CitationPanel + VerifiedBadge + SovereignBadge per answer turn;
+//        Trust Demo chip surfaces the deterministic fabrication-rejection money-shot;
+//        switching the selected filing clears the chat thread.
+// No backend change — /audit-defense already accepts free-text query + evidence.
+
 import { useEffect, useRef, useState } from 'react'
-import { type AuditDefenseResponse, getAuditDefense } from '../api/client'
+import { Link } from 'react-router-dom'
+import { type AuditDefenseResponse, type FilingRecord, getAuditDefense, listFilings } from '../api/client'
 import { CitationPanel, SovereignBadge, VerifiedBadge } from '../components/CitationPanel'
-import { WhatNext } from '../components/JourneyProgress'
+import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
 
-// --- Constants ---
+// --- Types ---
 
-const DEMO_QUERY = 'Justify the RM4,800 repairs deduction'
-const DEMO_EVIDENCE: [string, string][] = [['invoice', 'INV-2025-0042: Office plumbing repair RM4,800']]
-
-const FABRICATION_QUERY = 'Claim deduction under ITA-1967-s999-FAKE (fictitious relief)'
-const FABRICATION_EVIDENCE: [string, string][] = [['claim', 'Fabricated clause ITA-1967-s999-FAKE RM50,000 deduction']]
-
-const EXAMPLE_QUERY = 'Is this depreciation deductible under the ITA?'
-const EXAMPLE_EVIDENCE: [string, string][] = [['asset', 'Motor vehicle RM120,000 depreciation YA2026']]
-
-// --- Pipeline stage simulation (mirrors FilingStudio deriveStages pattern; T4) ---
-
-type PipelineStage = 'retrieve' | 'ground' | 'verify' | 'reject'
-
-interface AuditStage {
-  id: PipelineStage
-  num: number
-  name: string
-  status: 'pending' | 'running' | 'complete' | 'blocked'
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  data?: AuditDefenseResponse
+  error?: string
+  isFabrication?: boolean
 }
 
-function deriveAuditStages(
-  loading: boolean,
-  data: AuditDefenseResponse | null,
-  isFabricationMode: boolean,
-  stageIndex: number
-): AuditStage[] {
-  const base: AuditStage[] = [
-    { id: 'retrieve', num: 1, name: 'Retrieve Law', status: 'pending' },
-    { id: 'ground', num: 2, name: 'Ground Claim', status: 'pending' },
-    { id: 'verify', num: 3, name: 'Verify Citations', status: 'pending' },
-    { id: 'reject', num: 4, name: 'Reject Fabrications', status: 'pending' }
-  ]
+// --- Helpers ---
 
-  if (!loading && !data) return base
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch {
+    return iso
+  }
+}
 
-  if (loading) {
-    for (let i = 0; i < base.length; i++) {
-      if (i < stageIndex) base[i].status = 'complete'
-      else if (i === stageIndex) base[i].status = 'running'
+function formatRM(value: number): string {
+  return `RM ${value.toLocaleString()}`
+}
+
+/** Derive evidence pairs from a filing's computation fields. */
+function filingEvidence(rec: FilingRecord): [string, string][] {
+  const fields = rec.computation?.fields ?? {}
+  return Object.entries(fields).map(([key, trace]) => [key, formatRM(trace.value)])
+}
+
+/** Field-key → readable label for suggested question generation. */
+const FIELD_LABELS: Record<string, string> = {
+  gross_income: 'gross income',
+  adjusted_income: 'adjusted income',
+  chargeable_income: 'chargeable income',
+  tax_payable: 'tax payable',
+  capital_allowances: 'capital allowances'
+}
+
+function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key.replace(/_/g, ' ')
+}
+
+/** Generate question chips from the filing's computation fields. */
+function seedQuestions(rec: FilingRecord): string[] {
+  const fields = rec.computation?.fields ?? {}
+  const questions: string[] = []
+
+  for (const [key, trace] of Object.entries(fields)) {
+    const label = fieldLabel(key)
+    const amount = formatRM(trace.value)
+
+    if (key === 'tax_payable') {
+      questions.push(`Why is the tax payable ${amount}?`)
+    } else if (key === 'chargeable_income') {
+      questions.push(`How is the chargeable income of ${amount} derived?`)
+    } else if (key === 'capital_allowances') {
+      questions.push(`Is the ${amount} capital allowances deductible?`)
+    } else if (key === 'adjusted_income') {
+      questions.push(`How is the adjusted income of ${amount} calculated?`)
+    } else if (key === 'gross_income') {
+      questions.push(`Is the ${amount} gross income figure correct for YA2026?`)
+    } else {
+      questions.push(`Justify the ${label} figure of ${amount}`)
     }
-    return base
   }
 
-  // data resolved
-  if (data) {
-    base[0].status = 'complete'
-    base[1].status = 'complete'
-    base[2].status = 'complete'
-    const hasRejected = data.citations.some((c) => !c.verified)
-    base[3].status = isFabricationMode && hasRejected ? 'blocked' : 'complete'
+  return questions.slice(0, 5) // at most 5 chips
+}
+
+const TRUST_DEMO_QUERY = 'Claim deduction under ITA-1967-s999-FAKE (fictitious relief clause)'
+const TRUST_DEMO_EVIDENCE: [string, string][] = [['claim', 'Fabricated clause ITA-1967-s999-FAKE RM50,000 deduction']]
+
+// --- Sub-components ---
+
+/** Single assistant turn rendered in the chat thread. */
+function AssistantTurn({ msg }: { msg: ChatMessage }) {
+  const data = msg.data
+  if (!data) {
+    return (
+      <div
+        style={{
+          padding: '12px 16px',
+          background: 'var(--screen)',
+          borderRadius: 'var(--radius)',
+          borderLeft: '3px solid var(--rust)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          color: 'var(--rust)'
+        }}
+      >
+        {msg.error ?? 'An error occurred. Please try again.'}
+      </div>
+    )
   }
 
-  return base
-}
+  const verifiedCitations = data.citations.filter((c) => c.verified)
+  const rejectedCitations = data.citations.filter((c) => !c.verified)
 
-function stageColor(status: AuditStage['status']): string {
-  if (status === 'complete') return 'var(--denim)'
-  if (status === 'running') return 'var(--mustard)'
-  if (status === 'blocked') return 'var(--rust)'
-  return 'var(--ink-soft)'
-}
-
-function stageLabel(status: AuditStage['status']): string {
-  if (status === 'complete') return 'COMPLETE'
-  if (status === 'running') return 'IN PROGRESS'
-  if (status === 'blocked') return 'BLOCKED'
-  return 'PENDING'
-}
-
-function AuditStageRow({ stage, isActive }: { stage: AuditStage; isActive: boolean }) {
-  const color = stageColor(stage.status)
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '36px 1fr auto',
-        alignItems: 'center',
-        gap: 12,
-        padding: '10px 18px',
-        borderBottom: 'var(--border)',
-        background: isActive ? 'var(--screen)' : 'transparent',
-        transition: 'background 200ms'
-      }}
-    >
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          border: `1.5px solid ${color}`,
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          fontWeight: 700,
-          color,
-          flexShrink: 0
-        }}
-      >
-        {stage.status === 'complete' ? '✓' : stage.status === 'blocked' ? '✗' : String(stage.num).padStart(2, '0')}
+    <div style={{ display: 'grid', gap: 10 }}>
+      {/* Fabrication money-shot: elevated when Trust Demo ran */}
+      {msg.isFabrication && rejectedCitations.length > 0 && (
+        <div className="window" style={{ borderColor: 'var(--rust)', background: 'rgba(181,80,60,0.04)' }}>
+          <div className="titlebar" style={{ borderBottomColor: 'var(--rust)' }}>
+            <span className="titlebar-title" style={{ color: 'var(--rust)' }}>
+              Trust Payoff: Fabricated Clause Blocked
+            </span>
+            <span className="unverified-stamp verified-stamp" style={{ transform: 'rotate(3deg)' }}>
+              BLOCKED
+            </span>
+          </div>
+          <div
+            style={{
+              padding: '12px 18px',
+              fontFamily: 'var(--font-body)',
+              fontSize: 13,
+              color: 'var(--ink)',
+              lineHeight: 1.6
+            }}
+          >
+            The clause ID{' '}
+            <strong style={{ color: 'var(--rust)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+              {rejectedCitations.flatMap((c) => c.clause_ids).join(', ')}
+            </strong>{' '}
+            is not present in the law corpus. The deterministic <code>ground_citation</code> gate set{' '}
+            <code>verified=false</code>: fabricated clause IDs cannot pass.
+            {verifiedCitations.length > 0 && (
+              <span>
+                {' '}
+                The genuine citation passes:{' '}
+                <strong style={{ color: 'var(--denim)' }}>{verifiedCitations[0].clause_ids.join(', ')}</strong>{' '}
+                <VerifiedBadge verified={true} />
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Defense Narrative */}
+      <div className="window">
+        <div className="titlebar">
+          <span className="titlebar-title">Defense Narrative</span>
+          <SovereignBadge sovereign={data.sovereign} model={data.active_model} />
+        </div>
+        <div style={{ padding: '14px 18px', fontSize: 14, lineHeight: 1.7, fontFamily: 'var(--font-body)' }}>
+          {data.exposure_note}
+        </div>
       </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 14,
-          fontWeight: stage.status === 'complete' || stage.status === 'blocked' ? 400 : 600,
-          color: stage.status === 'pending' ? 'var(--ink-soft)' : 'var(--ink)'
-        }}
-      >
-        {stage.name}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color,
-          whiteSpace: 'nowrap'
-        }}
-      >
-        {stageLabel(stage.status)}
+
+      {/* Citations */}
+      <div className="window">
+        <div className="titlebar">
+          <span className="titlebar-title">Citations</span>
+          <span className="titlebar-meta">
+            {verifiedCitations.length} verified
+            {rejectedCitations.length > 0 && <> · {rejectedCitations.length} rejected</>}
+          </span>
+        </div>
+        <ul className="req-list">
+          {data.citations.map((c) => (
+            <CitationPanel key={c.claim} citation={c} />
+          ))}
+        </ul>
       </div>
     </div>
   )
 }
 
-// --- Pack-shape preview (shown before a query runs) ---
-
-function PackShapePreview() {
+/** Single user message bubble. */
+function UserBubble({ text, isFabrication }: { text: string; isFabrication?: boolean }) {
   return (
-    <div className="window" style={{ marginBottom: 16, opacity: 0.7 }}>
-      <div className="titlebar">
-        <span className="titlebar-title" style={{ color: 'var(--ink-soft)' }}>
-          Defense Pack Preview
-        </span>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--ink-soft)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em'
-          }}
-        >
-          What you will get
-        </span>
-      </div>
-      <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
-        {/* Narrative placeholder */}
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              color: 'var(--ink-soft)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: 6
-            }}
-          >
-            Defense Narrative
-          </div>
-          <div
-            style={{
-              height: 14,
-              background: 'var(--grid)',
-              borderRadius: 3,
-              marginBottom: 6,
-              width: '90%'
-            }}
-          />
-          <div style={{ height: 14, background: 'var(--grid)', borderRadius: 3, width: '70%' }} />
-        </div>
-
-        {/* Citation placeholders */}
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              color: 'var(--ink-soft)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: 6
-            }}
-          >
-            Citations
-          </div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {[
-              { label: 'Claim supported by law', badge: true, badgeVerified: true },
-              { label: 'Fabricated clause (trust demo only)', badge: true, badgeVerified: false }
-            ].map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 12px',
-                  border: 'var(--border)',
-                  borderRadius: 'var(--radius)',
-                  background: 'var(--screen)',
-                  opacity: 0.8
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    color: 'var(--ink-soft)',
-                    flex: 1
-                  }}
-                >
-                  {item.label}
-                </span>
-                <VerifiedBadge verified={item.badgeVerified} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Exposure note placeholder */}
-        <div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              color: 'var(--ink-soft)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: 6
-            }}
-          >
-            Exposure Assessment
-          </div>
-          <div style={{ height: 14, background: 'var(--grid)', borderRadius: 3, width: '85%' }} />
-        </div>
-
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-soft)',
-            borderTop: 'var(--border)',
-            paddingTop: 10,
-            fontStyle: 'italic'
-          }}
-        >
-          The deterministic gate verifies every clause against the law corpus. Fabricated IDs cannot pass.
-        </div>
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div
+        style={{
+          maxWidth: '80%',
+          padding: '9px 14px',
+          background: isFabrication ? 'rgba(181,80,60,0.08)' : 'var(--screen)',
+          border: isFabrication ? '1px solid var(--rust)' : 'var(--border)',
+          borderRadius: 'var(--radius)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          color: isFabrication ? 'var(--rust)' : 'var(--ink)',
+          lineHeight: 1.5
+        }}
+      >
+        {isFabrication && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--rust)', marginRight: 6 }}>
+            [TRUST DEMO]
+          </span>
+        )}
+        {text}
       </div>
     </div>
   )
@@ -268,105 +215,133 @@ function PackShapePreview() {
 // --- Main component ---
 
 export default function AuditDefense() {
-  const { entity, error: entityError } = useEntity()
-  const [query, setQuery] = useState('')
-  const [data, setData] = useState<AuditDefenseResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [isFabricationMode, setIsFabricationMode] = useState(false)
-  const [technicalOpen, setTechnicalOpen] = useState(false)
+  const { error: entityError } = useEntity()
   const { notify } = useNotifications()
 
-  // For FE-simulated pipeline animation (T4): step through stages while loading
-  const [stageIndex, setStageIndex] = useState(0)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // AD-1: filing records + selection state
+  const [filings, setFilings] = useState<FilingRecord[]>([])
+  const [filingsLoading, setFilingsLoading] = useState(true)
+  const [selectedFiling, setSelectedFiling] = useState<FilingRecord | null>(null)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
+  // AD-2: chat state
+  const [thread, setThread] = useState<ChatMessage[]>([])
+  const [inputText, setInputText] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const threadEndRef = useRef<HTMLDivElement>(null)
+
+  // Load filing records on mount
   useEffect(() => {
-    setData(null)
-    setError(null)
-    setQuery('')
-    setIsFabricationMode(false)
-    setTechnicalOpen(false)
-    setStageIndex(0)
-  }, [entity?.tin])
+    setFilingsLoading(true)
+    listFilings()
+      .then((recs) => {
+        setFilings(recs)
+        setFilingsLoading(false)
+      })
+      .catch(() => {
+        setFilingsLoading(false)
+      })
+  }, [])
 
-  // Advance the simulated pipeline stage during loading
+  // Reset chat when persona switches (entity error guard)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona/entity changes
   useEffect(() => {
-    if (loading) {
-      setStageIndex(0)
-      timerRef.current = setInterval(() => {
-        setStageIndex((i) => Math.min(i + 1, 2)) // advance through stages 0, 1, 2; stage 3 resolves with data
-      }, 600)
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [loading])
+    setThread([])
+    setInputText('')
+    setSelectedFiling(null)
+    setFilings([])
+    setFilingsLoading(true)
+    listFilings()
+      .then((recs) => {
+        setFilings(recs)
+        setFilingsLoading(false)
+      })
+      .catch(() => {
+        setFilingsLoading(false)
+      })
+  }, [entityError])
 
-  const displayError = entityError ?? error
+  // Auto-scroll to bottom of chat thread on new messages
+  useEffect(() => {
+    if (thread.length > 0) {
+      threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [thread.length])
 
-  function applyChip(chipQuery: string, chipEvidence: [string, string][], fabrication: boolean) {
-    setQuery(chipQuery)
-    setIsFabricationMode(fabrication)
-    // Auto-run
-    runQuery(chipQuery, chipEvidence, fabrication)
+  function selectFiling(rec: FilingRecord) {
+    setSelectedFiling(rec)
+    setThread([])
+    setInputText('')
   }
 
-  function runQuery(q: string, evidence: [string, string][], fabrication: boolean) {
-    if (!entity || !q.trim()) return
-    setData(null)
-    setError(null)
-    setLoading(true)
-    setIsFabricationMode(fabrication)
-    setTechnicalOpen(false)
+  function clearFiling() {
+    setSelectedFiling(null)
+    setThread([])
+    setInputText('')
+  }
 
-    getAuditDefense(entity.tin, q.trim(), evidence, fabrication)
-      .then((res) => {
-        setData(res)
-        setLoading(false)
-        if (fabrication) {
-          const rejected = res.citations.filter((c) => !c.verified)
-          if (rejected.length > 0) {
-            notify({
-              title: 'Fabricated Citation Rejected',
-              body: `Deterministic gate blocked ${rejected.length} unverified clause${rejected.length !== 1 ? 's' : ''}.`,
-              kind: 'error'
-            })
-          }
+  async function sendMessage(query: string, evidence: [string, string][], isFabrication: boolean) {
+    if (!selectedFiling || !query.trim() || chatLoading) return
+
+    const userMsg: ChatMessage = { role: 'user', text: query, isFabrication }
+    setThread((prev) => [...prev, userMsg])
+    setInputText('')
+    setChatLoading(true)
+
+    try {
+      const res = await getAuditDefense(selectedFiling.tin, query.trim(), evidence, isFabrication)
+      const assistantMsg: ChatMessage = { role: 'assistant', text: res.exposure_note, data: res, isFabrication }
+      setThread((prev) => [...prev, assistantMsg])
+      if (isFabrication) {
+        const rejected = res.citations.filter((c) => !c.verified)
+        if (rejected.length > 0) {
+          notify({
+            title: 'Fabricated Citation Rejected',
+            body: `Deterministic gate blocked ${rejected.length} fabricated clause${rejected.length !== 1 ? 's' : ''}.`,
+            kind: 'error'
+          })
         }
-      })
-      .catch((e: Error) => {
-        setError(e.message)
-        setLoading(false)
-      })
+      }
+    } catch (e) {
+      const errMsg = (e as Error).message ?? 'Request failed'
+      setThread((prev) => [...prev, { role: 'assistant', text: '', error: errMsg }])
+    } finally {
+      setChatLoading(false)
+    }
   }
 
-  function handleSubmit() {
-    runQuery(query, [[query, query]], isFabricationMode)
+  function handleSend() {
+    if (!selectedFiling || !inputText.trim() || chatLoading) return
+    const evidence = filingEvidence(selectedFiling)
+    void sendMessage(inputText, evidence, false)
   }
 
-  const stages = deriveAuditStages(loading, data, isFabricationMode, stageIndex)
-  const activeStageId = loading
-    ? (stages.find((s) => s.status === 'running')?.id ?? null)
-    : data
-      ? (stages.find((s) => s.status !== 'complete' && s.status !== 'pending')?.id ?? stages[stages.length - 1].id)
-      : null
+  function handleChip(question: string) {
+    if (!selectedFiling || chatLoading) return
+    const evidence = filingEvidence(selectedFiling)
+    void sendMessage(question, evidence, false)
+  }
 
-  const rejectedCitations = data ? data.citations.filter((c) => !c.verified) : []
-  const verifiedCitations = data ? data.citations.filter((c) => c.verified) : []
+  function handleTrustDemo() {
+    if (!selectedFiling || chatLoading) return
+    void sendMessage(TRUST_DEMO_QUERY, TRUST_DEMO_EVIDENCE, true)
+  }
+
+  const suggestedQuestions = selectedFiling ? seedQuestions(selectedFiling) : []
 
   return (
     <>
       <div className="page-head">
-        <h1>Audit Defense</h1>
-        <p className="page-kicker">Citation-grounded defense pack · {entity?.tin ?? '...'}</p>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          Audit Assistant
+          <InfoTip content="When LHDN questions a figure on your filing, this assistant generates a citation-grounded justification. Every citation is verified by the deterministic gate against the law corpus. Fabricated clause IDs are stamped REJECTED." />
+        </h1>
+        <p className="page-kicker">
+          Select a saved filing to defend its figures with citation-grounded justifications. Every citation is verified;
+          fabricated ones are rejected.
+        </p>
       </div>
 
-      {/* Trust-demo headline: the fabrication money-shot framing */}
+      {/* Trust headline — always visible (AD-1 acceptance criterion) */}
       <div
         className="window"
         style={{ marginBottom: 16, borderColor: 'var(--denim)', background: 'rgba(65,82,110,0.04)' }}
@@ -391,131 +366,215 @@ export default function AuditDefense() {
             REJECTED
           </span>{' '}
           and the fabrication is shown in the pack. Use the <strong style={{ color: 'var(--rust)' }}>Trust Demo</strong>{' '}
-          chip below to see this live.
+          chip after selecting a filing to see this live.
         </div>
       </div>
 
-      {/* Query box + chip row */}
-      <div className="window" style={{ marginBottom: 16 }}>
-        <div className="titlebar">
-          <span className="titlebar-title">Defense Query</span>
-          {data && <SovereignBadge sovereign={data.sovereign} model={data.active_model} />}
-        </div>
-        <div style={{ padding: '14px 16px', display: 'grid', gap: 12 }}>
-          {/* Free-text input */}
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-soft)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em'
-              }}
-            >
-              Ask about any figure in your filing
+      {/* AD-1: Filing picker (shown when no filing is selected) */}
+      {!selectedFiling && (
+        <>
+          {filingsLoading && (
+            <div className="window">
+              <div className="titlebar">
+                <span className="titlebar-title">Your Filed Returns</span>
+                <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />
+              </div>
+              <div
+                style={{ padding: '24px 18px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}
+              >
+                Loading filings...
+              </div>
             </div>
-            <textarea
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setIsFabricationMode(false)
-              }}
-              rows={3}
-              placeholder="e.g. Justify the RM4,800 repairs deduction under ITA s33"
-              style={{
-                width: '100%',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                background: 'var(--screen)',
-                border: 'var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '10px 12px',
-                color: 'var(--ink)',
-                resize: 'vertical'
-              }}
-            />
+          )}
+
+          {!filingsLoading && filings.length === 0 && (
+            <div className="window" style={{ padding: '48px 24px', textAlign: 'center', display: 'grid', gap: 16 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7 }}>
+                No saved filings found. Complete a Form C filing first, then return here to defend any figure with a
+                citation-grounded justification.
+              </div>
+              <div>
+                <Link
+                  to="/filing/new"
+                  style={{
+                    display: 'inline-block',
+                    padding: '9px 22px',
+                    background: 'var(--denim)',
+                    color: 'var(--paper)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius)'
+                  }}
+                >
+                  Create a Filing
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {!filingsLoading && filings.length > 0 && (
+            <div className="window">
+              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="titlebar-title">Your Filed Returns</span>
+                <InfoTip content="Select a filing to defend its figures. The assistant will use that filing's actual computed figures as evidence when building justifications." />
+              </div>
+              {filings.map((rec) => {
+                const tp = rec.computation?.fields?.tax_payable?.value
+                return (
+                  <div
+                    key={rec.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: '14px 18px',
+                      borderBottom: 'var(--border)'
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          marginBottom: 4
+                        }}
+                      >
+                        {rec.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--ink-soft)',
+                          display: 'flex',
+                          gap: 12,
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <span>{rec.tin}</span>
+                        <span>{formatDate(rec.created_at)}</span>
+                        {tp != null && <span>Tax payable: {formatRM(tp)}</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => selectFiling(rec)}
+                      style={{
+                        padding: '8px 16px',
+                        border: 'none',
+                        background: 'var(--denim)',
+                        color: 'var(--paper)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 'var(--radius)',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Defend This Filing
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* AD-2: Chat assistant (shown once a filing is selected) */}
+      {selectedFiling && (
+        <>
+          {/* Selected filing header */}
+          <div
+            className="window"
+            style={{
+              marginBottom: 16,
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              alignItems: 'center',
+              gap: 12,
+              padding: '14px 18px'
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  color: 'var(--ink-soft)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: 4
+                }}
+              >
+                Defending Filing
+              </div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+                {selectedFiling.label}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
+                {selectedFiling.tin} · {formatDate(selectedFiling.created_at)}
+              </div>
+            </div>
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={!entity || loading || !query.trim()}
+              onClick={clearFiling}
               style={{
-                alignSelf: 'start',
-                padding: '8px 18px',
-                border: 'none',
-                borderRadius: 'var(--radius)',
-                background: !entity || loading || !query.trim() ? 'var(--grid)' : 'var(--denim)',
-                color: 'var(--paper)',
+                padding: '6px 14px',
+                border: 'var(--border)',
+                background: 'transparent',
+                color: 'var(--ink-soft)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: !entity || loading || !query.trim() ? 'default' : 'pointer'
+                fontSize: 11,
+                borderRadius: 'var(--radius)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              Build Defense Pack
+              Switch Filing
             </button>
           </div>
 
-          {/* Example chips */}
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-soft)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: 8
-              }}
-            >
-              Example Queries
+          {/* Suggested questions */}
+          <div className="window" style={{ marginBottom: 16 }}>
+            <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="titlebar-title">Suggested Questions</span>
+              <InfoTip content="These questions are seeded from the actual figures in your selected filing. Tapping one sends it directly to the assistant." />
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {/* Standard chip 1 */}
-              <button
-                type="button"
-                onClick={() => applyChip(DEMO_QUERY, DEMO_EVIDENCE, false)}
-                disabled={!entity || loading}
-                style={{
-                  padding: '6px 12px',
-                  border: 'var(--border)',
-                  borderRadius: 'var(--radius)',
-                  background: 'var(--screen)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: 'var(--ink)',
-                  cursor: entity && !loading ? 'pointer' : 'default',
-                  textAlign: 'left'
-                }}
-              >
-                {DEMO_QUERY}
-              </button>
+            <div style={{ padding: '12px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {suggestedQuestions.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => handleChip(q)}
+                  disabled={chatLoading}
+                  style={{
+                    padding: '6px 12px',
+                    border: 'var(--border)',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--screen)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    color: 'var(--ink)',
+                    cursor: chatLoading ? 'default' : 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
 
-              {/* Standard chip 2 */}
+              {/* Trust Demo chip */}
               <button
                 type="button"
-                onClick={() => applyChip(EXAMPLE_QUERY, EXAMPLE_EVIDENCE, false)}
-                disabled={!entity || loading}
-                style={{
-                  padding: '6px 12px',
-                  border: 'var(--border)',
-                  borderRadius: 'var(--radius)',
-                  background: 'var(--screen)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: 'var(--ink)',
-                  cursor: entity && !loading ? 'pointer' : 'default',
-                  textAlign: 'left'
-                }}
-              >
-                {EXAMPLE_QUERY}
-              </button>
-
-              {/* Trust-demo fabrication chip */}
-              <button
-                type="button"
-                onClick={() => applyChip(FABRICATION_QUERY, FABRICATION_EVIDENCE, true)}
-                disabled={!entity || loading}
+                onClick={handleTrustDemo}
+                disabled={chatLoading}
                 style={{
                   padding: '6px 12px',
                   border: '1px solid var(--rust)',
@@ -524,329 +583,101 @@ export default function AuditDefense() {
                   fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   color: 'var(--rust)',
-                  cursor: entity && !loading ? 'pointer' : 'default',
+                  cursor: chatLoading ? 'default' : 'pointer',
                   textAlign: 'left'
                 }}
               >
-                Trust Demo: fabricated clause injection
+                Trust Demo: inject fabricated clause
               </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Pack-shape preview — shown before any query runs */}
-      {!data && !loading && !displayError && <PackShapePreview />}
-
-      {/* Watchable FE-simulated pipeline (shown once a query starts) */}
-      {(loading || data) && (
-        <div className="window" style={{ marginBottom: 16 }}>
-          <div className="titlebar">
-            <span className="titlebar-title">Defense Pipeline</span>
-            {loading && <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />}
-          </div>
-          {stages.map((stage) => (
-            <AuditStageRow key={stage.id} stage={stage} isActive={stage.id === activeStageId} />
-          ))}
-        </div>
-      )}
-
-      {/* Fabrication money-shot — elevated as the headline trust payoff */}
-      {isFabricationMode && data && rejectedCitations.length > 0 && (
-        <div
-          className="window"
-          style={{
-            marginBottom: 16,
-            borderColor: 'var(--rust)',
-            background: 'rgba(181,80,60,0.04)'
-          }}
-        >
-          <div className="titlebar" style={{ borderBottomColor: 'var(--rust)' }}>
-            <span className="titlebar-title" style={{ color: 'var(--rust)' }}>
-              Trust Payoff: The AI Cannot Fabricate a Citation and Have It Pass
-            </span>
-            <span className="unverified-stamp verified-stamp" style={{ transform: 'rotate(3deg)' }}>
-              BLOCKED
-            </span>
-          </div>
-          <div style={{ padding: '14px 18px', display: 'grid', gap: 12 }}>
-            <div
-              style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: 14,
-                color: 'var(--ink)',
-                lineHeight: 1.6
-              }}
-            >
-              The clause ID{' '}
-              <strong style={{ color: 'var(--rust)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-                {rejectedCitations.flatMap((c) => c.clause_ids).join(', ')}
-              </strong>{' '}
-              is not present in the law corpus. The deterministic <code>ground_citation</code> gate set{' '}
-              <code>verified=false</code>. This is the trust money-shot: fabricated clause IDs are caught and stamped{' '}
-              <span className="verified-stamp unverified-stamp" style={{ verticalAlign: 'middle' }}>
-                REJECTED
-              </span>
-              .
-            </div>
-            {verifiedCitations.length > 0 && (
-              <div
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 13,
-                  color: 'var(--ink-soft)',
-                  borderTop: 'var(--border)',
-                  paddingTop: 10
-                }}
-              >
-                The genuine citation passes:{' '}
-                <strong style={{ color: 'var(--denim)' }}>{verifiedCitations[0].clause_ids.join(', ')}</strong>{' '}
-                <span className="verified-stamp" style={{ verticalAlign: 'middle' }}>
-                  VERIFIED
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {displayError && (
-        <div className="window error-window">
-          <div className="titlebar">
-            <span className="titlebar-title">Error</span>
-          </div>
-          <div className="error-body">{displayError}</div>
-        </div>
-      )}
-
-      {data && (
-        <>
-          {/* Defense Narrative — Tier 1 */}
-          <div className="window" style={{ marginBottom: 16 }}>
-            <div className="titlebar">
-              <span className="titlebar-title">Defense Narrative</span>
-              <span className="titlebar-meta">plain language</span>
-            </div>
-            <div
-              style={{
-                padding: '16px 18px',
-                fontSize: 15,
-                lineHeight: 1.7,
-                fontFamily: 'var(--font-body)'
-              }}
-            >
-              {data.exposure_note}
-            </div>
-          </div>
-
-          {/* Citations panel */}
-          <div className="window" style={{ marginBottom: 16 }}>
-            <div className="titlebar">
-              <span className="titlebar-title">Citations</span>
-              <span className="titlebar-meta">
-                {verifiedCitations.length} verified · {rejectedCitations.length} rejected
-              </span>
-            </div>
-            <ul className="req-list">
-              {data.citations.map((c) => (
-                <CitationPanel key={c.claim} citation={c} />
-              ))}
-            </ul>
-          </div>
-
-          {/* Law Corpus Matches */}
-          {data.items.length > 0 && (
+          {/* Chat thread */}
+          {thread.length > 0 && (
             <div className="window" style={{ marginBottom: 16 }}>
-              <div className="titlebar">
-                <span className="titlebar-title">Law Corpus Matches</span>
-                <span className="titlebar-meta">{data.items.length} items</span>
+              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="titlebar-title">Conversation</span>
+                <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are stamped REJECTED." />
               </div>
-              <ul className="req-list">
-                {data.items.map((item) => (
-                  <li
-                    key={Object.entries(item)
-                      .map(([k, v]) => `${k}:${v}`)
-                      .join('|')}
-                    className="requirement-row"
-                    style={{ padding: '10px 18px', display: 'grid', gap: 4 }}
-                  >
-                    {Object.entries(item).map(([k, v]) => (
-                      <div
-                        key={k}
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          color: 'var(--ink-soft)'
-                        }}
-                      >
-                        <strong style={{ color: 'var(--ink)' }}>{k}:</strong> {String(v)}
-                      </div>
-                    ))}
-                  </li>
+              <div style={{ padding: '16px 18px', display: 'grid', gap: 16 }}>
+                {thread.map((msg, idx) => (
+                  <div key={`${msg.role}-${idx}`}>
+                    {msg.role === 'user' ? (
+                      <UserBubble text={msg.text} isFabrication={msg.isFabrication} />
+                    ) : (
+                      <AssistantTurn msg={msg} />
+                    )}
+                  </div>
                 ))}
-              </ul>
+                {chatLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                      Building defense pack...
+                    </span>
+                  </div>
+                )}
+                <div ref={threadEndRef} />
+              </div>
             </div>
           )}
 
-          {/* Technical Details — Tier 2 collapsible */}
-          <div className="window" style={{ marginBottom: 16 }}>
-            <div className="titlebar">
-              <span className="titlebar-title">Technical Details</span>
-              <span className="titlebar-meta">deterministic core trace</span>
+          {/* Free-text input */}
+          <div className="window">
+            <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="titlebar-title">Ask a Question</span>
+              <InfoTip content="Ask how to justify any figure LHDN might question. The assistant grounds every answer in the law corpus and flags fabricated citations." />
             </div>
-            <div>
-              <button
-                type="button"
-                onClick={() => setTechnicalOpen((o) => !o)}
+            <div style={{ padding: '14px 16px', display: 'grid', gap: 10 }}>
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                rows={3}
+                placeholder="e.g. How do I justify the repairs deduction if LHDN questions it?"
+                disabled={chatLoading}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
                   width: '100%',
-                  padding: '10px 16px',
-                  border: 0,
-                  background: 'transparent',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12,
-                  color: 'var(--denim)',
-                  cursor: 'pointer',
-                  textAlign: 'left'
+                  background: 'var(--screen)',
+                  border: 'var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '10px 12px',
+                  color: 'var(--ink)',
+                  resize: 'vertical',
+                  opacity: chatLoading ? 0.6 : 1
                 }}
-              >
-                <span style={{ fontSize: 10 }}>{technicalOpen ? '▼' : '▶'}</span>
-                {technicalOpen ? 'Hide' : 'Show'} technical details
-              </button>
-
-              {technicalOpen && (
-                <div
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!inputText.trim() || chatLoading}
                   style={{
-                    borderTop: '1px solid var(--grid)',
-                    padding: '14px 18px',
-                    display: 'grid',
-                    gap: 16
+                    padding: '8px 18px',
+                    border: 'none',
+                    borderRadius: 'var(--radius)',
+                    background: !inputText.trim() || chatLoading ? 'var(--grid)' : 'var(--denim)',
+                    color: 'var(--paper)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: !inputText.trim() || chatLoading ? 'default' : 'pointer'
                   }}
                 >
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
-                        color: 'var(--ink-soft)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        marginBottom: 4
-                      }}
-                    >
-                      Query
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        color: 'var(--ink)',
-                        background: 'var(--screen)',
-                        padding: '6px 10px',
-                        borderRadius: 'var(--radius)'
-                      }}
-                    >
-                      {data.query}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
-                        color: 'var(--ink-soft)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        marginBottom: 4
-                      }}
-                    >
-                      Inference Route
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        color: 'var(--ink)',
-                        display: 'flex',
-                        gap: 8,
-                        alignItems: 'center',
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      <SovereignBadge sovereign={data.sovereign} model={data.active_model} />
-                      <span style={{ color: 'var(--ink-soft)' }}>
-                        sovereign={String(data.sovereign)} · model={data.active_model}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 10,
-                        color: 'var(--ink-soft)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        marginBottom: 8
-                      }}
-                    >
-                      Citation Gate Trace (clause_id → ground_citation → verified)
-                    </div>
-                    <div style={{ display: 'grid', gap: 6 }}>
-                      {data.citations.map((c) => (
-                        <div
-                          key={c.claim}
-                          style={{
-                            background: 'var(--screen)',
-                            padding: '8px 10px',
-                            borderRadius: 'var(--radius)',
-                            borderLeft: `3px solid ${c.verified ? 'var(--denim)' : 'var(--rust)'}`,
-                            display: 'grid',
-                            gap: 4,
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 11
-                          }}
-                        >
-                          <div>
-                            <span style={{ color: 'var(--ink-soft)' }}>clause_ids: </span>
-                            <strong style={{ color: c.verified ? 'var(--denim)' : 'var(--rust)' }}>
-                              {c.clause_ids.join(', ')}
-                            </strong>
-                          </div>
-                          <div>
-                            <span style={{ color: 'var(--ink-soft)' }}>ground_citation → </span>
-                            <strong style={{ color: c.verified ? 'var(--denim)' : 'var(--rust)' }}>
-                              corpus.exists() = {String(c.verified)}
-                            </strong>
-                          </div>
-                          {c.section && (
-                            <div style={{ color: 'var(--ink-soft)' }}>
-                              section: {c.section}
-                              {c.page_ref && ` · page: ${c.page_ref}`}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+                  {chatLoading ? 'Working...' : 'Send'}
+                </button>
+              </div>
             </div>
           </div>
         </>
       )}
-
-      <WhatNext
-        nextLabel="Dashboard"
-        nextRoute="/dashboard"
-        nextOutput="Your YA2026 command center: deadlines, entity snapshot, and the full compliance overview."
-      />
     </>
   )
 }

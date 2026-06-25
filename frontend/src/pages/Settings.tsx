@@ -4,9 +4,10 @@ import { useNotifications } from '../notifications'
 
 import './Settings.css'
 
-const PREF_KEYS = ['cukaipandai-theme', DEFAULT_PERSONA_KEY] as const
+// GR-9: only these UI-pref keys are local — business data lives on the backend
+const UI_PREF_KEYS = ['cukaipandai-theme', 'cp_journey_done'] as const
 
-const DATA_PREFIXES = ['cp_', 'cukaipandai-']
+const PREF_KEYS = ['cukaipandai-theme', DEFAULT_PERSONA_KEY] as const
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
@@ -28,14 +29,15 @@ export default function Settings() {
     window.location.reload()
   }
 
+  // GR-9: non-destructive — clears ONLY local UI prefs (theme + onboarding flag).
+  // Does NOT call any backend delete endpoint; saved company/filings data is preserved.
   const handleResetAllData = () => {
-    const confirmed = window.confirm('This clears your onboarding, custom companies, and all preferences. Continue?')
+    const confirmed = window.confirm(
+      'This resets your onboarding progress and interface preferences. Your saved company and filings are not affected. Continue?'
+    )
     if (!confirmed) return
-    const keys = Object.keys(window.localStorage)
-    for (const key of keys) {
-      if (DATA_PREFIXES.some((prefix) => key.startsWith(prefix))) {
-        window.localStorage.removeItem(key)
-      }
+    for (const key of UI_PREF_KEYS) {
+      window.localStorage.removeItem(key)
     }
     window.location.href = '/welcome'
   }
@@ -102,27 +104,6 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* About */}
-          <section className="settings-card" aria-labelledby="about-title">
-            <div className="settings-card-head">
-              <h2 id="about-title">About</h2>
-              <span className="settings-card-note">YA2026</span>
-            </div>
-            <div className="settings-about-block">
-              <strong>CukaiPandai</strong>
-              Sovereign, citation-grounded AI tax-assurance for Malaysian SMEs. Obligation calendar, cited Form C
-              filing, and audit-defense. Every figure is traceable to a verified YA2026 source.
-              <br />
-              <br />
-              <a href="https://github.com/AlaskanTuna/CukaiPandai" target="_blank" rel="noreferrer">
-                GitHub
-              </a>
-              <br />
-              <br />
-              Decision support, not legal advice.
-            </div>
-          </section>
-
           {/* Reset */}
           <section className="settings-card settings-card--wide" aria-labelledby="reset-title">
             <div className="settings-card-head">
@@ -134,7 +115,7 @@ export default function Settings() {
                 <strong>Reset all preferences</strong>
                 <span>Clears theme and default entity selection. Reloads the page.</span>
               </div>
-              <button type="button" className="settings-reset-btn" onClick={handleReset}>
+              <button type="button" className="settings-reset-btn settings-reset-btn--full" onClick={handleReset}>
                 Reset all preferences
               </button>
             </div>
@@ -142,7 +123,8 @@ export default function Settings() {
               <div className="settings-reset-desc">
                 <strong>Reset all data</strong>
                 <span>
-                  Clears onboarding progress, custom companies, and all preferences. Returns to first-run state.
+                  Resets onboarding and preferences only. Your saved company and filings remain intact (shared on the
+                  guest account).
                 </span>
               </div>
               <button

@@ -20,7 +20,7 @@ interface WizardStep {
 
 const WIZARD_STEPS: WizardStep[] = [
   { route: '/start/obligations', label: 'Obligation Calendar', num: 1 },
-  { route: '/start/filing', label: 'Cited Form C Filing', num: 2 },
+  { route: '/start/filing/new', label: 'Form C Filing', num: 2 },
   { route: '/start/audit-defense', label: 'Audit Defense Pack', num: 3 }
 ]
 

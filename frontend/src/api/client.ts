@@ -556,8 +556,14 @@ export async function getEntity(tin: string): Promise<EntityTaxProfile> {
 
 /** POST /entities/{tin}/obligations — derive the YA2026 obligation calendar. */
 export async function getObligations(tin: string, ssm: SsmProfile): Promise<ObligationCalendar> {
-  if (MOCK_MODE) return MOCK_OBLIGATIONS_BY_TIN[tin] ?? MOCK_OBLIGATIONS
-  return post<ObligationCalendar>(`/entities/${tin}/obligations`, { ssm })
+  if (MOCK_MODE) {
+    // For the Custom persona (context tin='CUSTOM'), resolve via the real SSM TIN.
+    const lookupTin = tin === 'CUSTOM' ? ssm.tin : tin
+    return MOCK_OBLIGATIONS_BY_TIN[lookupTin] ?? MOCK_OBLIGATIONS
+  }
+  // Use the real SSM TIN in the URL path (not the 'CUSTOM' context key).
+  const apiTin = tin === 'CUSTOM' ? ssm.tin : tin
+  return post<ObligationCalendar>(`/entities/${apiTin}/obligations`, { ssm })
 }
 
 /** POST /entities/{tin}/filings/form-c — one-shot synchronous computation (no HITL). */
@@ -710,7 +716,136 @@ export async function authGoogle(idToken: string): Promise<AuthResponse> {
   return post<AuthResponse>('/auth/google', { id_token: idToken })
 }
 
+/** POST /auth/guest — mint a shared-guest JWT (no body). Mock returns a fake token+user. */
+export async function authGuest(): Promise<AuthResponse> {
+  if (MOCK_MODE) {
+    return {
+      token: 'mock-guest',
+      user: { id: 'guest-shared', email: 'guest@cukaipandai.local', name: 'Guest', provider: 'guest' }
+    }
+  }
+  return post<AuthResponse>('/auth/guest', {})
+}
+
 /** GET /auth/me — resolve the current user from the stored bearer token (real mode only). */
 export async function authMe(): Promise<AuthUser> {
   return get<AuthUser>('/auth/me')
+}
+
+// --- Per-user entity profile (EP-1; EN-2) ---
+
+// Module-scoped in-memory mock store for the guest/demo entity profile.
+let _mockMyEntity: EntityTaxProfile | null = null
+
+/** GET /me/entity — fetch the current user's saved entity profile (404 if none). */
+export async function getMyEntity(): Promise<EntityTaxProfile> {
+  if (MOCK_MODE) {
+    if (!_mockMyEntity) throw new Error('404 No entity profile saved')
+    return _mockMyEntity
+  }
+  return get<EntityTaxProfile>('/me/entity')
+}
+
+/** PUT /me/entity — save the current user's entity profile. Returns the stored profile. */
+export async function putMyEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
+  if (MOCK_MODE) {
+    _mockMyEntity = { ...ssm }
+    return _mockMyEntity
+  }
+  const res = await fetch(`${BASE_URL}/me/entity`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ ssm })
+  })
+  return handleResponse<EntityTaxProfile>(res)
+}
+
+// --- Filing records (EP-2; FM-1/FM-2/FM-3) ---
+
+/** A saved filing record as returned by /me/filings. */
+export interface FilingRecord {
+  id: string
+  user_id: string
+  tin: string
+  label: string
+  computation: FormComputation
+  risk_flags: RiskFlag[]
+  line_items?: LineItem[]
+  created_at: string
+}
+
+// Module-scoped in-memory mock store for filing records (newest first).
+let _mockFilings: FilingRecord[] = []
+let _mockFilingSeq = 1
+
+function _mockFilingId(): string {
+  return `mock-filing-${String(_mockFilingSeq++).padStart(3, '0')}`
+}
+
+/** GET /me/filings — list the current user's filing records, newest first. */
+export async function listFilings(): Promise<FilingRecord[]> {
+  if (MOCK_MODE) return [..._mockFilings]
+  return get<FilingRecord[]>('/me/filings')
+}
+
+/** POST /me/filings — save a filing record. Returns the stored record with its id. */
+export async function saveFiling(body: {
+  tin: string
+  label?: string
+  computation: FormComputation
+  risk_flags?: RiskFlag[]
+  line_items?: LineItem[]
+}): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const rec: FilingRecord = {
+      id: _mockFilingId(),
+      user_id: 'mock-user',
+      tin: body.tin,
+      label: body.label ?? `Filing ${_mockFilingSeq - 1}`,
+      computation: body.computation,
+      risk_flags: body.risk_flags ?? [],
+      line_items: body.line_items,
+      created_at: new Date().toISOString()
+    }
+    _mockFilings = [rec, ..._mockFilings]
+    return rec
+  }
+  return post<FilingRecord>('/me/filings', body)
+}
+
+/** GET /me/filings/{id} — fetch a single filing record. Throws on 404. */
+export async function getFiling(id: string): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const rec = _mockFilings.find((r) => r.id === id)
+    if (!rec) throw new Error(`404 Filing ${id} not found`)
+    return rec
+  }
+  return get<FilingRecord>(`/me/filings/${id}`)
+}
+
+/** DELETE /me/filings/{id} — delete a single filing. Returns {deleted: id}. */
+export async function deleteFiling(id: string): Promise<{ deleted: string }> {
+  if (MOCK_MODE) {
+    _mockFilings = _mockFilings.filter((r) => r.id !== id)
+    return { deleted: id }
+  }
+  const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
+    method: 'DELETE',
+    headers: { ...authHeaders() }
+  })
+  return handleResponse<{ deleted: string }>(res)
+}
+
+/** DELETE /me/filings (body: {ids}) — delete multiple filings. Returns {deleted: ids}. */
+export async function deleteFilings(ids: string[]): Promise<{ deleted: string[] }> {
+  if (MOCK_MODE) {
+    _mockFilings = _mockFilings.filter((r) => !ids.includes(r.id))
+    return { deleted: ids }
+  }
+  const res = await fetch(`${BASE_URL}/me/filings`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ ids })
+  })
+  return handleResponse<{ deleted: string[] }>(res)
 }

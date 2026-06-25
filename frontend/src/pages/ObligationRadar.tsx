@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
-import { WhatNext } from '../components/JourneyProgress'
+import { InfoTip, Tooltip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-function fmtRM(n: number): string {
-  return `RM ${n.toLocaleString('en-MY')}`
 }
 
 function daysUntil(dueDate: string): number {
@@ -30,42 +26,55 @@ function countdown(dueDate: string): { label: string; overdue: boolean } {
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** Payoff headline: N obligations · M overdue · next due {date} */
-function ObligationSummary({ obligations }: { obligations: Obligation[] }) {
+// ---- Form codes glossary (moved from inline <details> into the Filing Obligations InfoTip) ----
+
+const FORM_CODES_CONTENT = (
+  <div style={{ display: 'grid', gap: 4 }}>
+    <div>
+      <strong style={{ color: 'var(--ink)' }}>Form C</strong> - annual income tax return for companies
+    </div>
+    <div>
+      <strong style={{ color: 'var(--ink)' }}>CP204</strong> - advance tax instalment estimate; submitted before the
+      financial year begins
+    </div>
+    <div>
+      <strong style={{ color: 'var(--ink)' }}>SST-02</strong> - Sales and Service Tax return; required if SST-registered
+    </div>
+    <div>
+      <strong style={{ color: 'var(--ink)' }}>CP39</strong> - monthly employer MTD (Monthly Tax Deduction) remittance
+      for employees
+    </div>
+    <div>
+      <strong style={{ color: 'var(--ink)' }}>MyInvois</strong> - e-invoicing compliance; required once gross income
+      exceeds RM 1,000,000
+    </div>
+  </div>
+)
+
+// ---- Obligation summary content (moved off body into calendar heading InfoTip) ----
+
+function obligationSummaryContent(obligations: Obligation[]) {
   const total = obligations.length
   const overdueCount = obligations.filter((o) => daysUntil(o.due_date) < 0).length
   const upcoming = [...obligations]
     .filter((o) => daysUntil(o.due_date) >= 0)
     .sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
-
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div className="dash-summary" style={{ marginTop: 0, marginBottom: overdueCount > 0 ? 6 : 0 }}>
-        <span>
-          <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
-        </span>
-        <span className="dash-summary-sep">·</span>
-        <span className={overdueCount > 0 ? 'dash-summary-alert' : undefined}>
-          <strong>{overdueCount}</strong> overdue
-        </span>
-        {upcoming && (
-          <>
-            <span className="dash-summary-sep">·</span>
-            <span>next due {formatDate(upcoming.due_date)}</span>
-          </>
-        )}
+    <div style={{ display: 'grid', gap: 4 }}>
+      <div>
+        <strong>{total}</strong> obligation{total === 1 ? '' : 's'} total
       </div>
+      <div>
+        <strong style={{ color: overdueCount > 0 ? 'var(--rust)' : undefined }}>{overdueCount}</strong> overdue
+      </div>
+      {upcoming && (
+        <div>
+          Next due: <strong>{formatDate(upcoming.due_date)}</strong>
+        </div>
+      )}
       {overdueCount > 0 && (
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--ink-soft)',
-            lineHeight: 1.5
-          }}
-        >
-          Dates shown are for the sample basis period. OVERDUE status reflects the demo clock, not your actual filing
-          status.
+        <div style={{ marginTop: 4, color: 'var(--ink-soft)', fontSize: 10 }}>
+          Dates shown are for the sample basis period. OVERDUE status reflects the demo clock.
         </div>
       )}
     </div>
@@ -73,18 +82,14 @@ function ObligationSummary({ obligations }: { obligations: Obligation[] }) {
 }
 
 /**
- * YA2026 calendar strip: a horizontal month grid derived from real due_dates.
- * The year range is computed from the obligations' actual dates, not hardcoded.
- * Each month cell lists which obligations fall in it, flagged overdue/upcoming.
+ * YA2026 calendar strip with custom Tooltip badges (no native title=).
  */
 function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
   if (obligations.length === 0) return null
 
-  // Derive the year span from the obligations' due_dates (not hardcoded)
   const years = new Set(obligations.map((o) => new Date(o.due_date).getFullYear()))
   const sortedYears = [...years].sort()
 
-  // Build a map: "YYYY-MM" -> Obligation[]
   const byYearMonth: Record<string, Obligation[]> = {}
   for (const ob of obligations) {
     const d = new Date(ob.due_date)
@@ -97,7 +102,11 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
     <div className="window" style={{ marginBottom: 20 }}>
       <div className="titlebar">
         <span className="titlebar-title">YA2026 Obligation Calendar</span>
-        <span className="titlebar-meta">{sortedYears.join(' – ')}</span>
+        <span className="titlebar-meta">{sortedYears.join(' - ')}</span>
+        <InfoTip
+          label="Obligation calendar summary"
+          content={obligations.length > 0 ? obligationSummaryContent(obligations) : 'No obligations loaded.'}
+        />
         <span className="closebox" aria-hidden="true" />
       </div>
 
@@ -161,29 +170,42 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
                     {mon}
                   </span>
 
-                  {/* Form badges for obligations in this month */}
+                  {/* Form badges — custom Tooltip, no native title= */}
                   {items.map((ob) => {
                     const { overdue } = countdown(ob.due_date)
                     return (
-                      <span
+                      <Tooltip
                         key={ob.rule_id}
-                        title={`${ob.form} · ${formatDate(ob.due_date)} · ${ob.obligation_type.replace(/_/g, ' ')}`}
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 8,
-                          fontWeight: 700,
-                          color: overdue ? 'var(--rust)' : 'var(--denim)',
-                          border: `1px solid ${overdue ? 'var(--rust)' : 'var(--denim)'}`,
-                          padding: '1px 3px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: '100%',
-                          borderRadius: 1
-                        }}
-                      >
-                        {ob.form}
-                      </span>
+                        trigger={
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 8,
+                              fontWeight: 700,
+                              color: overdue ? 'var(--rust)' : 'var(--denim)',
+                              border: `1px solid ${overdue ? 'var(--rust)' : 'var(--denim)'}`,
+                              padding: '1px 3px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '100%',
+                              borderRadius: 1,
+                              cursor: 'default'
+                            }}
+                          >
+                            {ob.form}
+                          </span>
+                        }
+                        content={
+                          <div>
+                            <div>
+                              <strong>{ob.form}</strong>
+                            </div>
+                            <div>{formatDate(ob.due_date)}</div>
+                            <div>{ob.obligation_type.replace(/_/g, ' ')}</div>
+                          </div>
+                        }
+                      />
                     )
                   })}
                 </div>
@@ -191,7 +213,7 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
             })}
           </div>
 
-          {/* Legend for this year's obligations */}
+          {/* Legend for the last year */}
           {sortedYears.indexOf(year) === sortedYears.length - 1 && (
             <div
               style={{
@@ -244,7 +266,7 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
           letterSpacing: '0.06em'
         }}
       >
-        Dates derived from real due_date · hover a badge for detail
+        Dates derived from real due_date - hover or focus a badge for detail
       </div>
     </div>
   )
@@ -274,14 +296,17 @@ export default function ObligationRadar() {
   }, [entity])
 
   const displayError = entityError ?? error
-
   const sorted = data ? [...data.obligations].sort((a, b) => a.due_date.localeCompare(b.due_date)) : []
 
   return (
     <>
       <div className="page-head">
-        <h1>Obligation Radar</h1>
-        <p className="page-kicker">YA2026 · {entity?.tin ?? '…'}</p>
+        <h1>Obligation Calendar</h1>
+        {/* OB-1: one-line entity-aware page description */}
+        <p className="page-kicker">
+          YA2026 deadlines for <strong>{entity?.tin ?? '...'}</strong> - every CP204, Form C, SST, and MTD date derived
+          from your entity profile.
+        </p>
       </div>
 
       {displayError && (
@@ -296,7 +321,7 @@ export default function ObligationRadar() {
       {(entityLoading || (!data && !displayError)) && !displayError && (
         <div className="window loading-window">
           <div className="titlebar">
-            <span className="titlebar-title">Loading Obligations…</span>
+            <span className="titlebar-title">Loading Obligations...</span>
           </div>
           <div className="loading-body">
             <div className="barber" />
@@ -304,97 +329,17 @@ export default function ObligationRadar() {
         </div>
       )}
 
-      {entity && data && <ObligationSummary obligations={data.obligations} />}
-
       {entity && data && data.obligations.length > 0 && <ObligationCalendarViz obligations={data.obligations} />}
 
       {entity && (
-        <div className="proof-grid">
-          {/* Left column: entity card */}
-          <div className="window" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="titlebar">
-              <span className="titlebar-title">Entity Snapshot</span>
-              <span className="titlebar-meta" style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-                {entity.tin}
-              </span>
-              <span className="closebox" aria-hidden="true" />
-            </div>
-
-            {/* Gross income hero */}
-            <div style={{ padding: '14px 18px 10px', borderBottom: 'var(--border)' }}>
-              <div
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: 'var(--ink)',
-                  lineHeight: 1.1
-                }}
-              >
-                {fmtRM(entity.gross_income)}
-              </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  color: 'var(--ink-soft)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.07em',
-                  marginTop: 3
-                }}
-              >
-                Gross income · YA2026
-              </div>
-            </div>
-
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, flex: 1 }}>
-              {[
-                { label: 'Entity type', value: entity.entity_type.replace(/_/g, ' ').toUpperCase() },
-                { label: 'MSIC code(s)', value: entity.msic_codes.join(', ') },
-                { label: 'SST registered', value: entity.sst_registered ? 'Yes' : 'No' },
-                {
-                  label: 'Basis period',
-                  value: entity.basis_period_start
-                    ? `${formatDate(entity.basis_period_start)} – ${formatDate(entity.basis_period_end)}`
-                    : 'N/A'
-                },
-                { label: 'Employees', value: String(entity.employee_count) },
-                { label: 'Paid-up capital', value: fmtRM(entity.paid_up_capital) }
-              ].map((row) => (
-                <li
-                  key={row.label}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'baseline',
-                    gap: 12,
-                    padding: '9px 18px',
-                    borderBottom: 'var(--border)'
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
-                      color: 'var(--ink-soft)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {row.label}
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'right' }}>{row.value}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Right column: obligations list */}
+        <div>
+          {/* Filing Obligations card — Entity Snapshot removed (OB-1) */}
           <div className="window" style={{ display: 'flex', flexDirection: 'column' }}>
             <div className="titlebar">
               <span className="titlebar-title">Filing Obligations</span>
-              <span className="titlebar-meta">{data ? `${data.obligations.length} items` : 'Loading…'}</span>
+              <span className="titlebar-meta">{data ? `${data.obligations.length} items` : 'Loading...'}</span>
+              {/* OB-1: form codes glossary moved here from inline <details> */}
+              <InfoTip label="Form codes explained" content={FORM_CODES_CONTENT} />
               <span className="closebox" aria-hidden="true" />
             </div>
 
@@ -402,52 +347,6 @@ export default function ObligationRadar() {
               <div style={{ padding: '16px 18px' }}>
                 <div className="barber" style={{ marginTop: 0 }} />
               </div>
-            )}
-
-            {sorted.length > 0 && (
-              <details style={{ padding: '6px 18px 4px', borderBottom: 'var(--border)' }}>
-                <summary
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--denim)',
-                    cursor: 'pointer',
-                    letterSpacing: '0.04em'
-                  }}
-                >
-                  Form codes explained
-                </summary>
-                <div
-                  style={{
-                    paddingTop: 6,
-                    display: 'grid',
-                    gap: 3,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--ink-soft)'
-                  }}
-                >
-                  <div>
-                    <strong style={{ color: 'var(--ink)' }}>Form C</strong> — annual income tax return for companies
-                  </div>
-                  <div>
-                    <strong style={{ color: 'var(--ink)' }}>CP204</strong> — advance tax instalment estimate; submitted
-                    before the financial year begins
-                  </div>
-                  <div>
-                    <strong style={{ color: 'var(--ink)' }}>SST-02</strong> — Sales and Service Tax return; required if
-                    SST-registered
-                  </div>
-                  <div>
-                    <strong style={{ color: 'var(--ink)' }}>CP39</strong> — monthly employer MTD (Monthly Tax Deduction)
-                    remittance for employees
-                  </div>
-                  <div>
-                    <strong style={{ color: 'var(--ink)' }}>MyInvois</strong> — e-invoicing compliance; required once
-                    gross income exceeds RM 1,000,000
-                  </div>
-                </div>
-              </details>
             )}
 
             {sorted.length > 0 && (
@@ -555,18 +454,11 @@ export default function ObligationRadar() {
                 marginTop: 'auto'
               }}
             >
-              Derived from YA2026 rules · LHDN-sourced
+              Derived from YA2026 rules - LHDN-sourced
             </div>
           </div>
         </div>
       )}
-
-      {/* JR-4: what next handoff */}
-      <WhatNext
-        nextLabel="Cited Form C Filing"
-        nextRoute="/filing"
-        nextOutput="Classify your trial balance and step through the Review and Approve gate to a cited Form C with your tax payable."
-      />
     </>
   )
 }

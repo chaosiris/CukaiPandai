@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { useActivePersona } from '../PersonaContext'
 import { type SsmProfile, getObligations } from '../api/client'
 import { BellIcon, ProfileIcon, ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
 import { type NotifKind, useNotifications } from '../notifications'
+
+// GR-4: routes where the ? walkthrough button is visible (Workspace + Compliance only)
+const WALKTHROUGH_ROUTES = ['/dashboard', '/analytics', '/obligations', '/filing', '/audit-defense', '/entity']
+
+function isWalkthroughRoute(pathname: string): boolean {
+  return WALKTHROUGH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))
+}
 
 // ---- Walkthrough modal ----
 
@@ -176,9 +183,10 @@ export function AppShell() {
   const [walkthroughOpen, setWalkthroughOpen] = useState(false)
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
-  const { persona, setPersona, personas } = useActivePersona()
+  const { persona } = useActivePersona()
   const { user, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const { notifications, unreadCount, markAllRead, dismiss, seedDeadlines, notify } = useNotifications()
 
   // Track previous persona TIN to detect genuine switches (not initial mount)
@@ -315,34 +323,6 @@ export function AppShell() {
                 <ThemeIcon theme={theme} />
               </button>
 
-              {/* Entity switcher */}
-              <select
-                className="topbar-entity-select"
-                value={persona.tin}
-                onChange={(e) => {
-                  const next = personas.find((p) => p.tin === e.target.value)
-                  if (next) setPersona(next)
-                }}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  padding: '4px 8px',
-                  background: 'var(--paper)',
-                  color: 'var(--ink)',
-                  border: '1px solid var(--grid)',
-                  borderRadius: 'var(--radius)',
-                  cursor: 'pointer',
-                  height: 34
-                }}
-                aria-label="Active entity"
-              >
-                {personas.map((p) => (
-                  <option key={p.tin} value={p.tin}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-
               {/* Bell notifications */}
               <div className="topbar-control">
                 <button
@@ -470,9 +450,6 @@ export function AppShell() {
               <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="drawer-wordmark">CukaiPandai</span>
             </Link>
-            <button className="drawer-close" type="button" aria-label="Close navigation" onClick={closeDrawer}>
-              x
-            </button>
           </div>
 
           <nav className="drawer-nav">
@@ -497,6 +474,9 @@ export function AppShell() {
               <NavLink className={drawerLinkClass} to="/audit-defense" onClick={closeDrawer}>
                 Audit Defense
               </NavLink>
+              <NavLink className={drawerLinkClass} to="/entity" onClick={closeDrawer}>
+                Entity
+              </NavLink>
             </div>
 
             <div className="drawer-section">
@@ -515,35 +495,37 @@ export function AppShell() {
         </aside>
       </div>
 
-      {/* Floating help button */}
-      <button
-        type="button"
-        aria-label="Open walkthrough"
-        onClick={() => setWalkthroughOpen(true)}
-        style={{
-          position: 'fixed',
-          bottom: 176,
-          right: 20,
-          zIndex: 90,
-          width: 44,
-          height: 44,
-          border: 'var(--border)',
-          borderRadius: '50%',
-          background: 'var(--denim)',
-          color: 'var(--paper)',
-          fontFamily: 'var(--font-display)',
-          fontSize: 22,
-          fontWeight: 700,
-          lineHeight: 1,
-          cursor: 'pointer',
-          boxShadow: '2px 2px 0 rgba(28, 27, 25, 0.22)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        ?
-      </button>
+      {/* Floating help button — GR-4: visible only on Workspace + Compliance pages */}
+      {isWalkthroughRoute(location.pathname) && (
+        <button
+          type="button"
+          aria-label="Open walkthrough"
+          onClick={() => setWalkthroughOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 90,
+            width: 44,
+            height: 44,
+            border: 'var(--border)',
+            borderRadius: '50%',
+            background: 'var(--denim)',
+            color: 'var(--paper)',
+            fontFamily: 'var(--font-display)',
+            fontSize: 22,
+            fontWeight: 700,
+            lineHeight: 1,
+            cursor: 'pointer',
+            boxShadow: '2px 2px 0 rgba(28, 27, 25, 0.22)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          ?
+        </button>
+      )}
 
       {/* Walkthrough modal */}
       {walkthroughOpen && <WalkthroughModal onClose={() => setWalkthroughOpen(false)} />}

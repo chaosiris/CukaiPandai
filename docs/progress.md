@@ -1091,3 +1091,305 @@ Four related FE changes implemented:
 | `bunx biome check frontend/src` | 38 files, 0 errors |
 
 Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were removed and rephrased (comma+participle, colon, semicolon); remaining em-dashes in the batch are code comments only.
+
+---
+
+## [26/06/26] — Wave 0 BE Foundation: EP-0 + EP-1 + EP-2 `[BE]`
+
+### EP-0 — Shared guest user + `POST /auth/guest`
+
+- **Constants** (`api/main.py`): `GUEST_USER_ID = "guest-shared"`, `GUEST_EMAIL = "guest@cukaipandai.local"`, `GUEST_NAME = "Guest"` — single source of truth.
+- **`UserRepository.ensure_guest(guest_id, guest_email, guest_name)`** (`api/persistence.py`): idempotent seeder — `get_by_email` first; only creates if absent; takes `provider="guest"`. `UserRepository.create` gained an optional `id` arg so the fixed guest id survives restarts.
+- **Startup seed** (`api/main.py`): `_USER_REPO.ensure_guest(...)` called immediately after `_USER_REPO = UserRepository()`.
+- **`POST /auth/guest`** (`api/main.py`): returns `{token, user}` — mints JWT via `auth.create_token(GUEST_USER_ID, GUEST_EMAIL, GUEST_NAME)`; never leaks a hash; defensively re-seeds if the row is absent.
+- **Design note (shared-data caveat):** the guest is a single shared backend account. All guests share one `sub`; any data written under that sub (entity profile, filing records) is shared/public across all guest sessions. This is the intended demo behaviour and will be documented in TD-W3.
+- **Tests:** `tests/api/test_guest_auth.py` (7 tests — token returned, sub == GUEST_USER_ID, email matches constant, /auth/me round-trip, idempotent seed, stable id across calls, provider == "guest").
+
+### EP-1 — `GET/PUT /me/entity` (per-user entity profile)
+
+- **`UserEntityRepository`** (`api/persistence.py`): `get(owner)` / `put(owner, data)`. Neon path: `user_entities(user_id text PRIMARY KEY, data jsonb)` with lazy `CREATE TABLE IF NOT EXISTS`; in-memory dict fallback; any DB error falls through silently.
+- **`_USER_ENTITY_REPO = UserEntityRepository()`** instantiated at startup in `api/main.py`.
+- **`_owner(authorization)` dependency** (`api/main.py`): calls `_bearer_user` (existing, 401 without token), then decodes the same token to extract `claims["sub"]`; returns the sub string.
+- **`GET /me/entity`**: returns saved profile or 404 if none yet.
+- **`PUT /me/entity`**: validates `{ssm}` via existing `_profile()` helper (422 on bad input), upserts via `_USER_ENTITY_REPO.put()`, returns the normalised profile.
+- **Migration** (`migrations/neon_schema.sql`): additive `CREATE TABLE IF NOT EXISTS user_entities (user_id text PRIMARY KEY, data jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`.
+- **Tests:** `tests/api/test_me_entity_endpoint.py` (8 tests — 401 no token on GET/PUT, 404 before save, PUT→GET round-trip, 422 bad ssm, per-owner isolation, upsert overwrites).
+
+### EP-2 — `/me/filings` CRUD (per-user filing records)
+
+- **`FilingRecordReq` + `MultiDeleteReq`** (`api/schemas.py`): request schemas for POST body and multi-delete body.
+- **`FilingRepository`** (`api/persistence.py`): `create(owner, rec)` / `list(owner)` / `get(owner, rec_id)` / `delete(owner, ids)`. New `filing_records` table (not the existing `filings` table — zero destructive alteration). In-memory `dict[str, list[dict]]` fallback; Neon path with lazy `CREATE TABLE IF NOT EXISTS`; any DB error falls through. `create()` always writes in-memory first.
+- **`_FILING_REPO = FilingRepository()`** at startup.
+- **Endpoints** (all `Depends(_owner)` → 401 without valid token):
+  - `POST /me/filings` → 200 + stored record with server-assigned `id`; 422 on bad body.
+  - `GET /me/filings` → list (newest first, per-owner).
+  - `GET /me/filings/{rec_id}` → full record or 404 if not owned/absent.
+  - `DELETE /me/filings/{rec_id}` → deletes or 404.
+  - `DELETE /me/filings` with `{ids:[...]}` body → multi-delete; foreign ids are silently skipped (no-op, never touch another owner's rows).
+- **Migration** (`migrations/neon_schema.sql`): additive `CREATE TABLE IF NOT EXISTS filing_records (id text PRIMARY KEY, user_id text NOT NULL, tin text, label text, computation jsonb, risk_flags jsonb, line_items jsonb, created_at timestamptz NOT NULL DEFAULT now())`.
+- **Tests:** `tests/api/test_me_filings_endpoint.py` (14 tests — 401 on all endpoints, create returns id, 422 bad body, list, get by id, 404 foreign id, delete, 404 re-get after delete, 404 delete foreign, multi-delete, multi-delete foreign is noop, list isolation, get-by-id isolation).
+
+### Test result
+
+`uv run pytest -q` → **158 passed** (was 129 before Wave 0; +29 new tests; 0 regressions).
+
+### Files touched
+
+- `backend/api/main.py` — constants, repos, `_owner` dep, 7 new endpoints
+- `backend/api/persistence.py` — `UserRepository.ensure_guest` + `id` arg; `UserEntityRepository`; `FilingRepository`
+- `backend/api/schemas.py` — `FilingRecordReq`, `MultiDeleteReq`
+- `backend/migrations/neon_schema.sql` — additive `user_entities` + `filing_records` tables
+- `backend/tests/api/test_guest_auth.py` (new, 7 tests)
+- `backend/tests/api/test_me_entity_endpoint.py` (new, 8 tests)
+- `backend/tests/api/test_me_filings_endpoint.py` (new, 14 tests)
+- `docs/plan.md` — EP-0/EP-1/EP-2 ticked `[x]`
+
+---
+
+## [26/06/26] — Wave 1: Quick UI Refinements + Tooltip + GR-1...GR-9 `[FE]`
+
+**Tasks:** UI-1, OB-1, GR-1, GR-2, GR-3, GR-4, GR-5, GR-6, GR-7, GR-8, GR-9
+
+### UI-1 — Reusable Tooltip + InfoTip
+
+- Created `frontend/src/components/Tooltip.tsx` with `Tooltip` (hover + focus-capture, ESC dismiss, fixed-positioned with edge-clamping, `aria-describedby`, `role="tooltip"`) and `InfoTip` (focusable `<button>` trigger, `aria-label`). Token-CSS only, z-index 200 (below z-300 walkthrough modal). No native `title=`, no new dependency.
+
+### OB-1 — Obligation Calendar (/obligations) refinements
+
+- Added entity-aware one-line page description under `<h1>`.
+- Replaced all calendar badge `title=` attributes with `<Tooltip>` (form + due date + obligation type shown in bubble).
+- Added `<InfoTip>` to both card titlebars: YA2026 Obligation Calendar (heading tooltip carries the live obligation summary: N total, M overdue, next due date + demo-clock note) and Filing Obligations (heading tooltip carries the full form-codes glossary).
+- Removed the inline `<details>` form-codes block; content moved into the Filing Obligations InfoTip.
+- Removed the `ObligationSummary` component from the page body; counts now live in the Calendar heading InfoTip.
+- Removed the Entity Snapshot left-column card (moving to `/entity` in Wave 2).
+- Removed `<WhatNext>` usage and import.
+
+### GR-1 — Dashboard: hide Journey strip when walkthrough done
+
+- `Dashboard.tsx`: `<JourneyStrip>` now gated on `!journeyDone`; absent when `cp_journey_done=1`.
+
+### GR-2 — Remove topbar entity selector
+
+- `AppShell.tsx`: removed the `<select>` topbar entity switcher. Entity selection is now exclusively in Settings / Workspace. Persona-switch side-effects (deadline re-seed + toast) remain intact since they trigger on `persona.tin` change from any source.
+
+### GR-3 — Remove drawer X close button
+
+- `AppShell.tsx`: removed `<button className="drawer-close">`. Backdrop-click and Escape remain the close affordances.
+
+### GR-4 — Walkthrough ? button: pin true bottom-right, scope to Workspace + Compliance
+
+- `AppShell.tsx`: ? button repositioned to `bottom: 20, right: 20` (was `bottom: 176`). Visibility gated via `useLocation()` + `isWalkthroughRoute()` helper: visible on `/dashboard`, `/analytics`, `/obligations`, `/filing/**`, `/audit-defense`, `/entity`; hidden on Essentials, marketing, auth, wizard.
+
+### GR-5 — Dashboard: remove StatusSummary + SnapshotPanel; single-column overview
+
+- `Dashboard.tsx`: removed `StatusSummary` component (demo-clock text), `SnapshotPanel` component, `fmtRM` helper, and `useEntity` import (all orphaned by removal). `dash-overview-grid` now holds only `DeadlinesPanel`; `QuickAccess` fills the freed primary-grid space.
+
+### GR-6 — Settings: remove About section; match reset-button colours
+
+- `Settings.tsx`: removed the About `<section>`. Applied `settings-reset-btn--full` to the "Reset all preferences" button to match "Reset all data".
+
+### GR-7 — Remove WhatNext from Filing + Audit Defense
+
+- `FilingStudio.tsx`: removed `<WhatNext>` usage and `WhatNext` import.
+- `AuditDefense.tsx`: removed `<WhatNext>` usage and `WhatNext` import.
+
+### GR-8 — Light theme as default
+
+- `useTheme.ts`: default changed from `systemTheme()` to `'light'` when no stored preference. Removed `systemTheme()` helper, `hasStoredTheme` state, and the system-preference media-query listener (all orphaned). Toggle + localStorage persistence unchanged.
+
+### GR-9 — Wizard sequence + non-destructive Reset All Data
+
+- `WizardLayout.tsx`: added `// TODO(Wave 3): repoint to /start/filing/new` comment on step 2; step still points to `/start/filing` (shippable; Wave 3 FM-2 repoints it).
+- `Settings.tsx`: `handleResetAllData` now clears ONLY `cukaipandai-theme` + `cp_journey_done` (the two local UI-pref keys). Removed the `DATA_PREFIXES` broad-sweep that was clearing business data keys. Button copy updated to clarify saved company/filings are not affected.
+- Welcome "Try sample data" and walkthrough modal "Yes, Show Me" already navigated to `/welcome` first (no change needed). `WizardLayout` `graduate()` already goes to `/dashboard` only at Finish/Skip.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **77 modules**, built in 2.08s
+- `bunx biome check frontend/src`: 0 errors (40 files checked)
+- Em-dash sweep: no em-dashes in user-facing copy (comments only)
+
+### Files touched
+
+- `frontend/src/components/Tooltip.tsx` (new)
+- `frontend/src/hooks/useTheme.ts`
+- `frontend/src/layouts/AppShell.tsx`
+- `frontend/src/layouts/WizardLayout.tsx`
+- `frontend/src/pages/Dashboard.tsx`
+- `frontend/src/pages/ObligationRadar.tsx`
+- `frontend/src/pages/FilingStudio.tsx`
+- `frontend/src/pages/AuditDefense.tsx`
+- `frontend/src/pages/Settings.tsx`
+- `docs/plan.md` — UI-1/OB-1/GR-1...GR-9 ticked `[x]`
+
+---
+
+## [26/06/26] — Wave 2: AUTH-FE + EN-1 + EN-2 (guest token, /entity page, backend-backed Custom persona) `[FE]`
+
+### AUTH-FE — `continueAsGuest` now calls `POST /auth/guest`
+
+- Added `authGuest(): Promise<AuthResponse>` to `frontend/src/api/client.ts`. Mock branch returns `{token:'mock-guest', user:{id:'guest-shared', ...provider:'guest'}}`. Live branch calls `POST /auth/guest`.
+- `AuthContext.continueAsGuest()` made async: calls `authGuest()`, stores the returned token via `setToken()`, persists user to `USER_KEY` localStorage, sets `GUEST_KEY='1'`, updates `isGuest=true` and `user` state. Every subsequent `authHeaders()` call attaches `Authorization: Bearer <guest-token>`.
+- `AuthScreen.tsx` `onGuest()` made async; wraps `await continueAsGuest()` in a try/catch (best-effort) with `busy` state while the call is in-flight. Navigation after guest auth unchanged.
+- Hydration on reload: the existing `authMe()` path now validates the guest token correctly (guest is a real user in the backend). Mock mode reads `readStoredUser()` as before.
+- Sign-out clears `USER_KEY` + `GUEST_KEY` + `cp_token` — guest session fully dropped.
+
+### EN-1 — `/entity` page (Compliance nav)
+
+- Created `frontend/src/pages/Entity.tsx`: view + edit the active company's full `EntityTaxProfile`.
+  - One-line page description under `<h1>`.
+  - Snapshot card showing all 9 fields (TIN, entity type, MSIC codes, gross income, paid-up capital, employees, SST, basis period, commencement date) with an `InfoTip` on the card heading.
+  - Sectioned edit form (Company Identity / Financial Profile / Basis Period) reusing the validation helpers and field layout from `CustomCompany.tsx`. Each section card has an `InfoTip`. Pre-fills from the active entity.
+  - Seed-entity notice shown when the active persona is one of the three built-in seeds.
+  - On save: `await putMyEntity(ssm)` (awaitable, surfaces 422 detail), then `activateCustomPersona(ssm)` to update context without a second PUT.
+  - Save status feedback (saving / saved / error inline).
+- Added `/entity` route in `frontend/src/App.tsx` (under `<AppShell/>`).
+- Added "Entity" NavLink to the **Compliance** drawer group in `frontend/src/layouts/AppShell.tsx` (after Audit Defense).
+- `WALKTHROUGH_ROUTES` in `AppShell.tsx` already included `/entity` (Wave 1 GR-4) — no change needed.
+
+### EN-2 — Persona model backed by `GET/PUT /me/entity`; localStorage data store removed
+
+- Added `getMyEntity(): Promise<EntityTaxProfile>` and `putMyEntity(ssm): Promise<EntityTaxProfile>` to `client.ts`. Mock branch: module-scoped `_mockMyEntity` (null until a PUT). Live: `GET/PUT /me/entity` with `authHeaders()`.
+- Refactored `PersonaContext.tsx`:
+  - Removed `cp_custom_entities` localStorage read/write and `cp_active_persona` data store entirely.
+  - On mount: best-effort `getMyEntity()` — if 200, builds a "Custom" persona (`tin='CUSTOM'`) from the profile and adds it to `allPersonas`; 404/error treated as "no custom entity yet".
+  - Added `activateCustomPersona(ssm)` action: updates context state without triggering a PUT (used by `/entity` page which does its own awaited PUT).
+  - `addCustomPersona(p)` still exists for `CustomCompany.tsx` (which needs the fire-and-forget path): updates context + fires `putMyEntity` best-effort.
+  - `entityReady: boolean` exposed so consumers can avoid white-screen while the initial fetch settles.
+  - Only `theme` + `cp_journey_done` remain in localStorage (UI prefs only).
+- Updated `useEntity.ts`: resolves "Custom" TIN from `customPersonas` (backend-sourced) without any network call — no white-screen for custom entities.
+- Updated `CustomCompany.tsx`: removed `createEntity` + `serverError` + the old localStorage + server-warn path. `handleSubmit` now just calls `addCustomPersona(persona)` (which does `putMyEntity` best-effort) and navigates. Updated footer/description copy (no "stored locally").
+- Updated `getObligations` in `client.ts`: for `tin='CUSTOM'` (the context key), resolves mock lookup and live URL path via `ssm.tin` so the backend always receives the real TIN.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **78 modules** (was 77; +1 new Entity page), 339 KB JS, 49 KB CSS, built in 1.94s
+- `bunx biome check frontend/src`: 0 errors (41 files checked)
+- No em-dashes in user-facing copy; Title Case headings; acronyms preserved (TIN, MSIC, SST, YA2026).
+
+### Files touched
+
+- `frontend/src/api/client.ts` (+`authGuest`, +`getMyEntity`, +`putMyEntity`, CUSTOM-TIN fix in `getObligations`)
+- `frontend/src/AuthContext.tsx` (async `continueAsGuest`, import `authGuest`)
+- `frontend/src/pages/AuthScreen.tsx` (async `onGuest`)
+- `frontend/src/PersonaContext.tsx` (backend-backed Custom persona, `activateCustomPersona`, `entityReady`)
+- `frontend/src/hooks/useEntity.ts` (CUSTOM TIN resolves from context)
+- `frontend/src/pages/CustomCompany.tsx` (use `addCustomPersona` only; removed `createEntity` + `serverError`)
+- `frontend/src/pages/Entity.tsx` (new)
+- `frontend/src/App.tsx` (+Entity import +`/entity` route)
+- `frontend/src/layouts/AppShell.tsx` (+Entity NavLink in Compliance group)
+- `docs/plan.md` (AUTH-FE/EN-1/EN-2 all sub-bullets ticked `[x]`)
+
+---
+
+## [26/06/26] — Wave 3: FM-1 + FM-2 + FM-3 + Wizard Repoint (Filing Records Dashboard + Creation + Saved Record) `[FE]`
+
+### FM-1 — `/filing` records dashboard
+
+- Rewrote `frontend/src/pages/FilingStudio.tsx` as a records-list dashboard (keeping the same export name so all existing imports/routes are unchanged).
+- Fetches `listFilings()` on mount, shows records newest-first with label / RM tax_payable headline / created date / risk-flag count.
+- Checkbox per row (+ "Select All") + "Delete Selected" button calls `deleteFilings(ids)` and updates local state.
+- Row label/meta/tax-payable cells are a `<Link display:contents>` to `/filing/[id]`; no non-interactive tabIndex.
+- Empty state ("No filings yet. Create your first...") with CTA to `/filing/new`; barber loading strip.
+- One-line `page-kicker` description + `InfoTip` on heading and on record count.
+
+### FM-2 — `/filing/new` creation (new file: `FilingNew.tsx`)
+
+- One-shot pipeline: Classify Line Items -> Compute Form C -> Risk Assessment -> Finalized (no Human Approval stage).
+- Guided input panel: labelled instruction ("Provide your trial balance -- one account per line"), one-line format example, persona's `demoRawText` pre-filled in textarea (paste = primary), CSV/XLSX/PDF file-drop clearly secondary.
+- "How this was calculated" provenance note shown immediately after computation: explicit statement that the tax figure is computed by the deterministic rule-based core, not the AI.
+- On Save Filing: calls `saveFiling({ tin: entity.tin, label, computation, risk_flags, line_items })` then navigates to `/filing/[id]`. Uses `entity.tin` (real TIN, e.g. `C0000000001` for Custom) per Wave 2 note, not `persona.tin` which can be `'CUSTOM'`.
+- Reuses `FilingPipeline.tsx` primitives: `ComputationPanel`, `Stage1Detail`, `StageRow`, `RiskFlagList`, `TechnicalDetailsDisclosure`.
+- `SovereignBadge` on the classified items card; barber on isLoading; `InfoTip` on pipeline heading.
+
+### FM-3 — `/filing/[id]` saved record view (new file: `FilingRecord.tsx`)
+
+- Loads `getFiling(id)` (404 -> friendly not-found card with links to `/filing` and `/filing/new`).
+- Layout: `ComputationPanel` (96px RM hero) on top, provenance note, risk flags card, then Filing Pipeline card (all stages COMPLETE through Finalized) with `TechnicalDetailsDisclosure` (collapsed `<details>`) at the bottom.
+- Provenance note states plainly: "computed by the deterministic, rule-based core -- not the AI."
+- Per-figure trace (`rule_id` / `config_version` / `inputs` / `value`) reachable by expanding "Show technical details".
+- Breadcrumb link back to `/filing`; "All Filings" + "New Filing" buttons at page bottom.
+- No WhatNext card.
+
+### Shared primitives — `FilingPipeline.tsx` (new file)
+
+- Extracted from old `FilingStudio.tsx`: `ComputationPanel`, `FigureTraceRow`, `Stage1Detail`, `StageRow`, `RiskFlagList`, `TechnicalDetailsDisclosure`, `severityColor`, `statusColor`, stage types.
+- `TechnicalDetailsDisclosure` takes `computation` + optional `classifyRouteInfo`; the `<details>` trigger is styled inside the card border (no standalone float).
+
+### client.ts additions
+
+- `FilingRecord` interface (mirrors `FilingRecord` backend schema).
+- `listFilings()`, `saveFiling(body)`, `getFiling(id)`, `deleteFiling(id)`, `deleteFilings(ids)` -- all with mock branches backed by a module-scoped `_mockFilings[]` store + auto-incrementing `_mockFilingSeq` so mock demos work without a backend.
+
+### Wizard Repoint (GR-9 Wave 3 TODO resolved)
+
+- `WizardLayout.tsx`: `WIZARD_STEPS[1].route` changed from `/start/filing` to `/start/filing/new`; label updated to "Form C Filing"; TODO comment removed.
+- `App.tsx`: old `<Route path="filing" element={<FilingStudio />} />` under `/start` replaced with `<Route path="filing/new" element={<FilingNew />} />`; standalone `/filing/new` and `/filing/:id` routes added under AppShell.
+- The full wizard tour now runs: welcome -> /start/obligations -> /start/filing/new -> /start/audit-defense -> /dashboard.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules** (was 78; +3 new pages), 351 KB JS, 49 KB CSS, built in 2.20s
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+- No em-dashes in user-facing copy; `--` used throughout; Title Case headings; acronyms (TIN, MSIC, SST, YA2026) preserved.
+
+### Files touched
+
+- `frontend/src/api/client.ts` (+`FilingRecord` interface + `listFilings`, `saveFiling`, `getFiling`, `deleteFiling`, `deleteFilings` with mock store)
+- `frontend/src/components/FilingPipeline.tsx` (new -- shared pipeline primitives)
+- `frontend/src/pages/FilingStudio.tsx` (rewritten as FM-1 records dashboard)
+- `frontend/src/pages/FilingNew.tsx` (new -- FM-2 creation flow)
+- `frontend/src/pages/FilingRecord.tsx` (new -- FM-3 saved record view)
+- `frontend/src/App.tsx` (new routes: `/filing/new`, `/filing/:id`, `/start/filing/new`)
+- `frontend/src/layouts/WizardLayout.tsx` (step 2 repointed to `/start/filing/new`)
+- `docs/plan.md` (FM-1/FM-2/FM-3 all sub-bullets ticked `[x]`)
+
+---
+
+## [26/06/26] — Wave 4: AD-1 + AD-2 (Conversational Audit Assistant) `[FE]`
+
+### AD-1 — Saved-filing picker on `/audit-defense`
+
+- Rewrote `frontend/src/pages/AuditDefense.tsx` as a two-phase conversational Audit Assistant.
+- Phase 1 (picker): fetches `listFilings()` on mount; shows a "Your Filed Returns" list with each record's label, TIN, created date, and tax payable, each with a "Defend This Filing" button.
+- Empty state: friendly explanation that a filing must be created first + a "Create a Filing" link to `/filing/new`.
+- Loading state: barber strip while `listFilings()` is in flight.
+- One-line page description under `<h1>` with an `InfoTip` (UI-1) on the heading explaining the citation-grounded justification promise and fabrication-rejection guarantee.
+- The "Why This Is Trustworthy" trust headline preserved (always visible on the page), pointing to the Trust Demo chip.
+- No `WhatNext` card (already removed in GR-7; not re-added).
+
+### AD-2 — Chat interface + seeded questions + fabrication trust signal
+
+- Phase 2 (chat): activated when a filing is selected; shows a "Defending Filing" header with label, TIN, date, and a "Switch Filing" button.
+- "Suggested Questions" card with tappable chips seeded from `rec.computation.fields` via `seedQuestions(rec)`: generates figure-specific questions (e.g. "Why is the tax payable RM 31,000?", "How is the chargeable income of RM 200,000 derived?") for up to 5 chips drawn from the filing's actual computed figures.
+- "Trust Demo: inject fabricated clause" chip (red border) sends `inject_fabricated=true` via the existing `getAuditDefense` path (BE-18 preserved).
+- Free-text input ("Ask a Question") with Enter-to-send and a "Send" button; disabled during in-flight requests.
+- Each message send: `getAuditDefense(rec.tin, query, filingEvidence(rec), isFabrication)` where `filingEvidence` derives `[[key, 'RM N'], ...]` from all `computation.fields` entries. Multi-turn thread appends both user bubble and assistant turn per message; 502/network errors surface as an inline red error bubble without breaking the thread.
+- Each assistant turn renders: a "Trust Payoff: Fabricated Clause Blocked" elevated panel (rust, BLOCKED stamp) when the Trust Demo ran and there are rejected citations; a "Defense Narrative" card with `SovereignBadge`; a "Citations" card with `CitationPanel` + `VerifiedBadge` per citation.
+- `notify()` fires on rejected fabricated citations (existing notification path preserved).
+- Auto-scroll to bottom of thread on each new message.
+- Switching the selected filing (clicking "Switch Filing") clears the thread, resets the input, and re-seeds chips from the new record's figures.
+- Persona/entity change also resets the picker (re-fetches filings) and clears chat.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules** (same count as Wave 3; no new modules added), 349 KB JS, 49 KB CSS, built in 1.77s
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+- No em-dashes in user-facing copy; Title Case headings; acronyms (TIN, MSIC, SST, RM, YA2026) preserved.
+- No backend change -- `/audit-defense` endpoint unchanged; `inject_fabricated` (BE-18) preserved as the trust-demo path.
+
+### Mock-mode reasoning
+
+- `listFilings()` mock reads from the module-scoped `_mockFilings[]` store (populated by `saveFiling()` in `FilingNew.tsx`). Empty by default until a filing is saved via the wizard or `/filing/new`.
+- Empty state links to `/filing/new`; saving a filing there populates the mock store and the picker shows immediately on return to `/audit-defense`.
+- Trust Demo chip uses `TRUST_DEMO_EVIDENCE` (fixed fabricated clause); not derived from the filing figures, so it works in mock mode even without a specific figure in the record.
+
+### Files touched
+
+- `frontend/src/pages/AuditDefense.tsx` (full rewrite -- AD-1 + AD-2)
+- `docs/plan.md` (AD-1/AD-2 all sub-bullets ticked `[x]`)
+- `docs/progress.md` (this entry)

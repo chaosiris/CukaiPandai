@@ -1,5 +1,15 @@
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { type AuthUser, authGoogle, authLogin, authMe, authSignup, clearToken, getToken, setToken } from './api/client'
+import {
+  type AuthUser,
+  authGoogle,
+  authGuest,
+  authLogin,
+  authMe,
+  authSignup,
+  clearToken,
+  getToken,
+  setToken
+} from './api/client'
 
 const GUEST_KEY = 'cp_entered_as_guest'
 const USER_KEY = 'cp_user'
@@ -13,7 +23,7 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, name?: string) => Promise<void>
   signInWithGoogle: (idToken: string) => Promise<void>
-  continueAsGuest: () => void
+  continueAsGuest: () => Promise<void>
   signOut: () => void
 }
 
@@ -94,13 +104,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn: async (email, password) => persist(await authLogin(email, password)),
       signUp: async (email, password, name) => persist(await authSignup(email, password, name)),
       signInWithGoogle: async (idToken) => persist(await authGoogle(idToken)),
-      continueAsGuest: () => {
+      continueAsGuest: async () => {
+        const res = await authGuest()
+        setToken(res.token)
         try {
+          localStorage.setItem(USER_KEY, JSON.stringify(res.user))
           localStorage.setItem(GUEST_KEY, '1')
         } catch {
           // ignore
         }
         setIsGuest(true)
+        setUser(res.user)
       },
       signOut: () => {
         clearToken()

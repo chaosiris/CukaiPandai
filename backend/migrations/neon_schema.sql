@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS defense_packs (
     created_at timestamptz DEFAULT now()
 );
 
--- Auth users — password HASHES only (PBKDF2-HMAC), never raw passwords. provider = 'password'|'google'.
+-- Auth users — password HASHES only (PBKDF2-HMAC), never raw passwords. provider = 'password'|'google'|'guest'.
 -- The app also creates this lazily (UserRepository._ensure_table); included here for psql provisioning.
 CREATE TABLE IF NOT EXISTS users (
     id            text PRIMARY KEY,
@@ -47,4 +47,24 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash text,
     provider      text NOT NULL DEFAULT 'password',
     created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- EP-1 — per-user entity profiles keyed by JWT sub. Additive; does not alter existing tables.
+CREATE TABLE IF NOT EXISTS user_entities (
+    user_id    text PRIMARY KEY,
+    data       jsonb NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- EP-2 — per-user filing records. Additive; does not alter the existing filings table.
+-- id is a server-assigned uuid hex; user_id is the JWT sub.
+CREATE TABLE IF NOT EXISTS filing_records (
+    id         text PRIMARY KEY,
+    user_id    text NOT NULL,
+    tin        text,
+    label      text,
+    computation jsonb,
+    risk_flags  jsonb,
+    line_items  jsonb,
+    created_at  timestamptz NOT NULL DEFAULT now()
 );
