@@ -267,6 +267,26 @@ _PL lists anything ambiguous here for the human to resolve at Gate 1. Phase-0 re
 
 **Acceptance criteria:** all consoles run on the live Render API end-to-end (CORS via BE-7 + the DO-2/DO-1 origin reconciliation); the **live** fabricated-citation rejection is proven to yield `verified=false` (DQ1/BE-18 path) — or, if DQ1=(B), the rejection is explicitly demoed in mock and noted in TD-3; the mock `items` shape matches live `[{contested_item, evidence}]`; and the mock branches on query so standard-vs-fabrication parity holds with live. The three `docs/test.md` carry-forward items are closed. _(Deploy handled by **DO-1/DO-2**.)_
 
+### Redesign Wave 4 — Filing Studio Stepper `[FE]`
+
+**Purpose:** Transform the Filing Studio into a Layak-style "watch the agent reason" stepped flow. Five numbered stages, each showing status (Pending / In Progress / Awaiting You / Complete) and a plain-English write-back when it completes. Driven by the existing endpoints — no SSE, no new backend surface. Preserves all current functionality.
+
+- [x] **Stage 01 - Classify Line Items** (`classifyTrialBalance`): pre-filled from `persona.demoRawText`; write-back "Read your trial balance, N line items classified"; classified items shown with income/deductible badges; ILMU sovereign badge rendered.
+- [x] **Stage 02 - Compute Form C** (`startFiling`): write-back "Chargeable income RM X, tax payable RM Y"; 96px hero `tax_payable`; honest-number IA (liability separated from supporting figures); per-figure `FigureTrace` `<details>` (rule_id / config_version / inputs; no clause-IDs on figures per FE-3 constraint).
+- [x] **Stage 03 - Risk Assessment**: write-back e.g. "1 high, 2 medium risk flags detected"; flags rendered with severity colors (rust / mustard / ink-soft).
+- [x] **Stage 04 - Human Approval** (HITL gate): status shows "AWAITING YOU" until acted on; Approve / Reject drive `resumeFiling`; 404-safe.
+- [x] **Stage 05 - Finalized**: write-back "Filing finalized" (approved) or "Filing rejected, returned for revision" (rejected); `ComputationPanel` re-rendered with final figures.
+- [x] **"Show technical details" disclosure**: expands to show `route_info` (sovereign / active_model from the classify call) + per-figure deterministic core trace (rule_id / config_version / inputs / value for every field in `computation.fields`).
+- [x] **One-shot (`getFormC`) "One-Shot (No Gate)" button** preserved as a secondary action after classify completes.
+- [x] Stages visually progress: numbered circle shows "01"/"02"... or "check" when complete; active stage highlighted (`--screen` background); status badge uses `--denim` (complete) / `--mustard` (running/awaiting) / `--rust` (error) / `--ink-soft` (pending).
+- [x] Works in mock mode (`VITE_API_MOCK=1`) AND live; persona switch resets the pipeline.
+- [x] Verified: `bunx tsc --noEmit` clean, `bun run build` green (59 modules), `bunx biome check frontend/src` 0 errors.
+- [x] Dark mode legible via tokens only; no literal hex outside `var(--...)`.
+
+**Acceptance criteria met:** five-stage stepper visible; each stage maps to an existing endpoint + shows a write-back; 96px hero / honest-number IA / FigureTrace details / HITL gate / one-shot fallback / sovereign badge all preserved; technical-details disclosure shows route_info + deterministic trace; build/lint clean.
+
+---
+
 ### Redesign Wave 2 — Dashboard Hub Depth `[FE]`
 
 **Purpose:** Fill the ~50% empty dead space below the action cards with real, data-driven content mirroring Layak's dashboard density. No fake data.

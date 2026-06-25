@@ -16,6 +16,25 @@ import {
 import { SovereignBadge } from '../components/CitationPanel'
 import { useEntity } from '../hooks/useEntity'
 
+// Figures that represent the final liability - rendered in the hero section
+const LIABILITY_KEYS = new Set(['tax_payable', 'zakat_offset', 'balance_payable'])
+// Figures that are upstream computations - rendered in the supporting section
+const UPSTREAM_KEYS = new Set(['gross_income', 'adjusted_income', 'chargeable_income'])
+
+// Stage identifiers in execution order
+type StageId = 'classify' | 'compute' | 'risk' | 'approval' | 'finalized'
+
+type StageStatus = 'pending' | 'running' | 'complete' | 'awaiting' | 'error'
+
+interface Stage {
+  id: StageId
+  num: number
+  name: string
+  status: StageStatus
+  writeBack?: string
+}
+
+// Internal flow phase - tracks what the UI and data state is
 type Phase =
   | { tag: 'idle' }
   | { tag: 'classifying' }
@@ -25,11 +44,6 @@ type Phase =
   | { tag: 'resuming'; start: FilingStartResponse }
   | { tag: 'approved'; result: FilingResumeResponse }
   | { tag: 'error'; message: string }
-
-// Figures that represent the final liability — rendered in the hero section
-const LIABILITY_KEYS = new Set(['tax_payable', 'zakat_offset', 'balance_payable'])
-// Figures that are upstream computations — rendered in the supporting section
-const UPSTREAM_KEYS = new Set(['gross_income', 'adjusted_income', 'chargeable_income'])
 
 function buildSsm(entity: {
   tin: string
@@ -63,16 +77,233 @@ function severityColor(severity: string): string {
   return 'var(--mustard)'
 }
 
-function RiskFlagList({ flags }: { flags: RiskFlag[] }) {
-  if (flags.length === 0) return null
+function statusColor(status: StageStatus): string {
+  if (status === 'complete') return 'var(--denim)'
+  if (status === 'running') return 'var(--mustard)'
+  if (status === 'awaiting') return 'var(--mustard)'
+  if (status === 'error') return 'var(--rust)'
+  return 'var(--ink-soft)'
+}
+
+function statusLabel(status: StageStatus): string {
+  if (status === 'complete') return 'COMPLETE'
+  if (status === 'running') return 'IN PROGRESS'
+  if (status === 'awaiting') return 'AWAITING YOU'
+  if (status === 'error') return 'ERROR'
+  return 'PENDING'
+}
+
+// Derive stage list from the current phase
+function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): Stage[] {
+  const base: Stage[] = [
+    { id: 'classify', num: 1, name: 'Classify Line Items', status: 'pending' },
+    { id: 'compute', num: 2, name: 'Compute Form C', status: 'pending' },
+    { id: 'risk', num: 3, name: 'Risk Assessment', status: 'pending' },
+    { id: 'approval', num: 4, name: 'Human Approval', status: 'pending' },
+    { id: 'finalized', num: 5, name: 'Finalized', status: 'pending' }
+  ]
+
+  if (phase.tag === 'idle') return base
+
+  if (phase.tag === 'classifying') {
+    base[0].status = 'running'
+    return base
+  }
+
+  if (phase.tag === 'classified' && classifyResult) {
+    const n = classifyResult.line_items.length
+    base[0].status = 'complete'
+    base[0].writeBack = `Read your trial balance, ${n} line item${n !== 1 ? 's' : ''} classified`
+    return base
+  }
+
+  if (phase.tag === 'starting') {
+    const n = classifyResult?.line_items.length ?? 0
+    base[0].status = 'complete'
+    base[0].writeBack = `Read your trial balance, ${n} line item${n !== 1 ? 's' : ''} classified`
+    base[1].status = 'running'
+    return base
+  }
+
+  if (phase.tag === 'pending_approval') {
+    const n = classifyResult?.line_items.length ?? 0
+    base[0].status = 'complete'
+    base[0].writeBack = `Read your trial balance, ${n} line item${n !== 1 ? 's' : ''} classified`
+
+    const comp = phase.start.computation
+    const taxPayable = comp.fields.tax_payable?.value
+    const chargeableIncome = comp.fields.chargeable_income?.value
+    base[1].status = 'complete'
+    base[1].writeBack =
+      chargeableIncome != null && taxPayable != null
+        ? `Chargeable income RM ${chargeableIncome.toLocaleString()}, tax payable RM ${taxPayable.toLocaleString()}`
+        : 'Form C computation complete'
+
+    const flags = phase.start.risk_flags
+    const high = flags.filter((f) => f.severity === 'high').length
+    const medium = flags.filter((f) => f.severity === 'medium').length
+    const low = flags.filter((f) => f.severity === 'low').length
+    const parts: string[] = []
+    if (high > 0) parts.push(`${high} high`)
+    if (medium > 0) parts.push(`${medium} medium`)
+    if (low > 0) parts.push(`${low} low`)
+    base[2].status = 'complete'
+    base[2].writeBack =
+      parts.length > 0
+        ? `${parts.join(', ')} risk flag${flags.length !== 1 ? 's' : ''} detected`
+        : 'No risk flags detected'
+
+    base[3].status = 'awaiting'
+    return base
+  }
+
+  if (phase.tag === 'resuming') {
+    const n = classifyResult?.line_items.length ?? 0
+    base[0].status = 'complete'
+    base[0].writeBack = `Read your trial balance, ${n} line item${n !== 1 ? 's' : ''} classified`
+    const comp = phase.start.computation
+    const taxPayable = comp.fields.tax_payable?.value
+    const chargeableIncome = comp.fields.chargeable_income?.value
+    base[1].status = 'complete'
+    base[1].writeBack =
+      chargeableIncome != null && taxPayable != null
+        ? `Chargeable income RM ${chargeableIncome.toLocaleString()}, tax payable RM ${taxPayable.toLocaleString()}`
+        : 'Form C computation complete'
+    const flags = phase.start.risk_flags
+    const high = flags.filter((f) => f.severity === 'high').length
+    const medium = flags.filter((f) => f.severity === 'medium').length
+    const low = flags.filter((f) => f.severity === 'low').length
+    const parts: string[] = []
+    if (high > 0) parts.push(`${high} high`)
+    if (medium > 0) parts.push(`${medium} medium`)
+    if (low > 0) parts.push(`${low} low`)
+    base[2].status = 'complete'
+    base[2].writeBack =
+      parts.length > 0
+        ? `${parts.join(', ')} risk flag${flags.length !== 1 ? 's' : ''} detected`
+        : 'No risk flags detected'
+    base[3].status = 'running'
+    return base
+  }
+
+  if (phase.tag === 'approved') {
+    const n = classifyResult?.line_items.length ?? 0
+    base[0].status = 'complete'
+    base[0].writeBack = `Read your trial balance, ${n} line item${n !== 1 ? 's' : ''} classified`
+    const comp = phase.result.computation
+    const taxPayable = comp.fields.tax_payable?.value
+    const chargeableIncome = comp.fields.chargeable_income?.value
+    base[1].status = 'complete'
+    base[1].writeBack =
+      chargeableIncome != null && taxPayable != null
+        ? `Chargeable income RM ${chargeableIncome.toLocaleString()}, tax payable RM ${taxPayable.toLocaleString()}`
+        : 'Form C computation complete'
+    base[2].status = 'complete'
+    base[3].status = 'complete'
+    base[3].writeBack = phase.result.approved ? 'Filing approved' : 'Filing rejected'
+    base[4].status = 'complete'
+    base[4].writeBack = phase.result.approved ? 'Filing finalized' : 'Filing rejected, returned for revision'
+    return base
+  }
+
+  if (phase.tag === 'error') {
+    // Mark the first non-complete stage as error
+    for (const s of base) {
+      if (s.status === 'pending') {
+        s.status = 'error'
+        break
+      }
+    }
+  }
+
+  return base
+}
+
+// Stage row in the stepper
+function StageRow({ stage, isActive }: { stage: Stage; isActive: boolean }) {
+  const color = statusColor(stage.status)
   return (
     <div
       style={{
-        marginTop: 16,
         display: 'grid',
-        gap: 8
+        gridTemplateColumns: '36px 1fr auto',
+        alignItems: 'center',
+        gap: 12,
+        padding: '10px 18px',
+        borderBottom: 'var(--border)',
+        background: isActive ? 'var(--screen)' : 'transparent',
+        transition: 'background 200ms'
       }}
     >
+      {/* Stage number circle */}
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          border: `1.5px solid ${color}`,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          fontWeight: 700,
+          color,
+          flexShrink: 0
+        }}
+      >
+        {stage.status === 'complete' ? '✓' : String(stage.num).padStart(2, '0')}
+      </div>
+
+      {/* Stage name + write-back */}
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 14,
+            fontWeight: stage.status === 'complete' ? 400 : 600,
+            color: stage.status === 'pending' ? 'var(--ink-soft)' : 'var(--ink)',
+            lineHeight: 1.3
+          }}
+        >
+          {stage.name}
+        </div>
+        {stage.writeBack && (
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              color: 'var(--ink-soft)',
+              marginTop: 2,
+              lineHeight: 1.4
+            }}
+          >
+            {stage.writeBack}
+          </div>
+        )}
+      </div>
+
+      {/* Status badge */}
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color,
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {statusLabel(stage.status)}
+      </div>
+    </div>
+  )
+}
+
+function RiskFlagList({ flags }: { flags: RiskFlag[] }) {
+  if (flags.length === 0) return null
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
       {flags.map((f) => (
         <div
           key={f.code}
@@ -171,7 +402,7 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
   const otherEntries = entries.filter(([k]) => !LIABILITY_KEYS.has(k) && !UPSTREAM_KEYS.has(k))
 
   return (
-    <div className="window" style={{ marginTop: 16 }}>
+    <div className="window" style={{ marginTop: 12 }}>
       <div className="titlebar">
         <span className="titlebar-title">
           {title}: {computation.form}
@@ -223,7 +454,7 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
         </div>
       )}
 
-      {/* Liability section — tax payable + related figures */}
+      {/* Liability section - tax payable + related figures */}
       {liabilityEntries.length > 0 && (
         <>
           <div
@@ -248,7 +479,7 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
         </>
       )}
 
-      {/* Supporting figures — upstream computation inputs */}
+      {/* Supporting figures - upstream computation inputs */}
       {upstreamEntries.length > 0 && (
         <>
           <div
@@ -303,10 +534,151 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
   )
 }
 
+// Technical details disclosure - shows route_info + per-figure trace for the computed figures
+function TechnicalDetails({
+  classifyResult,
+  computation
+}: {
+  classifyResult: ClassifyResponse | null
+  computation: FormComputation | null
+}) {
+  return (
+    <details style={{ marginTop: 16 }}>
+      <summary
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--denim)',
+          cursor: 'pointer',
+          userSelect: 'none',
+          padding: '8px 0',
+          letterSpacing: '0.04em'
+        }}
+      >
+        Show technical details
+      </summary>
+      <div
+        className="window"
+        style={{
+          marginTop: 8,
+          padding: '16px 18px',
+          display: 'grid',
+          gap: 16,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--ink-soft)'
+        }}
+      >
+        {/* Route info from the classify call */}
+        {classifyResult && (
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--ink-soft)',
+                marginBottom: 8
+              }}
+            >
+              Route Info
+            </div>
+            <div style={{ display: 'grid', gap: 4 }}>
+              <div>
+                <strong style={{ color: 'var(--ink)' }}>sovereign:</strong>{' '}
+                {classifyResult.sovereign ? 'true' : 'false'}
+              </div>
+              <div>
+                <strong style={{ color: 'var(--ink)' }}>active_model:</strong> {classifyResult.active_model}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Per-figure deterministic trace */}
+        {computation && (
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--ink-soft)',
+                marginBottom: 8
+              }}
+            >
+              Deterministic Core Trace
+            </div>
+            <div style={{ display: 'grid', gap: 12 }}>
+              {Object.entries(computation.fields).map(([key, trace]) => (
+                <div
+                  key={key}
+                  style={{
+                    borderLeft: '2px solid var(--grid)',
+                    paddingLeft: 12,
+                    display: 'grid',
+                    gap: 3
+                  }}
+                >
+                  <div style={{ color: 'var(--ink)', fontWeight: 700 }}>{key.replace(/_/g, ' ')}</div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>rule_id:</strong> {trace.rule_id}
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>config_version:</strong> {trace.config_version}
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>inputs:</strong>{' '}
+                    {trace.inputs.length > 0 ? trace.inputs.join(', ') : 'none'}
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>value:</strong> RM {trace.value.toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
+  )
+}
+
+// Stage 1 detail: classified line items + sovereign badge
+function Stage1Detail({ classifyResult, lineItems }: { classifyResult: ClassifyResponse; lineItems: LineItem[] }) {
+  return (
+    <div className="window" style={{ marginTop: 12 }}>
+      <div className="titlebar">
+        <span className="titlebar-title">Classified Line Items</span>
+        <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
+      </div>
+      <ul className="req-list">
+        {lineItems.map((item) => (
+          <li key={item.code} className="requirement-row">
+            <div className="requirement-topline">
+              <span className="requirement-label">
+                <span className="requirement-label-text">{item.description}</span>
+                <span className="kind-tag">{item.category}</span>
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700 }}>
+                RM {item.amount.toLocaleString()}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                {item.code}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export default function FilingStudio() {
   const { persona } = useActivePersona()
   const { entity, error: entityError, loading: entityLoading } = useEntity()
-  // Reset the studio when the active persona changes
   const [rawText, setRawText] = useState(persona.demoRawText)
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
@@ -320,7 +692,33 @@ export default function FilingStudio() {
     setPhase({ tag: 'idle' })
   }, [persona.tin])
 
+  const stages = deriveStages(phase, classifyResult)
+  const activeStageId: StageId | null =
+    phase.tag === 'idle' || phase.tag === 'error'
+      ? null
+      : phase.tag === 'classifying'
+        ? 'classify'
+        : phase.tag === 'classified'
+          ? 'classify'
+          : phase.tag === 'starting'
+            ? 'compute'
+            : phase.tag === 'pending_approval'
+              ? 'approval'
+              : phase.tag === 'resuming'
+                ? 'approval'
+                : phase.tag === 'approved'
+                  ? 'finalized'
+                  : null
+
   const displayError = entityError ?? (phase.tag === 'error' ? phase.message : null)
+
+  // The computation to show in technical details (whichever is most recent)
+  const latestComputation =
+    phase.tag === 'approved'
+      ? phase.result.computation
+      : phase.tag === 'pending_approval' || phase.tag === 'resuming'
+        ? phase.start.computation
+        : null
 
   async function handleClassify() {
     if (!entity) return
@@ -357,8 +755,10 @@ export default function FilingStudio() {
       setPhase({ tag: 'approved', result })
     } catch (e) {
       const msg = (e as Error).message
-      // 404 means thread already finalized or unknown — surface helpfully
-      setPhase({ tag: 'error', message: msg.includes('404') ? 'Filing thread not found or already finalized.' : msg })
+      setPhase({
+        tag: 'error',
+        message: msg.includes('404') ? 'Filing thread not found or already finalized.' : msg
+      })
     }
   }
 
@@ -368,7 +768,6 @@ export default function FilingStudio() {
     try {
       const ssm = buildSsm(entity)
       const result = await getFormC(entity.tin, ssm, lineItems)
-      // Wrap the one-shot result to look like a resume result
       setPhase({ tag: 'approved', result: { approved: !result.requires_approval, computation: result.computation } })
     } catch (e) {
       setPhase({ tag: 'error', message: (e as Error).message })
@@ -381,20 +780,11 @@ export default function FilingStudio() {
 
   const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'starting' || phase.tag === 'resuming'
 
-  const loadingLabel =
-    phase.tag === 'classifying'
-      ? 'Classifying Trial Balance…'
-      : phase.tag === 'starting'
-        ? 'Starting Filing (HITL)…'
-        : phase.tag === 'resuming'
-          ? 'Resuming After Approval…'
-          : 'Loading Entity…'
-
   return (
     <>
       <div className="page-head">
         <h1>Filing Studio</h1>
-        <p className="page-kicker">Form C · YA2026 · {entity?.tin ?? '…'}</p>
+        <p className="page-kicker">Form C · YA2026 · {entity?.tin ?? '...'}</p>
       </div>
 
       {displayError && (
@@ -406,22 +796,11 @@ export default function FilingStudio() {
         </div>
       )}
 
-      {isLoading && (
-        <div className="window loading-window">
-          <div className="titlebar">
-            <span className="titlebar-title">{loadingLabel}</span>
-          </div>
-          <div className="loading-body">
-            <div className="barber" />
-          </div>
-        </div>
-      )}
-
-      {/* Step 1 — Classify trial balance */}
+      {/* Stage 1 input - trial balance text, shown when idle/error and entity loaded */}
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar">
-            <span className="titlebar-title">Step 1: Trial Balance</span>
+            <span className="titlebar-title">Stage 01 - Trial Balance</span>
             <span className="titlebar-meta">paste raw text</span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
@@ -440,7 +819,7 @@ export default function FilingStudio() {
                 color: 'var(--ink)',
                 resize: 'vertical'
               }}
-              placeholder="Paste trial balance text here…"
+              placeholder="Paste trial balance text here..."
             />
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -464,58 +843,152 @@ export default function FilingStudio() {
         </div>
       )}
 
-      {/* Step 2 — Classified line items */}
-      {(phase.tag === 'classified' ||
-        phase.tag === 'pending_approval' ||
-        phase.tag === 'resuming' ||
-        phase.tag === 'approved') &&
-        classifyResult && (
+      {/* The stepped pipeline - shown once classify has started */}
+      {phase.tag !== 'idle' && !entityLoading && (
+        <>
+          {/* Stepper card */}
           <div className="window" style={{ marginTop: 16 }}>
             <div className="titlebar">
-              <span className="titlebar-title">Step 1: Classified Line Items</span>
-              {classifyResult && (
-                <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
-              )}
+              <span className="titlebar-title">Filing Pipeline</span>
+              {isLoading && <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />}
             </div>
-            <ul className="req-list">
-              {lineItems.map((item) => (
-                <li key={item.code} className="requirement-row">
-                  <div className="requirement-topline">
-                    <span className="requirement-label">
-                      <span className="requirement-label-text">{item.description}</span>
-                      <span className="kind-tag">{item.category}</span>
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700 }}>
-                      RM {item.amount.toLocaleString()}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                      {item.code}
+            {stages.map((stage) => (
+              <StageRow key={stage.id} stage={stage} isActive={activeStageId === stage.id} />
+            ))}
+          </div>
+
+          {/* Stage 1 detail: classified line items (shown once classify completes) */}
+          {classifyResult &&
+            (phase.tag === 'classified' ||
+              phase.tag === 'starting' ||
+              phase.tag === 'pending_approval' ||
+              phase.tag === 'resuming' ||
+              phase.tag === 'approved') && (
+              <>
+                <Stage1Detail classifyResult={classifyResult} lineItems={lineItems} />
+
+                {/* Start Filing button - only while in "classified" state */}
+                {phase.tag === 'classified' && (
+                  <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={handleStartFiling}
+                      style={{
+                        padding: '8px 16px',
+                        border: 'var(--border)',
+                        background: 'var(--denim)',
+                        color: 'var(--paper)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius)'
+                      }}
+                    >
+                      Start Filing (HITL)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOneShot}
+                      style={{
+                        padding: '8px 16px',
+                        border: 'var(--border)',
+                        background: 'transparent',
+                        color: 'var(--ink)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius)'
+                      }}
+                    >
+                      One-Shot (No Gate)
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+          {/* Stage 2+3 detail: computation + risk flags (shown in pending_approval / resuming / approved) */}
+          {(phase.tag === 'pending_approval' || phase.tag === 'resuming') && (
+            <>
+              <ComputationPanel computation={phase.start.computation} title="Stage 02 - Computed (Pending Approval)" />
+
+              {phase.start.risk_flags.length > 0 && (
+                <div className="window" style={{ marginTop: 12 }}>
+                  <div className="titlebar">
+                    <span className="titlebar-title">Stage 03 - Risk Assessment</span>
+                    <span className="titlebar-meta">
+                      {phase.start.risk_flags.length} flag{phase.start.risk_flags.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                </li>
-              ))}
-            </ul>
-            {phase.tag === 'classified' && (
-              <div style={{ padding: '12px 18px', borderTop: 'var(--border)', display: 'flex', gap: 10 }}>
+                  <div style={{ padding: '12px 18px' }}>
+                    <RiskFlagList flags={phase.start.risk_flags} />
+                  </div>
+                </div>
+              )}
+
+              {/* Stage 4: Human approval gate */}
+              <div className="window" style={{ marginTop: 12 }}>
+                <div className="titlebar">
+                  <span className="titlebar-title">Stage 04 - Human Approval</span>
+                  <span className="titlebar-meta" style={{ color: 'var(--mustard)' }}>
+                    AWAITING YOU
+                  </span>
+                </div>
+                <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6 }}>
+                    Review the computed figures and risk flags above before approving this filing. This gate is
+                    enforced: the filing graph pauses here for human sign-off.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(true)}
+                      style={{
+                        padding: '8px 20px',
+                        border: '1px solid var(--denim)',
+                        background: 'var(--denim)',
+                        color: 'var(--paper)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius)'
+                      }}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApprove(false)}
+                      style={{
+                        padding: '8px 20px',
+                        border: '1px solid var(--rust)',
+                        background: 'transparent',
+                        color: 'var(--rust)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius)'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Stage 5: Finalized result */}
+          {phase.tag === 'approved' && (
+            <>
+              <ComputationPanel
+                computation={phase.result.computation}
+                title={phase.result.approved ? 'Stage 05 - Filing Finalized' : 'Stage 05 - Filing Rejected'}
+              />
+              <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
                 <button
                   type="button"
-                  onClick={handleStartFiling}
-                  style={{
-                    padding: '8px 16px',
-                    border: 'var(--border)',
-                    background: 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  Start Filing (HITL)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOneShot}
+                  onClick={handleReset}
                   style={{
                     padding: '8px 16px',
                     border: 'var(--border)',
@@ -527,108 +1000,16 @@ export default function FilingStudio() {
                     borderRadius: 'var(--radius)'
                   }}
                 >
-                  One-shot (no gate)
+                  Start Over
                 </button>
               </div>
-            )}
-          </div>
-        )}
-
-      {/* Step 3 — HITL pending approval */}
-      {phase.tag === 'pending_approval' && (
-        <>
-          <ComputationPanel computation={phase.start.computation} title="Step 2: Computed (Pending Approval)" />
-
-          {/* Risk flags — prominently before the approve gate */}
-          {phase.start.risk_flags.length > 0 && (
-            <div className="window" style={{ marginTop: 16 }}>
-              <div className="titlebar">
-                <span className="titlebar-title">Risk Flags</span>
-                <span className="titlebar-meta">
-                  {phase.start.risk_flags.length} flag{phase.start.risk_flags.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div style={{ padding: '12px 18px' }}>
-                <RiskFlagList flags={phase.start.risk_flags} />
-              </div>
-            </div>
+            </>
           )}
 
-          {/* Human-approval gate */}
-          <div className="window" style={{ marginTop: 16 }}>
-            <div className="titlebar">
-              <span className="titlebar-title">Step 3: Human Approval Gate</span>
-              {phase.start.requires_approval && <span className="titlebar-meta">PENDING APPROVAL</span>}
-            </div>
-            <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
-              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.6 }}>
-                Review the computed figures and risk flags above before approving this filing. This gate is enforced:
-                the filing graph pauses here for human sign-off.
-              </p>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => handleApprove(true)}
-                  style={{
-                    padding: '8px 20px',
-                    border: '1px solid var(--denim)',
-                    background: 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApprove(false)}
-                  style={{
-                    padding: '8px 20px',
-                    border: '1px solid var(--rust)',
-                    background: 'transparent',
-                    color: 'var(--rust)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  Reject
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Step 4 — Approved / finalized */}
-      {phase.tag === 'approved' && (
-        <>
-          <ComputationPanel
-            computation={phase.result.computation}
-            title={phase.result.approved ? 'Approved Filing' : 'Filing Rejected'}
-          />
-          <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              onClick={handleReset}
-              style={{
-                padding: '8px 16px',
-                border: 'var(--border)',
-                background: 'transparent',
-                color: 'var(--ink)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                cursor: 'pointer',
-                borderRadius: 'var(--radius)'
-              }}
-            >
-              Start over
-            </button>
-          </div>
+          {/* Technical details disclosure */}
+          {(classifyResult || latestComputation) && (
+            <TechnicalDetails classifyResult={classifyResult} computation={latestComputation} />
+          )}
         </>
       )}
     </>
