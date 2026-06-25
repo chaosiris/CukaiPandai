@@ -581,3 +581,44 @@ The hub deepens cleanly and non-regressively. The greeting + 3 action cards are 
 - `tokens.css` + `AppShell.css` untouched — no shared-surface color pollution.
 
 **Return to PM:** **Approve.** Wave 3 entry-journey is non-regressive — the dashboard hub and all consoles are byte-for-byte unchanged and simply relocated to `/dashboard`, routing is correct with two clean non-overlapping shell groups, there is no hard auth guard (guest flag is write-only, deep-linking works), and all internal links repoint correctly with no dead `/`-hub links. All three gates green (tsc 0 · build 59 modules · biome 0). The only findings are two **non-blocking advisories** — marketing-scoped literal hexes that duplicate existing tokens (prefer `var(--*)`), and em-dashes in landing copy that match the existing repo convention. Ready for Gate-2 commit authorization; the advisories can be folded into a follow-up polish task.
+
+---
+
+## [25/06/26] — Wave 4: Filing Studio Stepper (FilingStudio.tsx rewrite)
+
+**Branch:** working tree (uncommitted). Diff scope: `frontend/src/pages/FilingStudio.tsx` (+ `docs/plan.md`, `docs/progress.md`).
+
+**Verdict:** Approve
+
+**Diff scope confirmed:** `git diff main --stat` shows only `FilingStudio.tsx` + two docs. `git diff main -- frontend/src/api/client.ts` is **empty** — client.ts unchanged. No collateral changes to other consoles, tokens.css, or shared surfaces.
+
+**Non-regression (priority #1) — every prior capability preserved:**
+
+- classify via `classifyTrialBalance`; sovereign badge from `classifyResult.sovereign`/`active_model` (line 655, `Stage1Detail`) — kept.
+- HITL graph `startFiling` → Approve/Reject → `resumeFiling(tin, thread_id, approved)` (lines 741/754) — kept. The 404/error path is handled: `handleApprove` catch maps `404` to "Filing thread not found or already finalized." (line 760) and routes to `{tag:'error'}` rather than throwing — no white-screen.
+- `risk_flags` rendered with per-flag severity color/label (`RiskFlagList`, lines 303–338; severity drives border + tag color) — kept.
+- 96px hero `tax_payable` numeral (line 436) — kept. Honest-number IA preserved: `LIABILITY_KEYS` vs `UPSTREAM_KEYS` split into "Computed Liability" / "Supporting Figures" sections (lines 400–506) — kept.
+- per-figure `FigureTrace` `<details>` exposing rule_id/config_version/inputs (`FigureTraceRow`, lines 340–395) — kept.
+- one-shot `getFormC` fallback (`handleOneShot`, line 765) — kept; `approved: !requires_approval` mapping is byte-identical to the pre-rewrite handler (not a new behavior).
+
+**GROUNDING CONSTRAINT (critical) — PASS:** `grep clause_id|clause_ids|citation` over FilingStudio.tsx returns 0 matches. No clause-IDs or citations are rendered on Form C figure rows; provenance is limited to the FigureTrace (rule_id/config_version/inputs). Matches the pre-rewrite behavior.
+
+**Contract integrity (priority #2) — PASS:** Consumes the same shapes from the unchanged client.ts: `ClassifyResponse{line_items, sovereign, active_model}`, `FilingStartResponse{thread_id, computation, requires_approval, risk_flags}`, `FilingResumeResponse{approved, computation}`, `FormCResponse{computation, requires_approval, risk_flags}`, `FigureTrace{value, inputs, rule_id, config_version}`. No invented fields; tsc clean confirms structural match.
+
+**State-machine correctness — PASS:** Single `Phase` discriminated union drives the flow. Classify input (textarea) renders only in `idle`/`error`; Start/One-Shot buttons render only in `classified`; `handleApprove` guards `phase.tag !== 'pending_approval'`; "Start Over" resets to `classified` (preserving classify) or `idle`; persona switch (`useEffect` on `persona.tin`) resets rawText + classify + lineItems + phase. No reachable inconsistent/stuck state.
+
+**Mock + live — PASS:** Textarea pre-fills from `persona.demoRawText` (lines 682, 689); mock branches live entirely in the unchanged client.ts (`MOCK_MODE`), so both paths are unaffected by the rewrite.
+
+**Copy + theming — PASS:** 0 em-dashes in user-facing copy. Stage headings Title Case ("Classify Line Items", "Compute Form C", "Risk Assessment", "Human Approval", "Finalized"). Colors are tokens-only (`var(--denim)`, `var(--rust)`, `var(--mustard)`, `var(--ink)`, etc.) — no literal hex.
+
+**Findings (non-blocking):**
+
+- `FilingStudio.tsx:41` — [nit] The `classified` phase variant carries a `classify: ClassifyResponse` payload that the render path never reads (component reads the separate `classifyResult` state instead). Harmless redundant source-of-truth; could drop the payload from the union for clarity. No behavioral impact.
+
+**Smoke test:**
+
+- `cd frontend && bunx tsc --noEmit` → exit 0 (clean).
+- `cd frontend && bun run build` → green, 59 modules transformed, built in 1.83s.
+- `bunx biome check frontend/src` (from root) → 0 errors, 22 files checked.
+
+**Return to PM:** **Approve.** The Filing Studio stepper rewrite is non-regressive — all prior capabilities (classify + sovereign badge, HITL start/resume with graceful 404 handling, severity-coded risk flags, 96px tax_payable hero, honest-number liability/supporting IA, per-figure FigureTrace, one-shot fallback) are preserved, the grounding constraint holds (no clause-IDs/citations on figure rows), and the contract is intact (client.ts byte-for-byte unchanged, same response shapes consumed, no invented fields). State machine is sound with no stuck states; copy/theming clean. All three gates green. One non-blocking nit (a redundant unused union payload). Ready for Gate-2 commit authorization.

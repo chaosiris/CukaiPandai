@@ -613,3 +613,21 @@ CukaiPandai/
 - **Build:** `bunx tsc --noEmit` clean; `bun run build` → 59 modules, 0 errors, 1.73s; `bunx biome check frontend/src` → 0 errors.
 - **Files touched:** `frontend/src/App.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/layouts/MarketingShell.tsx` (new), `frontend/src/layouts/MarketingShell.css` (new), `frontend/src/pages/Landing.tsx` (new), `frontend/src/pages/Landing.css` (new), `frontend/src/pages/LoginGate.tsx` (new), `frontend/src/pages/LoginGate.css` (new), `docs/plan.md`, `docs/progress.md`.
 - **[25/06/26 cleanup]** Em-dashes swept from all user-facing FE copy (AppShell banner/popover, Landing steps/mock copy, Dashboard trust strip + card desc, NotFound titlebar — 9 strings across 4 files; re-enforcing the PR rule); marketing CSS literal hex tokenized in `Landing.css` (8 literals → `var(--ink/ink-soft/denim)`, 4 redundant dark overrides removed) and `LoginGate.css` (3 `#e9edf3` → `var(--ink)`); build: tsc clean, `bun run build` green (59 modules), biome 0 errors.
+
+---
+
+## [25/06/26] — Redesign Wave 4 — Filing Studio Stepper `[FE]`
+
+- Rewrote `frontend/src/pages/FilingStudio.tsx` to a Layak-style numbered stage stepper while preserving all existing filing functionality (classify, HITL start/resume, one-shot fallback, risk flags, 96px hero, honest-number IA, FigureTrace details, sovereign badge).
+- **Stage model:** five `StageId` values (`classify` / `compute` / `risk` / `approval` / `finalized`) with `StageStatus` (`pending` / `running` / `awaiting` / `complete` / `error`) derived purely from the existing `Phase` union type; no new state variables added.
+- **Stage 01 (Classify Line Items):** drives `classifyTrialBalance`; write-back "Read your trial balance, N line items classified"; `Stage1Detail` sub-component shows the `LineItem[]` with category badges and the `SovereignBadge` from `classifyResult.sovereign`/`active_model`.
+- **Stage 02 (Compute Form C):** drives `startFiling`; write-back shows chargeable income + tax payable from `computation.fields`; existing `ComputationPanel` (96px hero, honest-number IA, per-figure `FigureTraceRow` `<details>`) is unchanged and re-rendered as "Stage 02 - Computed (Pending Approval)".
+- **Stage 03 (Risk Assessment):** write-back "X high, Y medium risk flags detected" or "No risk flags detected"; existing `RiskFlagList` rendered inside a dedicated Stage 03 window card.
+- **Stage 04 (Human Approval):** status "AWAITING YOU" (mustard) while `pending_approval`; existing Approve/Reject buttons driving `resumeFiling`; 404-safe error path unchanged.
+- **Stage 05 (Finalized):** write-back "Filing finalized" or "Filing rejected, returned for revision"; `ComputationPanel` re-rendered with final `resumeFiling` result; "Start Over" resets to classified state.
+- **Stepper card:** `Filing Pipeline` window shows all five `StageRow`s (numbered circle with check on complete; stage name in Fraunces; write-back in Space Mono; status badge in denim/mustard/rust/ink-soft); active stage highlighted with `--screen` background; barber-pole progress indicator in the titlebar while loading.
+- **"Show technical details" disclosure:** `TechnicalDetails` component expands to `route_info` (`sovereign` / `active_model` from the classify call) + deterministic core trace per figure (`rule_id` / `config_version` / `inputs` / `value` for every `computation.fields` entry). FE-side only, no new endpoint.
+- **One-shot path preserved:** "One-Shot (No Gate)" button after classify completes calls `getFormC` and wraps the result into the same `approved` phase.
+- **No new CSS file added:** stepper layout uses exclusively existing token classes (`.window`, `.titlebar`, `.titlebar-meta`, `.req-list`, `.requirement-row`, `var(--denim)`, `var(--mustard)`, `var(--rust)`, `var(--ink-soft)`, `var(--screen)`, `var(--font-mono)`, `var(--font-display)`).
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (59 modules, 1.80s); `bunx biome check frontend/src` 0 errors.
+- **Files touched:** `frontend/src/pages/FilingStudio.tsx`, `docs/plan.md`, `docs/progress.md`.
