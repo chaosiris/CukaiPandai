@@ -641,3 +641,19 @@ CukaiPandai/
 - **Fix 3 — FilingStudio Phase union nit:** In `FilingStudio.tsx` line 41, removed `classify: ClassifyResponse` from the `| { tag: 'classified' }` variant. Updated the two `setPhase({ tag: 'classified', classify: ... })` callsites (lines 730 and 778) to `setPhase({ tag: 'classified' })`. The field was set but never read (`phase.classify` has zero reads; the separate `classifyResult` state is used throughout). Zero behavior change.
 - **Build:** `bunx tsc --noEmit` clean; `bun run build` green (59 modules); `bunx biome check frontend/src` 0 errors (22 files checked).
 - **Files touched:** `frontend/src/layouts/AppShell.tsx`, `frontend/src/styles/tokens.css`, `frontend/src/pages/ObligationRadar.tsx`, `frontend/src/pages/FilingStudio.tsx`, `docs/plan.md`, `docs/progress.md`.
+
+---
+
+## [25/06/26] — Settings feature + sidebar reorder `[FE]`
+
+- **Task 1 — Settings page (`/settings`):** New `frontend/src/pages/Settings.tsx` + `Settings.css` under the AppShell (topbar/drawer/footer shell). Three sections:
+  - **Appearance:** dark/light theme toggle wired to `useTheme` (instant apply; persists via `cukaipandai-theme` localStorage key).
+  - **Workspace:** default entity selector over `PERSONAS`; selection writes `cp_default_persona` to localStorage, calls `setPersona` to apply immediately, and is read back by `PersonaContext` on next load (initial state now calls `readDefaultPersona()` which checks localStorage before falling back to `DEFAULT_PERSONA`).
+  - **About:** read-only block — app name/description, GitHub link, "Decision support, not legal advice", YA2026.
+  - **Reset:** "Reset all preferences" button clears `cukaipandai-theme` + `cp_default_persona` and reloads.
+- **Task 1 — Profile popover (real, not placeholder):** `AppShell.tsx` profile button now renders a functional `.topbar-popover` with **Settings** (navigates to `/settings`, closes popover) and **Sign Out** (clears `cp_entered_as_guest`, navigates to `/`). Added `useNavigate` import. Removed disabled placeholder `Settings (Wave 2)` button.
+- **Task 1 — Route:** `/settings` added to `App.tsx` under the `<AppShell />` layout route.
+- **Task 2 — Sidebar group order:** Drawer nav reordered — **Workspace** (Dashboard) now comes first, **Compliance** (Obligations, Filing, Audit Defense) second. Removed `<div className="drawer-placeholder">Settings (Wave 2)</div>` from the Workspace section.
+- **PersonaContext:** Exports `DEFAULT_PERSONA_KEY` constant; initial state reads from `localStorage` so persisted default survives reload.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` green (61 modules); `bunx biome check frontend/src` 0 errors (24 files checked).
+- **Files touched:** `frontend/src/PersonaContext.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/App.tsx`, `frontend/src/pages/Settings.tsx` (new), `frontend/src/pages/Settings.css` (new), `docs/progress.md`.

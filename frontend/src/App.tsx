@@ -9,6 +9,7 @@ import { Landing } from './pages/Landing'
 import { LoginGate } from './pages/LoginGate'
 import NotFound from './pages/NotFound'
 import ObligationRadar from './pages/ObligationRadar'
+import Settings from './pages/Settings'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/obligations" element={<ObligationRadar />} />
             <Route path="/filing" element={<FilingStudio />} />
             <Route path="/audit-defense" element={<AuditDefense />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

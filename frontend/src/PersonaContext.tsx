@@ -2,7 +2,18 @@
 // instead of using the ACME_* constants directly.
 
 import { createContext, useContext, useState } from 'react'
-import { DEFAULT_PERSONA, type Persona } from './personas'
+import { DEFAULT_PERSONA, PERSONAS, type Persona } from './personas'
+
+export const DEFAULT_PERSONA_KEY = 'cp_default_persona'
+
+function readDefaultPersona(): Persona {
+  const tin = window.localStorage.getItem(DEFAULT_PERSONA_KEY)
+  if (tin) {
+    const found = PERSONAS.find((p) => p.tin === tin)
+    if (found) return found
+  }
+  return DEFAULT_PERSONA
+}
 
 interface PersonaContextValue {
   persona: Persona
@@ -15,7 +26,7 @@ const PersonaContext = createContext<PersonaContextValue>({
 })
 
 export function ActivePersonaProvider({ children }: { children: React.ReactNode }) {
-  const [persona, setPersona] = useState<Persona>(DEFAULT_PERSONA)
+  const [persona, setPersona] = useState<Persona>(readDefaultPersona)
   return <PersonaContext.Provider value={{ persona, setPersona }}>{children}</PersonaContext.Provider>
 }
 
