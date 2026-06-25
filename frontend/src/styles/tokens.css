@@ -337,6 +337,7 @@ a {
 }
 
 .popover-item span,
+.popover-detail,
 .profile-summary span {
   color: var(--ink-soft);
   font-family: var(--font-mono);
@@ -1228,6 +1229,101 @@ a {
   .topbar-entity-select {
     max-width: 100px;
     font-size: 10px;
+  }
+}
+
+/* ── Notification bell: kind-dot in dropover ────────────────────────── */
+.notif-kind-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Toast container (fixed, top-right) ─────────────────────────────── */
+.toast-container {
+  position: fixed;
+  top: calc(var(--topbar-height) + 16px);
+  right: 16px;
+  z-index: 200;
+  display: grid;
+  gap: 8px;
+  width: min(320px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background: var(--window);
+  border: var(--border);
+  border-left: 3px solid var(--denim);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  animation: toast-in 160ms ease both;
+}
+
+.toast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-kind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.toast-title {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.toast-close:hover {
+  color: var(--rust);
+}
+
+.toast-body {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

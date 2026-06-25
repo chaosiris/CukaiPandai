@@ -15,6 +15,7 @@ import {
 } from '../api/client'
 import { SovereignBadge } from '../components/CitationPanel'
 import { useEntity } from '../hooks/useEntity'
+import { useNotifications } from '../notifications'
 
 // Figures that represent the final liability - rendered in the hero section
 const LIABILITY_KEYS = new Set(['tax_payable', 'zakat_offset', 'balance_payable'])
@@ -683,6 +684,7 @@ export default function FilingStudio() {
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
   const [phase, setPhase] = useState<Phase>({ tag: 'idle' })
+  const { notify } = useNotifications()
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
   useEffect(() => {
@@ -753,6 +755,11 @@ export default function FilingStudio() {
       if (!entity) return
       const result = await resumeFiling(entity.tin, start.thread_id, approved)
       setPhase({ tag: 'approved', result })
+      if (approved) {
+        notify({ title: 'Filing Finalized', body: 'Form C filing approved and finalized.', kind: 'success' })
+      } else {
+        notify({ title: 'Filing Returned', body: 'Filing returned for revision.', kind: 'warning' })
+      }
     } catch (e) {
       const msg = (e as Error).message
       setPhase({

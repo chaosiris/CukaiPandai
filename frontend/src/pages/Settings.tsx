@@ -1,5 +1,6 @@
 import { DEFAULT_PERSONA_KEY, useActivePersona } from '../PersonaContext'
 import { useTheme } from '../hooks/useTheme'
+import { useNotifications } from '../notifications'
 import { PERSONAS } from '../personas'
 
 import './Settings.css'
@@ -9,12 +10,14 @@ const PREF_KEYS = ['cukaipandai-theme', DEFAULT_PERSONA_KEY] as const
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona } = useActivePersona()
+  const { toast } = useNotifications()
 
   const handleDefaultPersonaChange = (tin: string) => {
     const next = PERSONAS.find((p) => p.tin === tin)
     if (!next) return
     window.localStorage.setItem(DEFAULT_PERSONA_KEY, tin)
     setPersona(next)
+    toast({ title: 'Default Entity Updated', body: `Default entity set to ${next.label}.`, kind: 'info' })
   }
 
   const handleReset = () => {
