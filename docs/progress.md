@@ -501,3 +501,48 @@ CukaiPandai/
 - **M2:** Varied Selera on `basis_period_start`/`basis_period_end` (Apr 2024–Mar 2025 FY vs Acme's Jan–Dec 2025). Synced identically across all three places: `backend/core/fixtures/entity_selera.json`, `frontend/src/personas.ts`, `frontend/src/api/client.ts`. Result: Selera's obligation calendar has different Form C (Oct 2025 vs Jul 2026), CP204, einvoice, and SST due-dates from Acme's — visibly distinct without changing any obligation logic.
 - **Tests:** `uv run pytest -q` → 107 passed (unchanged). `bunx tsc --noEmit` → clean. `bun run build` → 48 modules green. `bunx biome check frontend/src` → 0 errors.
 - `frontend/src/api/client.ts` (MOCK_ENTITIES map for all 3 personas)
+
+---
+
+## [25/06/26] — Redesign Wave 1 (RW-1 → RW-6) `[FE]`
+
+**All six Wave-1 tasks implemented in one pass.**
+
+### RW-1 — AppShell layout (gating)
+
+- Created `frontend/src/layouts/AppShell.tsx`: ProofRank-pattern shell stripped of auth/notifications/settings. Owns: `.page-scroll` → `.topbar` (hamburger + brand lockup + controls) → `<main className="app-shell"><Outlet/>` → `.drawer-layer` → `.app-footer`. All CSS reused from `tokens.css` (no new CSS authored). Drawer closes on Escape, backdrop click, and link click.
+
+### RW-2 — LogoMark (inline SVG)
+
+- Created `frontend/src/components/icons.tsx` exporting `LogoMark` (30×30 inline SVG, ledger/document-stamp motif in `currentColor` — no image asset, no `public/` dir), `ThemeIcon` (sun/moon by theme prop), `ProfileIcon`. Used in topbar, drawer head, and footer in all three slots.
+
+### RW-3 — Route consoles under the shell + surgical layout pass
+
+- Rewrote `frontend/src/App.tsx`: `<ActivePersonaProvider>` → `<BrowserRouter>` → single `<Route element={<AppShell/>}>` wrapping index/obligations/filing/audit-defense/404. Old inline topbar + NavLinks + `PersonaPicker` + `DemoModeBanner` removed from App.tsx (shell owns all of this now; DEMO MODE banner lives in AppShell).
+- Removed the `<div className="app-shell">` outer wrapper from `ObligationRadar.tsx`, `FilingStudio.tsx`, `AuditDefense.tsx` — replaced with `<>…</>` fragment; page-head + window internals untouched. All data-fetching, persona wiring, HITL flow, citation/badge rendering, and api/client.ts calls are 100% unchanged.
+
+### RW-4 — Theme toggle
+
+- Created `frontend/src/hooks/useTheme.ts` (adapted from ProofRank; localStorage key = `cukaipandai-theme`; respects `prefers-color-scheme`; persists across reload).
+- Dark-mode audit: all four surfaces use CSS custom properties throughout. The only rgba values in page files are pre-existing alpha tints of `--denim`/`--rust` (legible on the dark `#10141c` base). Toggle is included (not hidden). Dark mode is legible on all surfaces.
+
+### RW-5 — Dashboard hub at `/` + entity-switcher upgrade
+
+- Created `frontend/src/pages/Dashboard.tsx`: time-of-day greeting + 3-card grid (Obligation Calendar · Cited Form C Filing · Audit Defense), each card a `.window` `<Link>` with title, description, mono kicker. Responsive (`auto-fit minmax(260px,1fr)`).
+- `/` is now the dashboard hub (index route). `/obligations` stays reachable from hub cards and drawer.
+- Entity switcher moved into AppShell topbar as a styled `<select>` reading/writing `useActivePersona()` — the exact same `PersonaContext` all consoles read via `useEntity`. No behaviour change; only presentation upgraded.
+
+### RW-6 — In-shell 404
+
+- Created `frontend/src/pages/NotFound.tsx`: uses `.empty-window`/`.empty-body`/`.empty-arrow`/`.empty-hello` devkit classes. Friendly copy + `<Link to="/">` back to dashboard. Mounted as `<Route path="*">` inside the AppShell route — topbar + footer always present on unknown paths.
+
+### Build / lint status
+
+- `bunx tsc --noEmit` → clean (0 errors)
+- `bun run build` → green (53 modules, 219kB JS)
+- `bunx biome check frontend/src` → 0 errors (16 files checked)
+- `tokens.css` unchanged
+
+### Deferred (Wave 2+)
+
+- Marketing landing, auth/guest gate, settings depth, chat surface, persistent sidebar rail, console-internals redesign — all remain in the Wave 2+ deferred list as documented.

@@ -28,7 +28,7 @@ export default function ObligationRadar() {
   const displayError = entityError ?? error
 
   return (
-    <div className="app-shell">
+    <>
       <div className="page-head">
         <h1>Obligation Radar</h1>
         <p className="page-kicker">YA2026 · {entity?.tin ?? '…'}</p>
@@ -129,6 +129,6 @@ export default function ObligationRadar() {
           </ul>
         </div>
       )}
-    </div>
+    </>
   )
 }

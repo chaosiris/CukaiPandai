@@ -391,7 +391,7 @@ export default function FilingStudio() {
           : 'Loading Entity…'
 
   return (
-    <div className="app-shell">
+    <>
       <div className="page-head">
         <h1>Filing Studio</h1>
         <p className="page-kicker">Form C · YA2026 · {entity?.tin ?? '…'}</p>
@@ -631,6 +631,6 @@ export default function FilingStudio() {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }

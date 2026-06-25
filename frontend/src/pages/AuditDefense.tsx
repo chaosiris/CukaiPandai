@@ -52,7 +52,7 @@ export default function AuditDefense() {
   const verifiedCitations = data ? data.citations.filter((c) => c.verified) : []
 
   return (
-    <div className="app-shell">
+    <>
       <div className="page-head">
         <h1>Audit Defense</h1>
         <p className="page-kicker">Citation-grounded response pack · {entity?.tin ?? '…'}</p>
@@ -432,6 +432,6 @@ export default function AuditDefense() {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }
