@@ -6,6 +6,8 @@ import './Settings.css'
 
 const PREF_KEYS = ['cukaipandai-theme', DEFAULT_PERSONA_KEY] as const
 
+const DATA_PREFIXES = ['cp_', 'cukaipandai-']
+
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
   const { persona, setPersona, personas } = useActivePersona()
@@ -24,6 +26,18 @@ export default function Settings() {
       window.localStorage.removeItem(key)
     }
     window.location.reload()
+  }
+
+  const handleResetAllData = () => {
+    const confirmed = window.confirm('This clears your onboarding, custom companies, and all preferences. Continue?')
+    if (!confirmed) return
+    const keys = Object.keys(window.localStorage)
+    for (const key of keys) {
+      if (DATA_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        window.localStorage.removeItem(key)
+      }
+    }
+    window.location.href = '/welcome'
   }
 
   return (
@@ -113,11 +127,32 @@ export default function Settings() {
           <section className="settings-card settings-card--wide" aria-labelledby="reset-title">
             <div className="settings-card-head">
               <h2 id="reset-title">Reset</h2>
-              <span className="settings-card-note">Preferences</span>
+              <span className="settings-card-note">Danger Zone</span>
             </div>
-            <button type="button" className="settings-reset-btn" onClick={handleReset}>
-              Reset all preferences
-            </button>
+            <div className="settings-reset-row">
+              <div className="settings-reset-desc">
+                <strong>Reset all preferences</strong>
+                <span>Clears theme and default entity selection. Reloads the page.</span>
+              </div>
+              <button type="button" className="settings-reset-btn" onClick={handleReset}>
+                Reset all preferences
+              </button>
+            </div>
+            <div className="settings-reset-row">
+              <div className="settings-reset-desc">
+                <strong>Reset all data</strong>
+                <span>
+                  Clears onboarding progress, custom companies, and all preferences. Returns to first-run state.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="settings-reset-btn settings-reset-btn--full"
+                onClick={handleResetAllData}
+              >
+                Reset all data
+              </button>
+            </div>
           </section>
         </div>
       </section>
