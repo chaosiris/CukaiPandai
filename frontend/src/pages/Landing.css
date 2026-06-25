@@ -66,13 +66,15 @@
       rgba(236, 231, 216, 0.96) 0%,
       rgba(236, 231, 216, 0.7) 42%,
       rgba(236, 231, 216, 0.05) 68%
-    ), linear-gradient(160deg, #41526e 0%, #1c2d40 55%, #0e1a26 100%);
+    ), linear-gradient(160deg, rgba(65, 82, 110, 0.55) 0%, rgba(28, 45, 64, 0.6) 55%, rgba(14, 26, 38, 0.7) 100%),
+    url("/marketing/hero-background.webp") center / cover no-repeat;
   color: var(--ink);
 }
 
 [data-theme="dark"] .lp-hero {
-  background: linear-gradient(90deg, rgba(16, 20, 28, 0.97) 0%, rgba(16, 20, 28, 0.8) 42%, rgba(16, 20, 28, 0.1) 68%),
-    linear-gradient(160deg, #1d2430 0%, #0e1a26 55%, #060c14 100%);
+  background: linear-gradient(90deg, rgba(16, 20, 28, 0.97) 0%, rgba(16, 20, 28, 0.8) 42%, rgba(16, 20, 28, 0.12) 68%),
+    linear-gradient(160deg, rgba(29, 36, 48, 0.7) 0%, rgba(14, 26, 38, 0.78) 55%, rgba(6, 12, 20, 0.85) 100%),
+    url("/marketing/hero-background.webp") center / cover no-repeat;
 }
 
 .lp-hero-inner {
@@ -521,6 +523,132 @@
   background: transparent;
 }
 
+/* ---- FAQ (featured, document style) ---- */
+.lp-faq {
+  background: var(--window);
+  border-top: var(--border);
+}
+
+.lp-faq-inner {
+  width: min(940px, calc(100vw - 48px));
+}
+
+.lp-faq-h2 {
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  margin: 6px 0 32px;
+}
+
+.lp-faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lp-faq-item {
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.lp-faq-q {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lp-faq-q::-webkit-details-marker {
+  display: none;
+}
+
+.lp-faq-num,
+.lp-faq-toggle {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.lp-faq-num {
+  color: var(--ink-soft);
+}
+
+.lp-faq-toggle {
+  color: var(--denim);
+  font-size: 1.1rem;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lp-faq-q-text {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.lp-faq-item[open] .lp-faq-q {
+  background: var(--screen);
+}
+
+.lp-faq-item[open] .lp-faq-toggle {
+  color: var(--rust);
+  transform: rotate(45deg);
+}
+
+.lp-faq-a {
+  border-top: var(--border);
+  padding: 14px 18px 18px;
+  background: var(--window);
+}
+
+.lp-faq-cat {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--ink-soft);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.lp-faq-a p {
+  max-width: 66ch;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.lp-faq-more {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 26px;
+  padding: 12px 22px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  color: var(--denim);
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.lp-faq-more:hover {
+  color: var(--paper);
+  background: var(--denim);
+}
+
 /* ---- Back to top ---- */
 .lp-top {
   position: fixed;
@@ -554,6 +682,10 @@
 /* ---- Dark theme tonal ramp ---- */
 [data-theme="dark"] .lp-how {
   background: #1d2634;
+}
+
+[data-theme="dark"] .lp-faq {
+  background: #161d29;
 }
 
 [data-theme="dark"] .lp-trust,
@@ -600,13 +732,13 @@
 
 @media (max-width: 640px) {
   .lp-hero {
-    background: linear-gradient(rgba(236, 231, 216, 0.94), rgba(236, 231, 216, 0.94)),
-      linear-gradient(160deg, #41526e 0%, #1c2d40 100%);
+    background: linear-gradient(rgba(236, 231, 216, 0.86), rgba(236, 231, 216, 0.86)),
+      url("/marketing/hero-background.webp") center / cover no-repeat;
   }
 
   [data-theme="dark"] .lp-hero {
-    background: linear-gradient(rgba(16, 20, 28, 0.97), rgba(16, 20, 28, 0.97)),
-      linear-gradient(160deg, #1d2430 0%, #060c14 100%);
+    background: linear-gradient(rgba(16, 20, 28, 0.9), rgba(16, 20, 28, 0.9)), url("/marketing/hero-background.webp")
+      center / cover no-repeat;
   }
 
   .lp-mock-obligations li {

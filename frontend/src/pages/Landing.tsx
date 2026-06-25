@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { FAQ_ITEMS } from '../faqData'
 import './Landing.css'
+
+const FEATURED_FAQS = FAQ_ITEMS.filter((item) => item.featured)
 
 type Step = {
   num: string
@@ -222,6 +225,34 @@ export function Landing() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* FAQ — featured pairs, document style */}
+        <section className="lp-section lp-faq" id="faq">
+          <div className="lp-inner lp-faq-inner">
+            <p className="lp-kicker">Frequently Asked</p>
+            <h2 className="lp-h2 lp-faq-h2">Straight Answers, No Fabrication.</h2>
+            <div className="lp-faq-list">
+              {FEATURED_FAQS.map((item, i) => (
+                <details className="lp-faq-item" key={item.q}>
+                  <summary className="lp-faq-q">
+                    <span className="lp-faq-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="lp-faq-q-text">{item.q}</span>
+                    <span className="lp-faq-toggle" aria-hidden="true">
+                      +
+                    </span>
+                  </summary>
+                  <div className="lp-faq-a">
+                    <span className="lp-faq-cat">{item.category}</span>
+                    <p>{item.a}</p>
+                  </div>
+                </details>
+              ))}
+            </div>
+            <Link className="lp-faq-more" to="/faq">
+              See All Questions
+            </Link>
           </div>
         </section>
 

@@ -5,6 +5,7 @@ import { MarketingShell } from './layouts/MarketingShell'
 import { NotificationProvider } from './notifications'
 import AuditDefense from './pages/AuditDefense'
 import Dashboard from './pages/Dashboard'
+import Faq from './pages/Faq'
 import FilingStudio from './pages/FilingStudio'
 import { Landing } from './pages/Landing'
 import NotFound from './pages/NotFound'
@@ -36,6 +37,7 @@ export default function App() {
             {/* App routes (under AppShell) */}
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/faq" element={<Faq />} />
               <Route path="/obligations" element={<ObligationRadar />} />
               <Route path="/filing" element={<FilingStudio />} />
               <Route path="/audit-defense" element={<AuditDefense />} />
