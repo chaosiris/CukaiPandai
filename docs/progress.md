@@ -1281,3 +1281,68 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `frontend/src/App.tsx` (+Entity import +`/entity` route)
 - `frontend/src/layouts/AppShell.tsx` (+Entity NavLink in Compliance group)
 - `docs/plan.md` (AUTH-FE/EN-1/EN-2 all sub-bullets ticked `[x]`)
+
+---
+
+## [26/06/26] — Wave 3: FM-1 + FM-2 + FM-3 + Wizard Repoint (Filing Records Dashboard + Creation + Saved Record) `[FE]`
+
+### FM-1 — `/filing` records dashboard
+
+- Rewrote `frontend/src/pages/FilingStudio.tsx` as a records-list dashboard (keeping the same export name so all existing imports/routes are unchanged).
+- Fetches `listFilings()` on mount, shows records newest-first with label / RM tax_payable headline / created date / risk-flag count.
+- Checkbox per row (+ "Select All") + "Delete Selected" button calls `deleteFilings(ids)` and updates local state.
+- Row label/meta/tax-payable cells are a `<Link display:contents>` to `/filing/[id]`; no non-interactive tabIndex.
+- Empty state ("No filings yet. Create your first...") with CTA to `/filing/new`; barber loading strip.
+- One-line `page-kicker` description + `InfoTip` on heading and on record count.
+
+### FM-2 — `/filing/new` creation (new file: `FilingNew.tsx`)
+
+- One-shot pipeline: Classify Line Items -> Compute Form C -> Risk Assessment -> Finalized (no Human Approval stage).
+- Guided input panel: labelled instruction ("Provide your trial balance -- one account per line"), one-line format example, persona's `demoRawText` pre-filled in textarea (paste = primary), CSV/XLSX/PDF file-drop clearly secondary.
+- "How this was calculated" provenance note shown immediately after computation: explicit statement that the tax figure is computed by the deterministic rule-based core, not the AI.
+- On Save Filing: calls `saveFiling({ tin: entity.tin, label, computation, risk_flags, line_items })` then navigates to `/filing/[id]`. Uses `entity.tin` (real TIN, e.g. `C0000000001` for Custom) per Wave 2 note, not `persona.tin` which can be `'CUSTOM'`.
+- Reuses `FilingPipeline.tsx` primitives: `ComputationPanel`, `Stage1Detail`, `StageRow`, `RiskFlagList`, `TechnicalDetailsDisclosure`.
+- `SovereignBadge` on the classified items card; barber on isLoading; `InfoTip` on pipeline heading.
+
+### FM-3 — `/filing/[id]` saved record view (new file: `FilingRecord.tsx`)
+
+- Loads `getFiling(id)` (404 -> friendly not-found card with links to `/filing` and `/filing/new`).
+- Layout: `ComputationPanel` (96px RM hero) on top, provenance note, risk flags card, then Filing Pipeline card (all stages COMPLETE through Finalized) with `TechnicalDetailsDisclosure` (collapsed `<details>`) at the bottom.
+- Provenance note states plainly: "computed by the deterministic, rule-based core -- not the AI."
+- Per-figure trace (`rule_id` / `config_version` / `inputs` / `value`) reachable by expanding "Show technical details".
+- Breadcrumb link back to `/filing`; "All Filings" + "New Filing" buttons at page bottom.
+- No WhatNext card.
+
+### Shared primitives — `FilingPipeline.tsx` (new file)
+
+- Extracted from old `FilingStudio.tsx`: `ComputationPanel`, `FigureTraceRow`, `Stage1Detail`, `StageRow`, `RiskFlagList`, `TechnicalDetailsDisclosure`, `severityColor`, `statusColor`, stage types.
+- `TechnicalDetailsDisclosure` takes `computation` + optional `classifyRouteInfo`; the `<details>` trigger is styled inside the card border (no standalone float).
+
+### client.ts additions
+
+- `FilingRecord` interface (mirrors `FilingRecord` backend schema).
+- `listFilings()`, `saveFiling(body)`, `getFiling(id)`, `deleteFiling(id)`, `deleteFilings(ids)` -- all with mock branches backed by a module-scoped `_mockFilings[]` store + auto-incrementing `_mockFilingSeq` so mock demos work without a backend.
+
+### Wizard Repoint (GR-9 Wave 3 TODO resolved)
+
+- `WizardLayout.tsx`: `WIZARD_STEPS[1].route` changed from `/start/filing` to `/start/filing/new`; label updated to "Form C Filing"; TODO comment removed.
+- `App.tsx`: old `<Route path="filing" element={<FilingStudio />} />` under `/start` replaced with `<Route path="filing/new" element={<FilingNew />} />`; standalone `/filing/new` and `/filing/:id` routes added under AppShell.
+- The full wizard tour now runs: welcome -> /start/obligations -> /start/filing/new -> /start/audit-defense -> /dashboard.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules** (was 78; +3 new pages), 351 KB JS, 49 KB CSS, built in 2.20s
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+- No em-dashes in user-facing copy; `--` used throughout; Title Case headings; acronyms (TIN, MSIC, SST, YA2026) preserved.
+
+### Files touched
+
+- `frontend/src/api/client.ts` (+`FilingRecord` interface + `listFilings`, `saveFiling`, `getFiling`, `deleteFiling`, `deleteFilings` with mock store)
+- `frontend/src/components/FilingPipeline.tsx` (new -- shared pipeline primitives)
+- `frontend/src/pages/FilingStudio.tsx` (rewritten as FM-1 records dashboard)
+- `frontend/src/pages/FilingNew.tsx` (new -- FM-2 creation flow)
+- `frontend/src/pages/FilingRecord.tsx` (new -- FM-3 saved record view)
+- `frontend/src/App.tsx` (new routes: `/filing/new`, `/filing/:id`, `/start/filing/new`)
+- `frontend/src/layouts/WizardLayout.tsx` (step 2 repointed to `/start/filing/new`)
+- `docs/plan.md` (FM-1/FM-2/FM-3 all sub-bullets ticked `[x]`)

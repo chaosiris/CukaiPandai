@@ -12,6 +12,8 @@ import CustomCompany from './pages/CustomCompany'
 import Dashboard from './pages/Dashboard'
 import Entity from './pages/Entity'
 import Faq from './pages/Faq'
+import FilingNew from './pages/FilingNew'
+import FilingRecord from './pages/FilingRecord'
 import FilingStudio from './pages/FilingStudio'
 import { Landing } from './pages/Landing'
 import NotFound from './pages/NotFound'
@@ -53,14 +55,20 @@ export default function App() {
 
                 {/* Standalone console routes: always reachable for returning users */}
                 <Route path="/obligations" element={<ObligationRadar />} />
+                {/* FM-1: /filing = records dashboard */}
                 <Route path="/filing" element={<FilingStudio />} />
+                {/* FM-2: /filing/new = one-shot creation */}
+                <Route path="/filing/new" element={<FilingNew />} />
+                {/* FM-3: /filing/:id = saved record view */}
+                <Route path="/filing/:id" element={<FilingRecord />} />
                 <Route path="/audit-defense" element={<AuditDefense />} />
                 <Route path="/entity" element={<Entity />} />
 
                 {/* Guided wizard routes (JR-2): wizard chrome wrapping the same console components */}
                 <Route path="/start" element={<WizardLayout />}>
                   <Route path="obligations" element={<ObligationRadar />} />
-                  <Route path="filing" element={<FilingStudio />} />
+                  {/* FM-2 creation flow in the wizard (Wave 3 repoint) */}
+                  <Route path="filing/new" element={<FilingNew />} />
                   <Route path="audit-defense" element={<AuditDefense />} />
                 </Route>
 

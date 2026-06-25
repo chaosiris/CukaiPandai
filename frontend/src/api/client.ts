@@ -759,3 +759,93 @@ export async function putMyEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
   })
   return handleResponse<EntityTaxProfile>(res)
 }
+
+// --- Filing records (EP-2; FM-1/FM-2/FM-3) ---
+
+/** A saved filing record as returned by /me/filings. */
+export interface FilingRecord {
+  id: string
+  user_id: string
+  tin: string
+  label: string
+  computation: FormComputation
+  risk_flags: RiskFlag[]
+  line_items?: LineItem[]
+  created_at: string
+}
+
+// Module-scoped in-memory mock store for filing records (newest first).
+let _mockFilings: FilingRecord[] = []
+let _mockFilingSeq = 1
+
+function _mockFilingId(): string {
+  return `mock-filing-${String(_mockFilingSeq++).padStart(3, '0')}`
+}
+
+/** GET /me/filings — list the current user's filing records, newest first. */
+export async function listFilings(): Promise<FilingRecord[]> {
+  if (MOCK_MODE) return [..._mockFilings]
+  return get<FilingRecord[]>('/me/filings')
+}
+
+/** POST /me/filings — save a filing record. Returns the stored record with its id. */
+export async function saveFiling(body: {
+  tin: string
+  label?: string
+  computation: FormComputation
+  risk_flags?: RiskFlag[]
+  line_items?: LineItem[]
+}): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const rec: FilingRecord = {
+      id: _mockFilingId(),
+      user_id: 'mock-user',
+      tin: body.tin,
+      label: body.label ?? `Filing ${_mockFilingSeq - 1}`,
+      computation: body.computation,
+      risk_flags: body.risk_flags ?? [],
+      line_items: body.line_items,
+      created_at: new Date().toISOString()
+    }
+    _mockFilings = [rec, ..._mockFilings]
+    return rec
+  }
+  return post<FilingRecord>('/me/filings', body)
+}
+
+/** GET /me/filings/{id} — fetch a single filing record. Throws on 404. */
+export async function getFiling(id: string): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const rec = _mockFilings.find((r) => r.id === id)
+    if (!rec) throw new Error(`404 Filing ${id} not found`)
+    return rec
+  }
+  return get<FilingRecord>(`/me/filings/${id}`)
+}
+
+/** DELETE /me/filings/{id} — delete a single filing. Returns {deleted: id}. */
+export async function deleteFiling(id: string): Promise<{ deleted: string }> {
+  if (MOCK_MODE) {
+    _mockFilings = _mockFilings.filter((r) => r.id !== id)
+    return { deleted: id }
+  }
+  const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
+    method: 'DELETE',
+    headers: { ...authHeaders() }
+  })
+  return handleResponse<{ deleted: string }>(res)
+}
+
+/** DELETE /me/filings (body: {ids}) — delete multiple filings. Returns {deleted: ids}. */
+export async function deleteFilings(ids: string[]): Promise<{ deleted: string[] }> {
+  if (MOCK_MODE) {
+    _mockFilings = _mockFilings.filter((r) => !ids.includes(r.id))
+    return { deleted: ids }
+  }
+  const res = await fetch(`${BASE_URL}/me/filings`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ ids })
+  })
+  return handleResponse<{ deleted: string[] }>(res)
+}
