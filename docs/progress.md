@@ -599,3 +599,17 @@ CukaiPandai/
 - **YAML validated:** `python3 -c "import yaml; yaml.safe_load(open(...))"` → valid.
 - **Runbook note added:** `docs/runbook.md` §4 deploy mechanism line for frontend now notes that `deploy-frontend` installs Bun via `oven-sh/setup-bun` so `vercel build` can run the project's bun-based build.
 - **Files touched:** `.github/workflows/deploy.yml`, `docs/runbook.md`.
+
+---
+
+## [25/06/26] — Redesign Wave 3 — Entry Journey: Landing + Auth/Guest Gate `[FE]`
+
+- Created `frontend/src/layouts/MarketingShell.tsx` + `MarketingShell.css`: standalone marketing layout (sticky topbar with LogoMark + wordmark + theme toggle + "Get Started" CTA → `/login`; fixed denim footer reusing `.footer-*` tokens). No AppShell dependency.
+- Created `frontend/src/pages/Landing.tsx` + `Landing.css`: full editorial marketing landing — pinned hero with denim-gradient background and cream overlay, "how it works" 3-step sticky-left / scrolling-right-cards section mapped to the three consoles (Obligations / Filing / Audit Defense), fixed dark-band sovereignty section (4 trust cards: sovereign inference · deterministic gate · decision-support · YA2026-sourced), and a finale CTA to `/login`. All content grounded to the real product story; no fabricated metrics, pricing, or testimonials.
+- Created `frontend/src/pages/LoginGate.tsx` + `LoginGate.css`: 50:50 ProofRank-layout auth/guest gate — left denim hero panel (wordmark + tagline + Caveat script line + mono footer), right cream panel with "Continue as Guest →" (sets `localStorage` flag, navigates to `/dashboard`), plus disabled SSO + email fields labeled "coming soon" (no real auth backend).
+- Updated `frontend/src/App.tsx`: routing restructured — `/` and `/login` render under `MarketingShell` (no AppShell); `/dashboard`, `/obligations`, `/filing`, `/audit-defense`, and `*` remain under AppShell. No hard auth guard on any route (demo-friendly).
+- Updated `frontend/src/layouts/AppShell.tsx`: topbar brand-lockup `to="/"` → `to="/dashboard"`, drawer brand link `to="/"` → `to="/dashboard"`, drawer "Dashboard" NavLink `to="/"` → `to="/dashboard"`.
+- All existing consoles + persona switching + in-shell 404 unaffected; Dashboard hub still at `/dashboard`.
+- **Build:** `bunx tsc --noEmit` clean; `bun run build` → 59 modules, 0 errors, 1.73s; `bunx biome check frontend/src` → 0 errors.
+- **Files touched:** `frontend/src/App.tsx`, `frontend/src/layouts/AppShell.tsx`, `frontend/src/layouts/MarketingShell.tsx` (new), `frontend/src/layouts/MarketingShell.css` (new), `frontend/src/pages/Landing.tsx` (new), `frontend/src/pages/Landing.css` (new), `frontend/src/pages/LoginGate.tsx` (new), `frontend/src/pages/LoginGate.css` (new), `docs/plan.md`, `docs/progress.md`.
+- **[25/06/26 cleanup]** Em-dashes swept from all user-facing FE copy (AppShell banner/popover, Landing steps/mock copy, Dashboard trust strip + card desc, NotFound titlebar — 9 strings across 4 files; re-enforcing the PR rule); marketing CSS literal hex tokenized in `Landing.css` (8 literals → `var(--ink/ink-soft/denim)`, 4 redundant dark overrides removed) and `LoginGate.css` (3 `#e9edf3` → `var(--ink)`); build: tsc clean, `bun run build` green (59 modules), biome 0 errors.
