@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
 import {
   type ClassifyResponse,
@@ -11,9 +11,11 @@ import {
   classifyTrialBalance,
   getFormC,
   resumeFiling,
-  startFiling
+  startFiling,
+  uploadDocument
 } from '../api/client'
 import { SovereignBadge } from '../components/CitationPanel'
+import { WhatNext } from '../components/JourneyProgress'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
 
@@ -347,13 +349,9 @@ function FigureTraceRow({
       <div className="requirement-topline">
         <span className="requirement-label">
           <span className="requirement-label-text">{label.replace(/_/g, ' ')}</span>
-          <span className="kind-tag">{trace.rule_id}</span>
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700 }}>
           RM {trace.value.toLocaleString()}
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-          {trace.config_version}
         </span>
       </div>
       <details style={{ paddingLeft: 2 }}>
@@ -442,15 +440,6 @@ function ComputationPanel({ computation, title }: { computation: FormComputation
             }}
           >
             RM {heroEntry[1].value.toLocaleString()}
-          </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              color: 'var(--ink-soft)'
-            }}
-          >
-            {heroEntry[1].rule_id} · {heroEntry[1].config_version}
           </div>
         </div>
       )}
@@ -684,6 +673,9 @@ export default function FilingStudio() {
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
   const [phase, setPhase] = useState<Phase>({ tag: 'idle' })
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { notify } = useNotifications()
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
@@ -724,15 +716,50 @@ export default function FilingStudio() {
 
   async function handleClassify() {
     if (!entity) return
+    setUploadError(null)
     setPhase({ tag: 'classifying' })
     try {
-      const result = await classifyTrialBalance(entity.tin, rawText)
+      const result = await classifyTrialBalance(entity.tin, rawText, entity)
       setClassifyResult(result)
       setLineItems(result.line_items)
       setPhase({ tag: 'classified' })
     } catch (e) {
       setPhase({ tag: 'error', message: (e as Error).message })
     }
+  }
+
+  async function handleUpload(file: File) {
+    if (!entity) return
+    const allowed = ['.csv', '.xlsx', '.pdf']
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+    if (!allowed.includes(ext)) {
+      setUploadError(`Unsupported file type "${ext}". Upload a CSV, XLSX, or PDF trial balance.`)
+      return
+    }
+    setUploadError(null)
+    setPhase({ tag: 'classifying' })
+    try {
+      const result = await uploadDocument(entity.tin, file, entity)
+      setClassifyResult(result)
+      setLineItems(result.line_items)
+      setPhase({ tag: 'classified' })
+      notify({
+        title: 'File Classified',
+        body: `${file.name} classified into ${result.line_items.length} line items.`,
+        kind: 'success'
+      })
+    } catch (e) {
+      const msg = (e as Error).message
+      setUploadError(`Upload failed: ${msg}. You can paste the trial balance text below instead.`)
+      setPhase({ tag: 'idle' })
+    }
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) void handleUpload(file)
   }
 
   async function handleStartFiling() {
@@ -803,14 +830,95 @@ export default function FilingStudio() {
         </div>
       )}
 
-      {/* Stage 1 input - trial balance text, shown when idle/error and entity loaded */}
+      {/* Stage 1 input - trial balance upload or paste, shown when idle/error and entity loaded */}
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar">
             <span className="titlebar-title">Stage 01 - Trial Balance</span>
-            <span className="titlebar-meta">paste raw text</span>
+            <span className="titlebar-meta">upload or paste</span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
+            {/* Drag-and-drop zone (JR-7) */}
+            <button
+              type="button"
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: dragOver ? '2px dashed var(--denim)' : '2px dashed var(--grid)',
+                borderRadius: 'var(--radius)',
+                background: dragOver ? 'rgba(65,82,110,0.06)' : 'var(--screen)',
+                padding: '20px 16px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'border-color 150ms, background 150ms',
+                width: '100%'
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
+                }}
+              >
+                Drop a CSV, XLSX, or PDF trial balance here
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 6 }}>
+                or click to browse
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.pdf"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleUpload(file)
+                  e.target.value = ''
+                }}
+              />
+            </button>
+
+            {/* Upload error — shown inline; paste fallback always available */}
+            {uploadError && (
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--rust)',
+                  padding: '8px 12px',
+                  border: '1px solid var(--rust)',
+                  borderRadius: 'var(--radius)',
+                  background: 'rgba(181,80,60,0.04)'
+                }}
+              >
+                {uploadError}
+              </div>
+            )}
+
+            {/* Divider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--grid)' }} />
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  color: 'var(--ink-soft)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}
+              >
+                or paste below
+              </span>
+              <div style={{ flex: 1, height: 1, background: 'var(--grid)' }} />
+            </div>
+
+            {/* Paste fallback (hard requirement — always functional) */}
             <textarea
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
@@ -891,7 +999,7 @@ export default function FilingStudio() {
                         borderRadius: 'var(--radius)'
                       }}
                     >
-                      Start Filing (HITL)
+                      File With Review
                     </button>
                     <button
                       type="button"
@@ -907,7 +1015,7 @@ export default function FilingStudio() {
                         borderRadius: 'var(--radius)'
                       }}
                     >
-                      One-Shot (No Gate)
+                      File Without Review
                     </button>
                   </div>
                 )}
@@ -1019,6 +1127,13 @@ export default function FilingStudio() {
           )}
         </>
       )}
+
+      {/* JR-4: what next handoff */}
+      <WhatNext
+        nextLabel="Audit Defense Pack"
+        nextRoute="/audit-defense"
+        nextOutput="Build a citation-grounded defense pack. Fabricated clauses are deterministically rejected at the gate."
+      />
     </>
   )
 }

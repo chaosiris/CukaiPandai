@@ -63,17 +63,17 @@
   padding: 72px 0 88px;
   background: linear-gradient(
       90deg,
-      rgba(236, 231, 216, 0.96) 0%,
-      rgba(236, 231, 216, 0.7) 42%,
-      rgba(236, 231, 216, 0.05) 68%
-    ), linear-gradient(160deg, rgba(65, 82, 110, 0.55) 0%, rgba(28, 45, 64, 0.6) 55%, rgba(14, 26, 38, 0.7) 100%),
+      rgba(236, 231, 216, 0.95) 0%,
+      rgba(236, 231, 216, 0.58) 36%,
+      rgba(236, 231, 216, 0) 62%
+    ), linear-gradient(160deg, rgba(65, 82, 110, 0.14) 0%, rgba(28, 45, 64, 0.12) 55%, rgba(14, 26, 38, 0.12) 100%),
     url("/marketing/hero-background.webp") center / cover no-repeat;
   color: var(--ink);
 }
 
 [data-theme="dark"] .lp-hero {
-  background: linear-gradient(90deg, rgba(16, 20, 28, 0.97) 0%, rgba(16, 20, 28, 0.8) 42%, rgba(16, 20, 28, 0.12) 68%),
-    linear-gradient(160deg, rgba(29, 36, 48, 0.7) 0%, rgba(14, 26, 38, 0.78) 55%, rgba(6, 12, 20, 0.85) 100%),
+  background: linear-gradient(90deg, rgba(16, 20, 28, 0.96) 0%, rgba(16, 20, 28, 0.78) 38%, rgba(16, 20, 28, 0) 62%),
+    linear-gradient(160deg, rgba(29, 36, 48, 0.34) 0%, rgba(14, 26, 38, 0.36) 55%, rgba(6, 12, 20, 0.42) 100%),
     url("/marketing/hero-background.webp") center / cover no-repeat;
 }
 

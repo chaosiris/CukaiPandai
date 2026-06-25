@@ -1,7 +1,6 @@
 import { DEFAULT_PERSONA_KEY, useActivePersona } from '../PersonaContext'
 import { useTheme } from '../hooks/useTheme'
 import { useNotifications } from '../notifications'
-import { PERSONAS } from '../personas'
 
 import './Settings.css'
 
@@ -9,11 +8,11 @@ const PREF_KEYS = ['cukaipandai-theme', DEFAULT_PERSONA_KEY] as const
 
 export default function Settings() {
   const { theme, toggleTheme } = useTheme()
-  const { persona, setPersona } = useActivePersona()
+  const { persona, setPersona, personas } = useActivePersona()
   const { toast } = useNotifications()
 
   const handleDefaultPersonaChange = (tin: string) => {
-    const next = PERSONAS.find((p) => p.tin === tin)
+    const next = personas.find((p) => p.tin === tin)
     if (!next) return
     window.localStorage.setItem(DEFAULT_PERSONA_KEY, tin)
     setPersona(next)
@@ -80,7 +79,7 @@ export default function Settings() {
                 value={persona.tin}
                 onChange={(e) => handleDefaultPersonaChange(e.currentTarget.value)}
               >
-                {PERSONAS.map((p) => (
+                {personas.map((p) => (
                   <option key={p.tin} value={p.tin}>
                     {p.label}
                   </option>

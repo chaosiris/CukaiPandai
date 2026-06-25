@@ -1,0 +1,5 @@
+code,description,amount,category
+4000,Revenue,500000,income
+5100,Staff Costs,120000,deductible
+5200,Depreciation,15000,deductible
+5300,Entertainment,8000,non_deductible

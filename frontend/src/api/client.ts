@@ -362,16 +362,63 @@ const MOCK_FILING_RESUME: FilingResumeResponse = {
   computation: MOCK_FORM_C.computation
 }
 
-const MOCK_CLASSIFY: ClassifyResponse = {
-  line_items: [
-    { code: 'REV', description: 'Trade revenue', amount: 5000000, category: 'revenue' },
-    { code: 'SAL', description: 'Salaries and wages', amount: 2000000, category: 'expense' },
-    { code: 'REP', description: 'Repairs and maintenance', amount: 4800, category: 'expense' },
-    { code: 'DEP', description: 'Depreciation', amount: 120000, category: 'expense' }
-  ],
-  sovereign: true,
-  active_model: 'nemo-super'
+// Per-persona mock classify responses keyed by TIN (TD-J1 mock fidelity).
+// Each set uses the entity's own gross_income as the revenue figure — not a static Acme amount.
+// Line items are the user's own input categories/amounts; no invented tax rates or thresholds.
+const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
+  // Acme: gross_income=5,000,000; 12 employees
+  [ACME_TIN]: {
+    line_items: [
+      { code: 'REV', description: 'Trade revenue', amount: 5000000, category: 'revenue' },
+      { code: 'SAL', description: 'Salaries and wages', amount: 2000000, category: 'expense' },
+      { code: 'REP', description: 'Repairs and maintenance', amount: 4800, category: 'expense' },
+      { code: 'DEP', description: 'Depreciation', amount: 120000, category: 'expense' }
+    ],
+    sovereign: true,
+    active_model: 'nemo-super'
+  },
+  // Sinar: gross_income=380,000; 3 employees
+  C7654321098: {
+    line_items: [
+      { code: 'REV', description: 'IT services revenue', amount: 380000, category: 'revenue' },
+      { code: 'SAL', description: 'Salaries and wages', amount: 120000, category: 'expense' },
+      { code: 'SUB', description: 'Software subscriptions', amount: 18000, category: 'expense' },
+      { code: 'OFF', description: 'Office expenses', amount: 9600, category: 'expense' }
+    ],
+    sovereign: true,
+    active_model: 'nemo-super'
+  },
+  // Selera: gross_income=2,500,000; 45 employees
+  C3219876540: {
+    line_items: [
+      { code: 'REV', description: 'Food and beverage revenue', amount: 2500000, category: 'revenue' },
+      { code: 'SAL', description: 'Salaries and wages', amount: 900000, category: 'expense' },
+      { code: 'COG', description: 'Cost of goods sold', amount: 850000, category: 'expense' },
+      { code: 'REN', description: 'Rental expense', amount: 120000, category: 'expense' },
+      { code: 'UTL', description: 'Utilities', amount: 48000, category: 'expense' }
+    ],
+    sovereign: true,
+    active_model: 'nemo-super'
+  }
 }
+
+function makeMockClassify(tin: string, entityProfile?: EntityTaxProfile): ClassifyResponse {
+  if (MOCK_CLASSIFY_BY_TIN[tin]) return MOCK_CLASSIFY_BY_TIN[tin]
+  // Custom entity: derive revenue from gross_income; keep other lines proportional
+  const revenue = entityProfile?.gross_income ?? 1000000
+  return {
+    line_items: [
+      { code: 'REV', description: 'Revenue', amount: revenue, category: 'revenue' },
+      { code: 'SAL', description: 'Salaries and wages', amount: Math.round(revenue * 0.35), category: 'expense' },
+      { code: 'OPX', description: 'Operating expenses', amount: Math.round(revenue * 0.12), category: 'expense' }
+    ],
+    sovereign: true,
+    active_model: 'nemo-super'
+  }
+}
+
+// Keep as fallback for callers that don't have a TIN context
+const MOCK_CLASSIFY: ClassifyResponse = MOCK_CLASSIFY_BY_TIN[ACME_TIN]
 
 const MOCK_DEFENSE_VERIFIED_CITATION: Citation = {
   claim: 'Repairs deduction RM4,800 allowed under ITA s33(1)(a)',
@@ -516,8 +563,12 @@ export async function resumeFiling(tin: string, thread_id: string, approved: boo
 }
 
 /** POST /entities/{tin}/documents/classify — classify raw trial-balance text into LineItem[]. */
-export async function classifyTrialBalance(tin: string, raw_text: string): Promise<ClassifyResponse> {
-  if (MOCK_MODE) return MOCK_CLASSIFY
+export async function classifyTrialBalance(
+  tin: string,
+  raw_text: string,
+  profile?: EntityTaxProfile
+): Promise<ClassifyResponse> {
+  if (MOCK_MODE) return makeMockClassify(tin, profile ?? MOCK_ENTITIES[tin])
   return post<ClassifyResponse>(`/entities/${tin}/documents/classify`, { raw_text })
 }
 
@@ -540,4 +591,31 @@ export async function getAuditDefense(
 export async function getMsic(code: string): Promise<Record<string, unknown>> {
   if (MOCK_MODE) return MOCK_MSIC
   return get<Record<string, unknown>>(`/reference/msic/${code}`)
+}
+
+/**
+ * POST /entities/{tin}/documents/upload — multipart file upload → classify.
+ * T6: does NOT use post<T>() (which sets Content-Type: application/json).
+ * The browser sets the multipart/form-data boundary automatically.
+ * Mock branch returns MOCK_CLASSIFY so the flow works with VITE_API_MOCK=1.
+ */
+export async function uploadDocument(tin: string, file: File, profile?: EntityTaxProfile): Promise<ClassifyResponse> {
+  if (MOCK_MODE) return makeMockClassify(tin, profile ?? MOCK_ENTITIES[tin])
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${BASE_URL}/entities/${tin}/documents/upload`, {
+    method: 'POST',
+    body: form
+  })
+  return handleResponse<ClassifyResponse>(res)
+}
+
+/**
+ * POST /entities — create or replace a custom entity (BE-J1).
+ * Body is the SSM profile. Returns the stored EntityTaxProfile.
+ * Mock branch is a no-op echo — returns the ssm cast to EntityTaxProfile.
+ */
+export async function createEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
+  if (MOCK_MODE) return ssm as EntityTaxProfile
+  return post<EntityTaxProfile>('/entities', { ssm })
 }

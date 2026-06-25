@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type SsmProfile, getObligations } from '../api/client'
-import { BellIcon, LogoMark, ProfileIcon, ThemeIcon } from '../components/icons'
+import { BellIcon, ProfileIcon, ThemeIcon } from '../components/icons'
 import { useTheme } from '../hooks/useTheme'
 import { type NotifKind, useNotifications } from '../notifications'
-import { PERSONAS } from '../personas'
 
 const isMock = import.meta.env.VITE_API_MOCK === '1'
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === '1'
@@ -53,7 +52,7 @@ export function AppShell() {
   const [activePopover, setActivePopover] = useState<TopbarPopover>(null)
   const topbarControlsRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
-  const { persona, setPersona } = useActivePersona()
+  const { persona, setPersona, personas } = useActivePersona()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAllRead, dismiss, seedDeadlines, notify } = useNotifications()
 
@@ -157,7 +156,7 @@ export function AppShell() {
 
             {/* Brand lockup */}
             <Link className="brand-lockup" to="/dashboard" aria-label="CukaiPandai dashboard">
-              <LogoMark />
+              <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="topbar-wordmark">CukaiPandai</span>
             </Link>
 
@@ -196,7 +195,7 @@ export function AppShell() {
                 className="topbar-entity-select"
                 value={persona.tin}
                 onChange={(e) => {
-                  const next = PERSONAS.find((p) => p.tin === e.target.value)
+                  const next = personas.find((p) => p.tin === e.target.value)
                   if (next) setPersona(next)
                 }}
                 style={{
@@ -212,7 +211,7 @@ export function AppShell() {
                 }}
                 aria-label="Active entity"
               >
-                {PERSONAS.map((p) => (
+                {personas.map((p) => (
                   <option key={p.tin} value={p.tin}>
                     {p.label}
                   </option>
@@ -343,7 +342,7 @@ export function AppShell() {
               aria-label="CukaiPandai dashboard"
               onClick={closeDrawer}
             >
-              <LogoMark />
+              <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="drawer-wordmark">CukaiPandai</span>
             </Link>
             <button className="drawer-close" type="button" aria-label="Close navigation" onClick={closeDrawer}>
@@ -382,7 +381,7 @@ export function AppShell() {
       <footer className="app-footer">
         <div className="footer-inner">
           <div className="footer-brand">
-            <LogoMark />
+            <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
             <span className="footer-wordmark">CukaiPandai</span>
           </div>
           <nav className="footer-links" aria-label="CukaiPandai footer">

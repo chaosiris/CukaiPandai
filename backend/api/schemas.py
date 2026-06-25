@@ -3,6 +3,10 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class EntityCreateReq(BaseModel):
+    ssm: dict
+
+
 class ObligationsReq(BaseModel):
     ssm: dict
 

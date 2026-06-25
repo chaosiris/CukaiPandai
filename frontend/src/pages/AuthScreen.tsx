@@ -1,5 +1,4 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { LogoMark } from '../components/icons'
 import './Auth.css'
 
 export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
@@ -12,7 +11,15 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     } catch {
       // localStorage may be unavailable; not a blocker
     }
-    navigate('/dashboard', { replace: true })
+    // JR-3: first-run guests (no cp_journey_done) go to /welcome; returning users go to /dashboard.
+    const journeyDone = (() => {
+      try {
+        return localStorage.getItem('cp_journey_done') === '1'
+      } catch {
+        return false
+      }
+    })()
+    navigate(journeyDone ? '/dashboard' : '/welcome', { replace: true })
   }
 
   return (
@@ -20,7 +27,7 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       {/* Left: denim hero panel */}
       <section className="auth-hero">
         <Link className="auth-brand" to="/" aria-label="CukaiPandai home">
-          <LogoMark />
+          <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
           <span>CukaiPandai</span>
         </Link>
         <div className="auth-hero-copy">

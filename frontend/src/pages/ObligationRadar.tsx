@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { type ObligationCalendar, getObligations } from '../api/client'
+import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
+import { WhatNext } from '../components/JourneyProgress'
 import { useEntity } from '../hooks/useEntity'
 
 function formatDate(iso: string): string {
@@ -11,17 +12,242 @@ function fmtRM(n: number): string {
   return `RM ${n.toLocaleString('en-MY')}`
 }
 
-function countdown(dueDate: string): { label: string; overdue: boolean } {
+function daysUntil(dueDate: string): number {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const due = new Date(dueDate)
   due.setHours(0, 0, 0, 0)
-  const diffMs = due.getTime() - today.getTime()
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return { label: `${Math.abs(diffDays)}d overdue`, overdue: true }
-  if (diffDays === 0) return { label: 'Due today', overdue: false }
-  if (diffDays === 1) return { label: 'Due tomorrow', overdue: false }
-  return { label: `in ${diffDays}d`, overdue: false }
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function countdown(dueDate: string): { label: string; overdue: boolean } {
+  const d = daysUntil(dueDate)
+  if (d < 0) return { label: `${Math.abs(d)}d overdue`, overdue: true }
+  if (d === 0) return { label: 'Due today', overdue: false }
+  if (d === 1) return { label: 'Due tomorrow', overdue: false }
+  return { label: `in ${d}d`, overdue: false }
+}
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Payoff headline: N obligations · M overdue · next due {date} */
+function ObligationSummary({ obligations }: { obligations: Obligation[] }) {
+  const total = obligations.length
+  const overdueCount = obligations.filter((o) => daysUntil(o.due_date) < 0).length
+  const upcoming = [...obligations]
+    .filter((o) => daysUntil(o.due_date) >= 0)
+    .sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date))[0]
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div className="dash-summary" style={{ marginTop: 0, marginBottom: overdueCount > 0 ? 6 : 0 }}>
+        <span>
+          <strong>{total}</strong> obligation{total === 1 ? '' : 's'}
+        </span>
+        <span className="dash-summary-sep">·</span>
+        <span className={overdueCount > 0 ? 'dash-summary-alert' : undefined}>
+          <strong>{overdueCount}</strong> overdue
+        </span>
+        {upcoming && (
+          <>
+            <span className="dash-summary-sep">·</span>
+            <span>next due {formatDate(upcoming.due_date)}</span>
+          </>
+        )}
+      </div>
+      {overdueCount > 0 && (
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--ink-soft)',
+            lineHeight: 1.5
+          }}
+        >
+          Dates shown are for the sample basis period. OVERDUE status reflects the demo clock, not your actual filing
+          status.
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * YA2026 calendar strip: a horizontal month grid derived from real due_dates.
+ * The year range is computed from the obligations' actual dates, not hardcoded.
+ * Each month cell lists which obligations fall in it, flagged overdue/upcoming.
+ */
+function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
+  if (obligations.length === 0) return null
+
+  // Derive the year span from the obligations' due_dates (not hardcoded)
+  const years = new Set(obligations.map((o) => new Date(o.due_date).getFullYear()))
+  const sortedYears = [...years].sort()
+
+  // Build a map: "YYYY-MM" -> Obligation[]
+  const byYearMonth: Record<string, Obligation[]> = {}
+  for (const ob of obligations) {
+    const d = new Date(ob.due_date)
+    const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
+    if (!byYearMonth[key]) byYearMonth[key] = []
+    byYearMonth[key].push(ob)
+  }
+
+  return (
+    <div className="window" style={{ marginBottom: 20 }}>
+      <div className="titlebar">
+        <span className="titlebar-title">YA2026 Obligation Calendar</span>
+        <span className="titlebar-meta">{sortedYears.join(' – ')}</span>
+        <span className="closebox" aria-hidden="true" />
+      </div>
+
+      {sortedYears.map((year) => (
+        <div key={year} style={{ padding: '12px 18px 16px', borderBottom: 'var(--border)' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              color: 'var(--ink-soft)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.07em',
+              marginBottom: 10
+            }}
+          >
+            {year}
+          </div>
+
+          {/* 12-column month grid */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(12, 1fr)',
+              gap: 4
+            }}
+          >
+            {MONTH_SHORT.map((mon, idx) => {
+              const key = `${year}-${String(idx).padStart(2, '0')}`
+              const items = byYearMonth[key] ?? []
+              const hasOverdue = items.some((o) => daysUntil(o.due_date) < 0)
+              const hasUpcoming = items.some((o) => daysUntil(o.due_date) >= 0)
+              const isActive = items.length > 0
+
+              const accentColor = hasOverdue ? 'var(--rust)' : hasUpcoming ? 'var(--denim)' : undefined
+
+              return (
+                <div
+                  key={mon}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '6px 2px',
+                    borderTop: isActive ? `2px solid ${accentColor}` : '2px solid transparent',
+                    background: isActive ? 'var(--screen)' : undefined,
+                    borderRadius: 2
+                  }}
+                >
+                  {/* Month label */}
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 9,
+                      color: isActive ? accentColor : 'var(--ink-soft)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      fontWeight: isActive ? 700 : 400
+                    }}
+                  >
+                    {mon}
+                  </span>
+
+                  {/* Form badges for obligations in this month */}
+                  {items.map((ob) => {
+                    const { overdue } = countdown(ob.due_date)
+                    return (
+                      <span
+                        key={ob.rule_id}
+                        title={`${ob.form} · ${formatDate(ob.due_date)} · ${ob.obligation_type.replace(/_/g, ' ')}`}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 8,
+                          fontWeight: 700,
+                          color: overdue ? 'var(--rust)' : 'var(--denim)',
+                          border: `1px solid ${overdue ? 'var(--rust)' : 'var(--denim)'}`,
+                          padding: '1px 3px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '100%',
+                          borderRadius: 1
+                        }}
+                      >
+                        {ob.form}
+                      </span>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Legend for this year's obligations */}
+          {sortedYears.indexOf(year) === sortedYears.length - 1 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 16,
+                marginTop: 10,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                color: 'var(--ink-soft)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    border: '1px solid var(--rust)',
+                    borderRadius: 1
+                  }}
+                />
+                Overdue
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    border: '1px solid var(--denim)',
+                    borderRadius: 1
+                  }}
+                />
+                Upcoming
+              </span>
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div
+        style={{
+          padding: '8px 18px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9,
+          color: 'var(--ink-soft)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em'
+        }}
+      >
+        Dates derived from real due_date · hover a badge for detail
+      </div>
+    </div>
+  )
 }
 
 export default function ObligationRadar() {
@@ -77,6 +303,10 @@ export default function ObligationRadar() {
           </div>
         </div>
       )}
+
+      {entity && data && <ObligationSummary obligations={data.obligations} />}
+
+      {entity && data && data.obligations.length > 0 && <ObligationCalendarViz obligations={data.obligations} />}
 
       {entity && (
         <div className="proof-grid">
@@ -175,18 +405,56 @@ export default function ObligationRadar() {
             )}
 
             {sorted.length > 0 && (
+              <details style={{ padding: '6px 18px 4px', borderBottom: 'var(--border)' }}>
+                <summary
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--denim)',
+                    cursor: 'pointer',
+                    letterSpacing: '0.04em'
+                  }}
+                >
+                  Form codes explained
+                </summary>
+                <div
+                  style={{
+                    paddingTop: 6,
+                    display: 'grid',
+                    gap: 3,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--ink-soft)'
+                  }}
+                >
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>Form C</strong> — annual income tax return for companies
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>CP204</strong> — advance tax instalment estimate; submitted
+                    before the financial year begins
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>SST-02</strong> — Sales and Service Tax return; required if
+                    SST-registered
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>CP39</strong> — monthly employer MTD (Monthly Tax Deduction)
+                    remittance for employees
+                  </div>
+                  <div>
+                    <strong style={{ color: 'var(--ink)' }}>MyInvois</strong> — e-invoicing compliance; required once
+                    gross income exceeds RM 1,000,000
+                  </div>
+                </div>
+              </details>
+            )}
+
+            {sorted.length > 0 && (
               <ul className="req-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {sorted.map((ob) => {
                   const { label, overdue } = countdown(ob.due_date)
-                  const isUrgent =
-                    !overdue &&
-                    (() => {
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-                      const due = new Date(ob.due_date)
-                      due.setHours(0, 0, 0, 0)
-                      return (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 30
-                    })()
+                  const isUrgent = !overdue && daysUntil(ob.due_date) <= 30
 
                   return (
                     <li
@@ -232,16 +500,6 @@ export default function ObligationRadar() {
                             }}
                           >
                             {ob.obligation_type.replace(/_/g, ' ')}
-                          </div>
-                          <div
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: 10,
-                              color: 'var(--ink-soft)',
-                              marginTop: 2
-                            }}
-                          >
-                            {ob.rule_id} · {ob.config_version}
                           </div>
                         </div>
 
@@ -302,6 +560,13 @@ export default function ObligationRadar() {
           </div>
         </div>
       )}
+
+      {/* JR-4: what next handoff */}
+      <WhatNext
+        nextLabel="Cited Form C Filing"
+        nextRoute="/filing"
+        nextOutput="Classify your trial balance and step through the Review and Approve gate to a cited Form C with your tax payable."
+      />
     </>
   )
 }

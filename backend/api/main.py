@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -30,6 +30,7 @@ from api.persistence import EntityRepository, make_checkpointer
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
+    EntityCreateReq,
     FilingResumeReq,
     FormCReq,
     ObligationsReq,
@@ -108,6 +109,17 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.post("/entities")
+def create_entity(req: EntityCreateReq) -> dict:
+    """BE-J1 — Create (or update) a custom entity. Validates the ssm body → EntityTaxProfile;
+    persists via EntityRepository.create() (Neon when available, in-memory always); returns the
+    normalised profile. 422 on bad input; upsert-safe on duplicate TIN."""
+    profile = _profile(req.ssm)
+    data = profile.model_dump(mode="json")
+    _ENTITY_REPO.create(data)
+    return data
+
+
 @app.get("/entities/{tin}")
 def get_entity(tin: str) -> dict:
     """Serve an entity profile so the FE can render onboarding + the calendar header (BE-8;
@@ -140,6 +152,51 @@ def classify(tin: str, req: ClassifyReq, llm: LLMClient = Depends(get_llm)) -> d
     """Classify raw trial-balance text into LineItem[] (BE-9; resolves Q7)."""
     try:
         items = classify_line_items(req.raw_text, llm)
+    except _PARSE_ERRORS as e:
+        raise HTTPException(status_code=502, detail=f"Model returned unparseable output: {e}") from e
+    return {"line_items": [i.model_dump(mode="json") for i in items], **llm.route_info()}
+
+
+def _extract_text(filename: str, content: bytes) -> str:
+    """Extract plain text from CSV, XLSX, or PDF bytes. Raises HTTPException on unsupported/empty."""
+    import csv
+    import io
+
+    name_lower = filename.lower()
+    if name_lower.endswith(".csv"):
+        text = content.decode("utf-8", errors="replace")
+        reader = csv.reader(io.StringIO(text))
+        rows = ["\t".join(row) for row in reader]
+        return "\n".join(rows)
+    elif name_lower.endswith(".xlsx"):
+        import openpyxl
+
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        lines: list[str] = []
+        for ws in wb.worksheets:
+            for row in ws.iter_rows(values_only=True):
+                lines.append("\t".join("" if v is None else str(v) for v in row))
+        wb.close()
+        return "\n".join(lines)
+    elif name_lower.endswith(".pdf"):
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(content))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        return "\n".join(pages)
+    else:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename!r}. Accepted: csv, xlsx, pdf")
+
+
+@app.post("/entities/{tin}/documents/upload")
+def upload_document(tin: str, file: UploadFile = File(...), llm: LLMClient = Depends(get_llm)) -> dict:
+    """BE-J2 — multipart upload: extract text from CSV/XLSX/PDF → classify_line_items → ClassifyResponse."""
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=422, detail="Uploaded file is empty")
+    raw_text = _extract_text(file.filename or "", content)
+    try:
+        items = classify_line_items(raw_text, llm)
     except _PARSE_ERRORS as e:
         raise HTTPException(status_code=502, detail=f"Model returned unparseable output: {e}") from e
     return {"line_items": [i.model_dump(mode="json") for i in items], **llm.route_info()}
