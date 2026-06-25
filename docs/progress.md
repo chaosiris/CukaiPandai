@@ -589,3 +589,13 @@ CukaiPandai/
 
 - **Badge fix:** form badge column widened from `56px` to `80px` with `overflow:hidden; text-overflow:ellipsis; min-width:0` so long labels (e.g. `MyInvois`) truncate cleanly without overlapping the row title; short labels (`CP204`, `C`, `CP39`) unaffected.
 - **Mock-fidelity:** rewrote all three persona obligation sets in `MOCK_OBLIGATIONS_BY_TIN` to mirror `derive_obligations()` exactly — canonical `oblig.*` rule_ids, correct `obligation_type` values, `config_version:'YA2026.1'`; removed invented `ITA_s77A`/`ITA_s107C`/`ITA_s109`/`SST_s26`/`CA_s259` references and non-existent forms (`CP37`, `CP204A`, `Audited Accounts`); Sinar (sst_registered=false, gross_income=380k) now correctly omits SST-02 and MyInvois; Selera (sst+45 employees) now includes SST-02+CP39+MyInvois as the backend would emit; due dates derived from `form_c_deadline`/`cp204_deadline` logic per each persona's basis period. Build/lint: `tsc --noEmit` clean, `bun run build` green (53 modules), `biome check` 0 errors.
+
+---
+
+## [25/06/26] — DO-5 CI bug fix: add setup-bun to deploy-frontend job `[DO]`
+
+- **Root cause:** `deploy-frontend` calls `vercel build`, which auto-detects `bun.lock` and tries `bun install`, but Bun was not on PATH in that job (only the `test` job ran `oven-sh/setup-bun`).
+- **Fix:** added `- uses: oven-sh/setup-bun@v2` with `if: env.HAS_VERCEL == '1'` guard immediately after the secret-check step and before "Install Vercel CLI", mirroring the version pin used in the `test` job. All existing `if: env.HAS_VERCEL == '1'` guards on vercel steps and the `environment: { name: production }` block unchanged.
+- **YAML validated:** `python3 -c "import yaml; yaml.safe_load(open(...))"` → valid.
+- **Runbook note added:** `docs/runbook.md` §4 deploy mechanism line for frontend now notes that `deploy-frontend` installs Bun via `oven-sh/setup-bun` so `vercel build` can run the project's bun-based build.
+- **Files touched:** `.github/workflows/deploy.yml`, `docs/runbook.md`.
