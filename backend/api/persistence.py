@@ -6,8 +6,9 @@ returns the in-memory fallback rather than breaking startup. Neon caveats baked 
 ``setup()`` over the DIRECT (unpooled) endpoint, serve runtime over the POOLED endpoint with
 ``prepare_threshold=0`` (PgBouncer transaction mode).
 
-NOTE: the Postgres branches require a live Neon `DATABASE_URL` (DO-4) and are not yet
-verified end-to-end against a real DB; the in-memory/fixtures fallbacks ARE tested.
+NOTE: the Postgres branches are verified end-to-end against a live Neon DB (PostgreSQL 18.4,
+Singapore region) — durable checkpointer (BE-15), EvidenceVault audit+links (BE-16), and
+EntityRepository with fixtures fallback (BE-17) all pass; DB-down fallbacks are also tested.
 """
 from __future__ import annotations
 
