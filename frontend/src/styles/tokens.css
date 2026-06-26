@@ -159,6 +159,13 @@ a {
   scroll-behavior: auto !important;
 }
 
+/* Loading indicator stays animated even with reduced motion (its motion conveys progress). */
+.reduce-motion .barber {
+  animation: barber-pole 650ms steps(4, end) infinite !important;
+  animation-duration: 650ms !important;
+  animation-iteration-count: infinite !important;
+}
+
 /* the wow flood (Dunbar): focused panel floods to one bold color */
 .flood {
   background: var(--denim);
@@ -1675,8 +1682,13 @@ a {
 
   .scorecard,
   .shortlist-row,
-  .verified-stamp,
-  .barber {
+  .verified-stamp {
     animation: none !important;
+  }
+
+  /* The barber-pole is a functional loading indicator: its motion IS the "loading" signal,
+     so keep it moving even under reduced motion (re-asserted to beat the global * rule above). */
+  .barber {
+    animation: barber-pole 650ms steps(4, end) infinite !important;
   }
 }
