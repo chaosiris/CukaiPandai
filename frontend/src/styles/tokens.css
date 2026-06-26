@@ -845,7 +845,10 @@ a {
   display: grid;
   gap: 10px;
   padding: 15px 18px 17px;
-  border-bottom: var(--border);
+}
+
+.requirement-row + .requirement-row {
+  border-top: var(--border);
 }
 
 .requirement-topline {
@@ -1709,6 +1712,60 @@ a {
   .dash-hero-rail {
     display: none;
   }
+}
+
+/* ── Left-edge drawer hotzone (FE-2.7 OQ-7) — desktop only ─────────── */
+/* Invisible fixed strip on the left edge; on pointer:fine (desktop)     */
+/* hovering into it opens the existing slide-in drawer. Mobile untouched.*/
+
+.drawer-hotzone {
+  display: none; /* hidden on touch/mobile */
+}
+
+@media (pointer: fine) and (min-width: 768px) {
+  .drawer-hotzone {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 119; /* just below drawer-layer (120) */
+    width: 8px;
+    height: 100vh;
+    background: transparent;
+    pointer-events: auto;
+  }
+}
+
+/* ── Row-divider full-bleed helper (FE-2.2) ─────────────────────────── */
+/* Use on a list/container whose rows need full-bleed top borders.       */
+/* .row-list children get a full-width top border via negative-margin so */
+/* the 1px line reaches the .window left/right outline (cancels padding)  */
+/* and the LAST child renders no bottom border colliding with the window. */
+
+.row-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Every child that is NOT the first gets a full-bleed top border.        */
+/* mx-auto inset: stretch border to edge by pulling it out of the row pad */
+.row-list > * + * {
+  border-top: var(--border);
+}
+
+/* Last child never emits a bottom border (avoids collision with .window) */
+.row-list > *:last-child {
+  border-bottom: none !important;
+}
+
+/* Convenience: a non-ul div row-list (div children) */
+.row-div-list > * + * {
+  border-top: var(--border);
+}
+
+.row-div-list > *:last-child {
+  border-bottom: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

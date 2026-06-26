@@ -5,15 +5,18 @@
 // "How this was calculated" provenance note: deterministic rule-based core, not the AI.
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import {
   type ClassifyResponse,
   type FormCResponse,
   type LineItem,
   classifyTrialBalance,
+  createDraftFiling,
+  getFiling,
   getFormC,
   saveFiling,
+  upgradeFiling,
   uploadDocument
 } from '../api/client'
 import type { SsmProfile } from '../api/client'
@@ -65,7 +68,6 @@ type Phase =
   | { tag: 'classified' }
   | { tag: 'computing' }
   | { tag: 'done'; result: FormCResponse }
-  | { tag: 'saving' }
   | { tag: 'error'; message: string }
 
 function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): Stage[] {
@@ -128,17 +130,6 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
     return base
   }
 
-  if (phase.tag === 'saving') {
-    const n = classifyResult?.line_items.length ?? 0
-    base[0].status = 'complete'
-    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} classified`
-    base[1].status = 'complete'
-    base[1].writeBack = 'Form C computation complete'
-    base[2].status = 'complete'
-    base[3].status = 'running'
-    return base
-  }
-
   if (phase.tag === 'error') {
     for (const s of base) {
       if (s.status === 'pending') {
@@ -154,6 +145,7 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
 export default function FilingNew() {
   const { persona } = useActivePersona()
   const { entity, error: entityError, loading: entityLoading } = useEntity()
+  const [searchParams] = useSearchParams()
   const [rawText, setRawText] = useState(persona.demoRawText)
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
@@ -161,9 +153,26 @@ export default function FilingNew() {
   const [latestResult, setLatestResult] = useState<FormCResponse | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [draftId, setDraftId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notify } = useNotifications()
   const navigate = useNavigate()
+
+  // Resume a draft: restore raw_text and set draftId so the user can re-classify or compute
+  const resumeId = searchParams.get('resume')
+  useEffect(() => {
+    if (!resumeId) return
+    getFiling(resumeId)
+      .then((rec) => {
+        if (rec.status === 'draft') {
+          if (rec.raw_text) setRawText(rec.raw_text)
+          setDraftId(rec.id)
+        }
+      })
+      .catch(() => {
+        // Silently ignore — a missing draft just starts fresh
+      })
+  }, [resumeId])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
   useEffect(() => {
@@ -172,6 +181,7 @@ export default function FilingNew() {
     setLineItems([])
     setPhase({ tag: 'idle' })
     setLatestResult(null)
+    setDraftId(null)
   }, [persona.tin])
 
   const stages = deriveStages(phase, classifyResult)
@@ -184,13 +194,13 @@ export default function FilingNew() {
           ? 'classify'
           : phase.tag === 'computing'
             ? 'compute'
-            : phase.tag === 'done' || phase.tag === 'saving'
+            : phase.tag === 'done'
               ? 'finalized'
               : null
 
   const entityEmpty = entity ? isEntityIncomplete(entity) : false
   const displayError = entityError ?? (phase.tag === 'error' ? phase.message : null)
-  const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'computing' || phase.tag === 'saving'
+  const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'computing'
 
   if (!entityLoading && entityEmpty) {
     return (
@@ -246,6 +256,19 @@ export default function FilingNew() {
       setClassifyResult(result)
       setLineItems(result.line_items)
       setPhase({ tag: 'classified' })
+      // Create draft record on classify (best-effort: a transient BE error must not block UI)
+      const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
+      try {
+        const draft = await createDraftFiling({
+          tin: entity.tin,
+          label,
+          line_items: result.line_items,
+          raw_text: rawText
+        })
+        setDraftId(draft.id)
+      } catch {
+        // Silently ignore — draft creation failure does not block classify flow
+      }
     } catch (e) {
       setPhase({ tag: 'error', message: (e as Error).message })
     }
@@ -271,6 +294,14 @@ export default function FilingNew() {
         body: `${file.name} classified into ${result.line_items.length} line items.`,
         kind: 'success'
       })
+      // Create draft record (best-effort)
+      const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
+      try {
+        const draft = await createDraftFiling({ tin: entity.tin, label, line_items: result.line_items })
+        setDraftId(draft.id)
+      } catch {
+        // Silently ignore
+      }
     } catch (e) {
       const msg = (e as Error).message
       setUploadError(`Upload failed: ${msg}. Paste the trial balance text below instead.`)
@@ -293,31 +324,36 @@ export default function FilingNew() {
       const result = await getFormC(entity.tin, ssm, lineItems)
       setLatestResult(result)
       setPhase({ tag: 'done', result })
+      // Auto-save: upgrade the draft to final (or create a final record if no draft was created)
+      const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
+      try {
+        let targetId = draftId
+        if (targetId) {
+          await upgradeFiling(targetId, {
+            computation: result.computation,
+            risk_flags: result.risk_flags,
+            line_items: lineItems,
+            status: 'final',
+            label
+          })
+        } else {
+          // No draft was created (e.g. BE was down during classify) — create the final record now
+          const rec = await saveFiling({
+            tin: entity.tin,
+            label,
+            computation: result.computation,
+            risk_flags: result.risk_flags,
+            line_items: lineItems
+          })
+          targetId = rec.id
+        }
+        notify({ title: 'Filing Saved', body: `${label} saved.`, kind: 'success' })
+        navigate(`/filing/${targetId}`)
+      } catch (saveErr) {
+        notify({ title: 'Auto-Save Failed', body: (saveErr as Error).message, kind: 'warning' })
+      }
     } catch (e) {
       setPhase({ tag: 'error', message: (e as Error).message })
-    }
-  }
-
-  async function handleSave() {
-    if (phase.tag !== 'done' || !entity) return
-    // Capture result before changing phase state
-    const savedResult = phase.result
-    setPhase({ tag: 'saving' })
-    try {
-      const label = `${persona.label} -- Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
-      // Use entity.tin (the real TIN) per Wave 2 note, not persona.tin which may be 'CUSTOM'
-      const rec = await saveFiling({
-        tin: entity.tin,
-        label,
-        computation: savedResult.computation,
-        risk_flags: savedResult.risk_flags,
-        line_items: lineItems
-      })
-      notify({ title: 'Filing Saved', body: `${label} saved.`, kind: 'success' })
-      navigate(`/filing/${rec.id}`)
-    } catch (e) {
-      setPhase({ tag: 'done', result: savedResult })
-      notify({ title: 'Save Failed', body: (e as Error).message, kind: 'warning' })
     }
   }
 
@@ -326,6 +362,7 @@ export default function FilingNew() {
     setClassifyResult(null)
     setLineItems([])
     setLatestResult(null)
+    setDraftId(null)
   }
 
   return (
@@ -510,17 +547,21 @@ Depreciation  120000"
       {/* Pipeline stepper + detail panels */}
       {phase.tag !== 'idle' && !entityLoading && (
         <>
-          {/* Pipeline card */}
-          <div className="window" style={{ marginTop: 16 }}>
-            <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="titlebar-title">Filing Pipeline</span>
-              <InfoTip content="The AI classifies your line items (Step 1). Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI is involved in computing the tax figure." />
-              {isLoading && <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />}
+          {/* Pipeline card — shown while in progress; hidden in done (it moves under Computed) */}
+          {phase.tag !== 'done' && (
+            <div className="window" style={{ marginTop: 16 }}>
+              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="titlebar-title">Filing Pipeline</span>
+                <InfoTip content="The AI classifies your line items (Step 1). Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI is involved in computing the tax figure." />
+                {isLoading && <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />}
+              </div>
+              <div className="row-div-list">
+                {stages.map((stage) => (
+                  <StageRow key={stage.id} stage={stage} isActive={activeStageId === stage.id} />
+                ))}
+              </div>
             </div>
-            {stages.map((stage) => (
-              <StageRow key={stage.id} stage={stage} isActive={activeStageId === stage.id} />
-            ))}
-          </div>
+          )}
 
           {/* Stage 1 detail: classified line items */}
           {classifyResult && phase.tag !== 'classifying' && (
@@ -568,42 +609,17 @@ Depreciation  120000"
             </>
           )}
 
-          {/* Stage 2+3 detail: computation + risk flags */}
-          {(phase.tag === 'done' || phase.tag === 'saving') && latestResult && (
+          {/* Stage 2+3 detail: computation + risk flags — auto-saved, reordered (FE-2.4) */}
+          {phase.tag === 'done' && latestResult && (
             <>
-              {/* Provenance note -- trust clarity */}
-              <div
-                className="window"
-                style={{
-                  marginTop: 12,
-                  padding: '14px 18px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  background: 'var(--screen)'
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    color: 'var(--denim)',
-                    flexShrink: 0,
-                    marginTop: 1
-                  }}
-                >
-                  [i]
-                </span>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', lineHeight: 1.6 }}>
-                  <strong>How this was calculated:</strong> The tax figure below was computed by the{' '}
-                  <strong>deterministic, rule-based core</strong> -- not the AI. The AI only classified your
-                  trial-balance line items in Step 1. Every figure traces to a specific rule ID and config version.
-                  Expand "Show technical details" below to see the full per-figure trace.
-                </div>
-              </div>
+              {/* Computed card (primary) — provenance in heading InfoTip */}
+              <ComputationPanel
+                computation={latestResult.computation}
+                title="Stage 02-03 - Computed"
+                headingTip="The tax figure was computed by the deterministic, rule-based core -- not the AI. The AI only classified your trial-balance line items in Step 1. Every figure traces to a specific rule ID and config version. Expand technical details below to see the full per-figure trace."
+              />
 
-              <ComputationPanel computation={latestResult.computation} title="Stage 02-03 - Computed" />
-
+              {/* Risk assessment (if any) */}
               {latestResult.risk_flags.length > 0 && (
                 <div className="window" style={{ marginTop: 12 }}>
                   <div className="titlebar">
@@ -618,46 +634,18 @@ Depreciation  120000"
                 </div>
               )}
 
-              {/* Save button */}
-              <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => void handleSave()}
-                  disabled={phase.tag === 'saving'}
-                  style={{
-                    padding: '9px 22px',
-                    border: 'none',
-                    background: phase.tag === 'saving' ? 'var(--ink-soft)' : 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: phase.tag === 'saving' ? 'not-allowed' : 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  {phase.tag === 'saving' ? 'Saving...' : 'Save Filing'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  style={{
-                    padding: '9px 16px',
-                    border: 'var(--border)',
-                    background: 'transparent',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  Start Over
-                </button>
-              </div>
-
-              {/* Technical details disclosure */}
+              {/* Filing Pipeline card (moved here, under Computed, before technical details) */}
               <div className="window" style={{ marginTop: 12 }}>
+                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="titlebar-title">Filing Pipeline</span>
+                  <InfoTip content="The AI classifies your line items (Step 1). Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI is involved in computing the tax figure." />
+                </div>
+                <div className="row-div-list">
+                  {stages.map((stage) => (
+                    <StageRow key={stage.id} stage={stage} isActive={activeStageId === stage.id} />
+                  ))}
+                </div>
+                {/* Technical details disclosure */}
                 <TechnicalDetailsDisclosure computation={latestResult.computation} classifyRouteInfo={classifyResult} />
               </div>
             </>

@@ -112,7 +112,7 @@ function OverdueExposure({ obligations }: { obligations: Obligation[] }) {
           All obligations are on track.
         </div>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        <ul className="row-list">
           {overdueRows.map((o) => {
             const pct = Math.round((o.daysOverdue / maxDays) * 100)
             return (
@@ -120,7 +120,6 @@ function OverdueExposure({ obligations }: { obligations: Obligation[] }) {
                 key={`${o.form}-${o.due_date}`}
                 style={{
                   padding: '10px 18px',
-                  borderTop: 'var(--border)',
                   transition: 'background-color 160ms ease'
                 }}
                 onMouseEnter={(e) => {
@@ -220,68 +219,58 @@ function OverdueExposure({ obligations }: { obligations: Obligation[] }) {
 
 // ---- Status Breakdown + By Form Type panels ----
 
-function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
-  const total = obligations.length
+// ---- Status Breakdown + By Form Type — compact count rows (OQ-1 option b) ----
 
-  const overdue = obligations.filter((o) => daysUntil(o.due_date) < 0)
+function StatusAndFormCounts({ obligations }: { obligations: Obligation[] }) {
+  const total = obligations.length
+  const overdue = obligations.filter((o) => daysUntil(o.due_date) < 0).length
   const withinThirty = obligations.filter((o) => {
     const d = daysUntil(o.due_date)
     return d >= 0 && d <= URGENT_WINDOW_DAYS
-  })
-  const later = obligations.filter((o) => daysUntil(o.due_date) > URGENT_WINDOW_DAYS)
+  }).length
+  const later = obligations.filter((o) => daysUntil(o.due_date) > URGENT_WINDOW_DAYS).length
 
-  function Bar({ count, color }: { count: number; color: string }) {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0
-    return (
-      <div
-        style={{
-          height: 8,
-          border: 'var(--border)',
-          background: 'var(--screen)',
-          overflow: 'hidden'
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: '100%',
-            background: color,
-            transition: 'width 300ms ease'
-          }}
-        />
-      </div>
-    )
+  const byForm: Record<string, number> = {}
+  for (const ob of obligations) {
+    byForm[ob.form] = (byForm[ob.form] ?? 0) + 1
   }
+  const formRows = Object.entries(byForm).sort((a, b) => b[1] - a[1])
 
-  const rows = [
-    { label: 'Overdue', count: overdue.length, color: 'var(--rust)' },
-    { label: `Due within ${URGENT_WINDOW_DAYS} days`, count: withinThirty.length, color: 'var(--mustard)' },
-    { label: 'Later', count: later.length, color: 'var(--denim)' }
+  const statusRows = [
+    { label: 'Overdue', count: overdue, color: overdue > 0 ? 'var(--rust)' : 'var(--ink-soft)' },
+    {
+      label: `Due within ${URGENT_WINDOW_DAYS} days`,
+      count: withinThirty,
+      color: withinThirty > 0 ? 'var(--mustard)' : 'var(--ink-soft)'
+    },
+    { label: 'On track', count: later, color: 'var(--denim)' }
   ]
 
   return (
-    <div className="window">
-      <div className="titlebar">
-        <span className="closebox" aria-hidden="true" />
-        <span className="titlebar-title">Status Breakdown</span>
-        <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          by deadline window
-          <InfoTip
-            content="Counts obligations by how close their due date is: overdue (past due), due within 30 days (act now), or later. Bars show share of total."
-            label="About Status Breakdown"
-          />
-        </span>
-      </div>
-
-      <div style={{ padding: '14px 18px', display: 'grid', gap: 14 }}>
-        {rows.map((r) => (
-          <div key={r.label} style={{ display: 'grid', gap: 6 }}>
-            <div
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+      {/* Status Breakdown — compact count rows */}
+      <div className="window">
+        <div className="titlebar">
+          <span className="closebox" aria-hidden="true" />
+          <span className="titlebar-title">Status Breakdown</span>
+          <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {total} total
+            <InfoTip
+              content="Counts obligations by how close their due date is: overdue (past due), due within 30 days (act now), or on track (later)."
+              label="About Status Breakdown"
+            />
+          </span>
+        </div>
+        <ul className="row-list">
+          {statusRows.map((r) => (
+            <li
+              key={r.label}
               style={{
                 display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'space-between',
-                alignItems: 'baseline',
-                gap: 8
+                gap: 12,
+                padding: '10px 18px'
               }}
             >
               <span
@@ -295,117 +284,51 @@ function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
               >
                 {r.label}
               </span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: r.count > 0 ? r.color : 'var(--ink-soft)'
-                }}
-              >
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: r.color }}>
                 {r.count}
               </span>
-            </div>
-            <Bar count={r.count} color={r.color} />
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* By Form Type — compact count rows */}
+      {formRows.length > 0 && (
+        <div className="window">
+          <div className="titlebar">
+            <span className="closebox" aria-hidden="true" />
+            <span className="titlebar-title">By Form Type</span>
+            <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {formRows.length} form{formRows.length !== 1 ? 's' : ''}
+              <InfoTip
+                content="Number of obligations per tax form type. Sorted most to fewest."
+                label="About By Form Type"
+              />
+            </span>
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ByFormType({ obligations }: { obligations: Obligation[] }) {
-  const byForm: Record<string, number> = {}
-  for (const ob of obligations) {
-    byForm[ob.form] = (byForm[ob.form] ?? 0) + 1
-  }
-  const formRows = Object.entries(byForm).sort((a, b) => b[1] - a[1])
-
-  if (formRows.length === 0) return null
-
-  const maxCount = formRows[0][1]
-
-  return (
-    <div className="window">
-      <div className="titlebar">
-        <span className="closebox" aria-hidden="true" />
-        <span className="titlebar-title">By Form Type</span>
-        <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          obligation count per form
-          <InfoTip
-            content="How many obligations fall under each tax form (e.g. CP204, Form C, SST-02). Sorted most to fewest; bars scaled to the largest count."
-            label="About By Form Type"
-          />
-        </span>
-      </div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {formRows.map(([form, count]) => {
-          const pct = Math.round((count / maxCount) * 100)
-          return (
-            <li
-              key={form}
-              style={{
-                padding: '10px 18px',
-                borderTop: 'var(--border)',
-                transition: 'background-color 160ms ease'
-              }}
-              onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLLIElement).style.backgroundColor = 'rgba(65, 82, 110, 0.07)'
-              }}
-              onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLLIElement).style.backgroundColor = ''
-              }}
-            >
-              <div
+          <ul className="row-list">
+            {formRows.map(([form, count]) => (
+              <li
+                key={form}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 12,
-                  marginBottom: 6
+                  padding: '10px 18px'
                 }}
               >
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: 'var(--denim)'
-                  }}
-                >
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--denim)' }}>
                   {form}
                 </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    color: 'var(--ink-soft)'
-                  }}
-                >
-                  {count} obligation{count === 1 ? '' : 's'}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                  {count}
                 </span>
-              </div>
-              <div
-                style={{
-                  height: 5,
-                  border: 'var(--border)',
-                  background: 'var(--screen)',
-                  overflow: 'hidden'
-                }}
-              >
-                <div
-                  style={{
-                    width: `${pct}%`,
-                    height: '100%',
-                    background: 'var(--denim)',
-                    transition: 'width 300ms ease'
-                  }}
-                />
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
@@ -595,18 +518,9 @@ export default function Analytics() {
             <OverdueExposure obligations={obligations} />
           </div>
 
-          {/* Status Breakdown + By Form Type — balanced two-column grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-              gap: 20,
-              alignItems: 'start',
-              marginBottom: 28
-            }}
-          >
-            <StatusBreakdown obligations={obligations} />
-            <ByFormType obligations={obligations} />
+          {/* Status Breakdown + By Form Type — compact count rows (OQ-1 option b) */}
+          <div style={{ marginBottom: 28 }}>
+            <StatusAndFormCounts obligations={obligations} />
           </div>
 
           {/* Cross-link footer */}
