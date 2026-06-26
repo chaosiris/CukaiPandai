@@ -267,8 +267,12 @@ class FilingRepository:
             "CREATE TABLE IF NOT EXISTS filing_records ("
             "id text PRIMARY KEY, user_id text NOT NULL, tin text, label text, "
             "computation jsonb, risk_flags jsonb, line_items jsonb, "
-            "created_at timestamptz NOT NULL DEFAULT now())"
+            "created_at timestamptz NOT NULL DEFAULT now(), "
+            "status text NOT NULL DEFAULT 'final', raw_text text)"
         )
+        # Additive migration for pre-existing tables (idempotent).
+        conn.execute("ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'final'")
+        conn.execute("ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS raw_text text")
 
     def create(self, owner: str, rec: dict) -> dict:
         import json as _json
@@ -279,6 +283,8 @@ class FilingRepository:
             "id": uuid.uuid4().hex,
             "user_id": owner,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": rec.get("status", "final"),
+            "raw_text": rec.get("raw_text"),
         }
         # Always write to in-memory first
         self._mem.setdefault(owner, []).insert(0, record)
@@ -288,14 +294,16 @@ class FilingRepository:
                 with _connect(url) as conn:
                     self._ensure_table(conn)
                     conn.execute(
-                        "INSERT INTO filing_records (id, user_id, tin, label, computation, risk_flags, line_items) "
-                        "VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb)",
+                        "INSERT INTO filing_records (id, user_id, tin, label, computation, risk_flags, line_items, status, raw_text) "
+                        "VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s)",
                         (
                             record["id"], owner,
                             rec.get("tin"), rec.get("label"),
                             _json.dumps(rec.get("computation")),
                             _json.dumps(rec.get("risk_flags", [])),
                             _json.dumps(rec.get("line_items")),
+                            record["status"],
+                            record["raw_text"],
                         ),
                     )
             except Exception:
@@ -309,14 +317,15 @@ class FilingRepository:
                 with _connect(url) as conn:
                     self._ensure_table(conn)
                     rows = conn.execute(
-                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at "
+                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at, "
+                        "COALESCE(status, 'final') AS status, raw_text "
                         "FROM filing_records WHERE user_id=%s ORDER BY created_at DESC",
                         (owner,),
                     ).fetchall()
                     return [dict(r) for r in rows]
             except Exception:
                 pass
-        return list(self._mem.get(owner, []))
+        return [self._coalesce(r) for r in self._mem.get(owner, [])]
 
     def get(self, owner: str, rec_id: str) -> dict | None:
         url = database_url()
@@ -325,7 +334,8 @@ class FilingRepository:
                 with _connect(url) as conn:
                     self._ensure_table(conn)
                     row = conn.execute(
-                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at "
+                        "SELECT id, user_id, tin, label, computation, risk_flags, line_items, created_at, "
+                        "COALESCE(status, 'final') AS status, raw_text "
                         "FROM filing_records WHERE id=%s AND user_id=%s",
                         (rec_id, owner),
                     ).fetchone()
@@ -334,8 +344,65 @@ class FilingRepository:
                 pass
         for rec in self._mem.get(owner, []):
             if rec["id"] == rec_id:
-                return rec
+                return self._coalesce(rec)
         return None
+
+    def _coalesce(self, rec: dict) -> dict:
+        """Backfill legacy in-memory records that pre-date the status/raw_text fields."""
+        if "status" not in rec:
+            rec = {**rec, "status": "final"}
+        if "raw_text" not in rec:
+            rec = {**rec, "raw_text": None}
+        return rec
+
+    def update(self, owner: str, rec_id: str, patch: dict) -> dict | None:
+        """Partially update an owned filing record. Returns the updated record or None if not found."""
+        import json as _json
+
+        # In-memory update first
+        records = self._mem.get(owner, [])
+        mem_rec = None
+        for i, r in enumerate(records):
+            if r["id"] == rec_id:
+                updated = {**r, **patch}
+                records[i] = updated
+                mem_rec = updated
+                break
+
+        # Best-effort Neon update
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    # Build SET clause dynamically from non-None patch keys (allow None for computation/raw_text)
+                    set_parts = []
+                    params = []
+                    jsonb_fields = {"computation", "risk_flags", "line_items"}
+                    for k, v in patch.items():
+                        if k in jsonb_fields:
+                            set_parts.append(f"{k} = %s::jsonb")
+                            params.append(_json.dumps(v))
+                        else:
+                            set_parts.append(f"{k} = %s")
+                            params.append(v)
+                    if set_parts:
+                        params.extend([rec_id, owner])
+                        row = conn.execute(
+                            f"UPDATE filing_records SET {', '.join(set_parts)} "
+                            "WHERE id=%s AND user_id=%s "
+                            "RETURNING id, user_id, tin, label, computation, risk_flags, line_items, created_at, "
+                            "COALESCE(status, 'final') AS status, raw_text",
+                            params,
+                        ).fetchone()
+                        if row:
+                            return dict(row)
+                        # Row not found in DB — if also not in memory, return None
+                        return mem_rec
+            except Exception:
+                pass
+
+        return mem_rec
 
     def delete(self, owner: str, ids: list[str]) -> None:
         url = database_url()

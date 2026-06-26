@@ -32,6 +32,7 @@ from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
     EntityCreateReq,
+    FilingRecordPatch,
     FilingRecordReq,
     FilingResumeReq,
     FormCReq,
@@ -259,6 +260,16 @@ def get_my_filing(rec_id: str, owner: str = Depends(_owner)) -> dict:
     if rec is None:
         raise HTTPException(status_code=404, detail="Filing record not found")
     return rec
+
+
+@app.patch("/me/filings/{rec_id}")
+def patch_my_filing(rec_id: str, req: FilingRecordPatch, owner: str = Depends(_owner)) -> dict:
+    """BE-2.1 — Partially update a filing record (e.g. upgrade a draft to final). 404 if not owned or absent."""
+    patch = {k: v for k, v in req.model_dump(mode="json").items() if v is not None}
+    updated = _FILING_REPO.update(owner, rec_id, patch)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Filing record not found")
+    return updated
 
 
 @app.delete("/me/filings/{rec_id}")

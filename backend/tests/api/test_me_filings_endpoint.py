@@ -31,7 +31,7 @@ _VALID_BODY = {
     "risk_flags": [],
 }
 
-_BAD_BODY = {"tin": "X"}  # missing required computation field
+_BAD_BODY = {"tin": "X", "computation": "not-a-dict"}  # computation must be a dict or null
 
 
 def _make_token(sub: str, email: str) -> str:

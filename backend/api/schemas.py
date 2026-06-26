@@ -1,14 +1,27 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class FilingRecordReq(BaseModel):
     tin: str
     label: str | None = None
-    computation: dict
+    computation: dict | None = None
     risk_flags: list[dict] = []
     line_items: list[dict] | None = None
+    status: Literal["draft", "final"] = "final"
+    raw_text: str | None = None
+
+
+class FilingRecordPatch(BaseModel):
+    computation: dict | None = None
+    risk_flags: list[dict] | None = None
+    line_items: list[dict] | None = None
+    status: Literal["draft", "final"] | None = None
+    label: str | None = None
+    raw_text: str | None = None
 
 
 class MultiDeleteReq(BaseModel):
