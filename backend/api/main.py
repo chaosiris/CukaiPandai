@@ -112,19 +112,26 @@ def get_msic() -> MsicClient:
     return _MSIC_CLIENT  # shared/cached live client; overridden with a fixture client in tests
 
 
+def _validation_detail(e: ValidationError) -> list[dict]:
+    """JSON-safe error list. include_context=False drops the raised exception object that
+    custom validators put in `ctx` (a ValueError isn't JSON-serializable, which would 500
+    the response); include_url=False keeps the envelope to the loc/msg/type the FE expects."""
+    return e.errors(include_url=False, include_context=False)
+
+
 def _profile(ssm: dict) -> EntityTaxProfile:
     """Validate an SSM dict at the boundary → 422 with field detail (BE-10) instead of a 500."""
     try:
         return EntityTaxProfile(**ssm)
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=e.errors()) from e
+        raise HTTPException(status_code=422, detail=_validation_detail(e)) from e
 
 
 def _line_items(line_items: list[dict]) -> list[LineItem]:
     try:
         return [LineItem(**li) for li in line_items]
     except ValidationError as e:
-        raise HTTPException(status_code=422, detail=e.errors()) from e
+        raise HTTPException(status_code=422, detail=_validation_detail(e)) from e
 
 
 @app.get("/health")

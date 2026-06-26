@@ -8,6 +8,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import type { SsmProfile } from '../api/client'
+import { MY_STATES } from '../lib/states'
+import { validateTin } from '../lib/tin'
 import type { Persona } from '../personas'
 
 const ENTITY_TYPES = [
@@ -21,6 +23,7 @@ const ENTITY_TYPES = [
 interface FormValues {
   tin: string
   entity_type: string
+  state: string
   msic_codes: string
   paid_up_capital: string
   gross_income: string
@@ -34,6 +37,7 @@ interface FormValues {
 const INITIAL: FormValues = {
   tin: '',
   entity_type: 'sdn_bhd',
+  state: '',
   msic_codes: '',
   paid_up_capital: '',
   gross_income: '',
@@ -55,12 +59,6 @@ function positiveNum(v: string): string | null {
   return null
 }
 
-function validateTin(v: string): string | null {
-  if (!v.trim()) return 'Required'
-  if (!/^[A-Z][0-9]{10}$/.test(v.trim())) return 'TIN format: one letter + 10 digits (e.g. C0000000001)'
-  return null
-}
-
 function validateMsic(v: string): string | null {
   if (!v.trim()) return 'Required'
   const parts = v
@@ -77,7 +75,7 @@ type FieldErrors = Partial<Record<keyof FormValues, string>>
 
 function validate(v: FormValues): FieldErrors {
   return {
-    tin: validateTin(v.tin) ?? undefined,
+    tin: validateTin(v.tin, v.entity_type) ?? undefined,
     msic_codes: validateMsic(v.msic_codes) ?? undefined,
     paid_up_capital: positiveNum(v.paid_up_capital) ?? undefined,
     gross_income: positiveNum(v.gross_income) ?? undefined,
@@ -180,7 +178,8 @@ export default function CustomCompany() {
       sst_registered: values.sst_registered,
       basis_period_start: values.basis_period_start,
       basis_period_end: values.basis_period_end,
-      ...(values.commencement_date ? { commencement_date: values.commencement_date } : {})
+      ...(values.commencement_date ? { commencement_date: values.commencement_date } : {}),
+      ...(values.state ? { state: values.state } : {})
     }
 
     const persona: Persona = {
@@ -238,7 +237,7 @@ export default function CustomCompany() {
             <Field
               label="Tax Identification Number (TIN)"
               error={visibleErrors.tin}
-              hint="Your company's tax ID issued by LHDN (Inland Revenue Board). Format: one letter + 10 digits"
+              hint="Your tax ID from LHDN. Prefix must match the entity type — C for Sdn Bhd/Bhd, D partnership, PT LLP, IG sole proprietor."
             >
               <input
                 type="text"
@@ -259,6 +258,20 @@ export default function CustomCompany() {
                 {ENTITY_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field
+              label="State / Federal Territory"
+              hint="Optional — used for state-specific public-holiday deadline shifts. Leave blank for national only."
+            >
+              <select value={values.state} onChange={(e) => set('state', e.target.value)} style={inputStyle}>
+                <option value="">— National only —</option>
+                {MY_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
                   </option>
                 ))}
               </select>
@@ -289,7 +302,7 @@ export default function CustomCompany() {
             <Field
               label="Paid-Up Capital (RM)"
               error={visibleErrors.paid_up_capital}
-              hint="SME threshold: RM 2,500,000"
+              hint="SME cap RM2,500,000 — above this you're taxed at a flat 24% (not the 15/17/24% SME bands)."
             >
               <input
                 type="number"
@@ -305,7 +318,7 @@ export default function CustomCompany() {
             <Field
               label="Gross Income (RM)"
               error={visibleErrors.gross_income}
-              hint="e-invoice threshold: RM 1,000,000"
+              hint="e-Invoice from RM1,000,000. SME gross cap RM50,000,000 — above it, taxed at a flat 24%."
             >
               <input
                 type="number"
@@ -318,7 +331,11 @@ export default function CustomCompany() {
               />
             </Field>
 
-            <Field label="Employee Count" error={visibleErrors.employee_count}>
+            <Field
+              label="Employee Count"
+              error={visibleErrors.employee_count}
+              hint="0 = nobody on payroll (a director taking director's fees isn't an employee)."
+            >
               <input
                 type="number"
                 min="0"

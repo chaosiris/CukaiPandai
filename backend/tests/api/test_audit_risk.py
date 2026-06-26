@@ -1,10 +1,17 @@
 from api.agents.audit_risk import assess_risk
-from core.models import FigureTrace, FormComputation
+from core.models import EntityTaxProfile, FigureTrace, FormComputation
 
 
 def _fc(ci):
     return FormComputation(form="C", fields={"chargeable_income": FigureTrace(
         value=ci, inputs=[], rule_id="cit.chargeable_income", config_version="YA2026.1")})
+
+
+def _profile(paid_up, gross):
+    return EntityTaxProfile(
+        tin="C1234567890", entity_type="sdn_bhd", msic_codes=["46900"],
+        paid_up_capital=paid_up, gross_income=gross, employee_count=5, sst_registered=False,
+        basis_period_start="2025-01-01", basis_period_end="2025-12-31")
 
 
 def test_turnover_mismatch_flagged():
@@ -51,3 +58,22 @@ def test_zero_tax_with_positive_income_flagged():
 def test_turnover_check_skipped_when_turnover_none():
     flags = assess_risk(_fc(200000), profile=None, declared_income=500000, myinvois_turnover=None)
     assert not any(f.code == "turnover_mismatch" for f in flags)
+
+
+def test_not_sme_flag_when_gross_exceeds_50m():
+    flags = assess_risk(_fc(200000), profile=_profile(1_000_000, 60_000_000),
+                        declared_income=60_000_000, myinvois_turnover=None)
+    assert any(f.code == "not_sme_flat_rate" for f in flags)
+
+
+def test_not_sme_flag_when_paidup_exceeds_2_5m():
+    flags = assess_risk(_fc(200000), profile=_profile(3_000_000, 5_000_000),
+                        declared_income=5_000_000, myinvois_turnover=None)
+    assert any(f.code == "not_sme_flat_rate" for f in flags)
+
+
+def test_sme_company_has_no_not_sme_flag():
+    flags = assess_risk(_fc(200000), profile=_profile(1_000_000, 5_000_000),
+                        declared_income=5_000_000, myinvois_turnover=None)
+    assert not any(f.code == "not_sme_flat_rate" for f in flags)
+

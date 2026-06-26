@@ -8,6 +8,8 @@ import { useActivePersona } from '../PersonaContext'
 import { type SsmProfile, putMyEntity } from '../api/client'
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
+import { MY_STATES } from '../lib/states'
+import { validateTin } from '../lib/tin'
 
 const ENTITY_TYPES = [
   { value: 'sdn_bhd', label: 'Sdn Bhd' },
@@ -20,6 +22,7 @@ const ENTITY_TYPES = [
 interface FormValues {
   tin: string
   entity_type: string
+  state: string
   msic_codes: string
   paid_up_capital: string
   gross_income: string
@@ -43,12 +46,6 @@ function positiveNum(v: string): string | null {
   return null
 }
 
-function validateTin(v: string): string | null {
-  if (!v.trim()) return 'Required'
-  if (!/^[A-Z][0-9]{10}$/.test(v.trim())) return 'TIN format: one letter + 10 digits (e.g. C0000000001)'
-  return null
-}
-
 function validateMsic(v: string): string | null {
   if (!v.trim()) return 'Required'
   const parts = v
@@ -63,7 +60,7 @@ function validateMsic(v: string): string | null {
 
 function validate(v: FormValues): FieldErrors {
   return {
-    tin: validateTin(v.tin) ?? undefined,
+    tin: validateTin(v.tin, v.entity_type) ?? undefined,
     msic_codes: validateMsic(v.msic_codes) ?? undefined,
     paid_up_capital: positiveNum(v.paid_up_capital) ?? undefined,
     gross_income: positiveNum(v.gross_income) ?? undefined,
@@ -144,6 +141,7 @@ export default function Entity() {
     setValues({
       tin: entity.tin,
       entity_type: entity.entity_type,
+      state: entity.state ?? '',
       msic_codes: entity.msic_codes.join(', '),
       paid_up_capital: String(entity.paid_up_capital),
       gross_income: String(entity.gross_income),
@@ -222,7 +220,8 @@ export default function Entity() {
       sst_registered: values.sst_registered,
       basis_period_start: values.basis_period_start,
       basis_period_end: values.basis_period_end,
-      ...(values.commencement_date ? { commencement_date: values.commencement_date } : {})
+      ...(values.commencement_date ? { commencement_date: values.commencement_date } : {}),
+      ...(values.state ? { state: values.state } : {})
     }
 
     setSaveStatus('saving')
@@ -270,6 +269,9 @@ export default function Entity() {
               value={entity.entity_type.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
             />
             <SnapRow label="MSIC Codes" value={entity.msic_codes.join(', ')} />
+            {entity.state && (
+              <SnapRow label="State" value={MY_STATES.find((s) => s.code === entity.state)?.label ?? entity.state} />
+            )}
             <SnapRow label="Gross Income" value={fmt(entity.gross_income)} />
             <SnapRow label="Paid-Up Capital" value={fmt(entity.paid_up_capital)} />
             <SnapRow label="Employees" value={String(entity.employee_count)} />
@@ -317,7 +319,7 @@ export default function Entity() {
             <Field
               label="Tax Identification Number (TIN)"
               error={visibleErrors.tin}
-              hint="Format: one letter + 10 digits (e.g. C0000000001)"
+              hint="LHDN prefix must match the entity type — C for Sdn Bhd/Bhd, D partnership, PT LLP, IG sole proprietor."
             >
               <input
                 type="text"
@@ -338,6 +340,20 @@ export default function Entity() {
                 {ENTITY_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field
+              label="State / Federal Territory"
+              hint="Optional — used for state-specific public-holiday deadline shifts. Leave blank for national only."
+            >
+              <select value={values.state} onChange={(e) => set('state', e.target.value)} style={inputStyle}>
+                <option value="">— National only —</option>
+                {MY_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
                   </option>
                 ))}
               </select>
@@ -374,7 +390,7 @@ export default function Entity() {
             <Field
               label="Paid-Up Capital (RM)"
               error={visibleErrors.paid_up_capital}
-              hint="SME threshold: RM 2,500,000"
+              hint="SME cap RM2,500,000 — above this you're taxed at a flat 24% (not the 15/17/24% SME bands)."
             >
               <input
                 type="number"
@@ -390,7 +406,7 @@ export default function Entity() {
             <Field
               label="Gross Income (RM)"
               error={visibleErrors.gross_income}
-              hint="e-Invoice threshold: RM 1,000,000"
+              hint="e-Invoice from RM1,000,000. SME gross cap RM50,000,000 — above it, taxed at a flat 24%."
             >
               <input
                 type="number"
@@ -403,7 +419,11 @@ export default function Entity() {
               />
             </Field>
 
-            <Field label="Employee Count" error={visibleErrors.employee_count}>
+            <Field
+              label="Employee Count"
+              error={visibleErrors.employee_count}
+              hint="0 = nobody on payroll (a director taking director's fees isn't an employee)."
+            >
               <input
                 type="number"
                 min="0"

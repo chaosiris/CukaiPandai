@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.computation import is_sme
+from core.config_loader import load_ya_config
 from core.models import FormComputation, RiskFlag
 
 
@@ -8,6 +10,7 @@ def assess_risk(
     profile,
     declared_income: float,
     myinvois_turnover: float | None,
+    ya: int = 2026,
 ) -> list[RiskFlag]:
     """Deterministic pre-flight checks that flag common LHDN audit triggers before filing."""
     flags: list[RiskFlag] = []
@@ -48,5 +51,27 @@ def assess_risk(
         flags.append(RiskFlag(
             code="zero_tax_positive_income", severity="medium",
             message="Positive chargeable income but zero tax payable — verify reliefs/rebates"))
+
+    # 5. SME status (informational): paid-up > RM2.5m OR gross business income > RM50m means the
+    #    company is NOT an SME, so chargeable income is taxed at the flat non-SME rate (not the
+    #    15/17/24% bands). Surfaced so the user sees WHY the SME bands don't apply. Needs the profile
+    #    (skipped when None, e.g. in isolated unit tests). NOTE: the >20% foreign-ownership SME
+    #    disqualifier (YA2024) is not modelled — there is no ownership field yet.
+    if profile is not None:
+        cfg = load_ya_config(ya)
+        if not is_sme(profile, cfg):
+            it = cfg["income_tax"]
+            reasons = []
+            if profile.paid_up_capital > it["sme_paidup_max"]:
+                reasons.append(
+                    f"paid-up capital RM{profile.paid_up_capital:,.0f} exceeds RM{it['sme_paidup_max']:,.0f}")
+            if profile.gross_income > it["sme_gross_max"]:
+                reasons.append(
+                    f"gross income RM{profile.gross_income:,.0f} exceeds RM{it['sme_gross_max']:,.0f}")
+            flags.append(RiskFlag(
+                code="not_sme_flat_rate", severity="low",
+                message=(
+                    "Not an SME for the preferential rate (" + "; ".join(reasons)
+                    + f") — chargeable income is taxed at the flat {it['non_sme_rate'] * 100:.0f}% rate.")))
 
     return flags

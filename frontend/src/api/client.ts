@@ -18,6 +18,8 @@ export interface SsmProfile {
   basis_period_start: string
   basis_period_end: string
   commencement_date?: string
+  // State/FT ISO code (e.g. SGR, KUL) — drives state-specific holiday shifting; omit for national only.
+  state?: string
 }
 
 export interface LineItem {
@@ -40,6 +42,7 @@ export interface EntityTaxProfile {
   basis_period_start: string
   basis_period_end: string
   commencement_date?: string
+  state?: string
 }
 
 export interface Obligation {
@@ -148,7 +151,8 @@ export const ACME_SSM: SsmProfile = {
   sst_registered: true,
   basis_period_start: '2025-01-01',
   basis_period_end: '2025-12-31',
-  commencement_date: '2018-03-01'
+  commencement_date: '2018-03-01',
+  state: 'SGR'
 }
 
 // --- Mock data (VITE_API_MOCK=1) — all data keyed to seeded Acme ---
@@ -163,7 +167,8 @@ const MOCK_ENTITY: EntityTaxProfile = {
   sst_registered: true,
   basis_period_start: '2025-01-01',
   basis_period_end: '2025-12-31',
-  commencement_date: '2018-03-01'
+  commencement_date: '2018-03-01',
+  state: 'SGR'
 }
 
 // Per-persona mock obligations — keyed by TIN so persona switching shows different deadlines.
@@ -174,14 +179,16 @@ const MOCK_ENTITY: EntityTaxProfile = {
 //   SST-02 (sst / oblig.sst.return): if sst_registered; due = basis_period_end
 //   CP39  (employer_mtd / oblig.employer.mtd): if employee_count > 0; due = basis_period_start
 // config_version matches ya_2026.yaml: 'YA2026.1'
+// Filing/payment deadlines roll off weekends + public holidays, state-aware via the entity's state
+// (Acme=SGR, Sinar=KUL, Selera=PNG); the MyInvois mandate-start is NOT shifted.
 const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
   // Acme: gross_income=5,000,000; sst_registered=true; employee_count=12
   // basis_period 2025-01-01–2025-12-31; commencement 2018-03-01 (not in basis period)
   // Form C due: 2025-12-31 + 7m → last day of Jul 2026 = 2026-07-31
   // CP204  due: 2025-01-01 - 30d = 2024-12-02
-  // MyInvois: 5,000,000 >= 1,000,000 → due = basis_period_start = 2025-01-01
-  // SST-02: sst_registered → due = basis_period_end = 2025-12-31
-  // CP39: employees → due = basis_period_start = 2025-01-01
+  // MyInvois: 5,000,000 >= 1,000,000 → due = basis_period_start = 2025-01-01 (mandate, not shifted)
+  // SST-02: sst_registered → due = basis_period_end = 2025-12-31 (Wed, no shift)
+  // CP39: employees → basis_period_start 2025-01-01 = New Year (SGR) → shifts to 2025-01-02
   [ACME_TIN]: {
     entity_tin: ACME_TIN,
     obligations: [
@@ -220,7 +227,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'employer_mtd',
         form: 'CP39',
-        due_date: '2025-01-01',
+        due_date: '2025-01-02',
         rule_id: 'oblig.employer.mtd',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -233,7 +240,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
   // CP204  due: 2025-01-01 - 30d = 2024-12-02
   // MyInvois: 380,000 < 1,000,000 → OMITTED
   // SST-02: sst_registered=false → OMITTED
-  // CP39: 3 employees → due = basis_period_start = 2025-01-01
+  // CP39: 3 employees → basis_period_start 2025-01-01 = New Year (KUL) → shifts to 2025-01-02
   C7654321098: {
     entity_tin: 'C7654321098',
     obligations: [
@@ -256,7 +263,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'employer_mtd',
         form: 'CP39',
-        due_date: '2025-01-01',
+        due_date: '2025-01-02',
         rule_id: 'oblig.employer.mtd',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -266,9 +273,9 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
   // Selera: gross_income=2,500,000; sst_registered=true; employee_count=45
   // basis_period 2024-04-01–2025-03-31; commencement 2019-09-01 (not in basis period)
   // Form C due: 2025-03-31 + 7m → last day of Oct 2025 = 2025-10-31
-  // CP204  due: 2024-04-01 - 30d = 2024-03-02
-  // MyInvois: 2,500,000 >= 1,000,000 → due = basis_period_start = 2024-04-01
-  // SST-02: sst_registered → due = basis_period_end = 2025-03-31
+  // CP204  due: 2024-04-01 - 30d = 2024-03-02 (Sat) → shifts to 2024-03-04
+  // MyInvois: 2,500,000 >= 1,000,000 → due = basis_period_start = 2024-04-01 (mandate, not shifted)
+  // SST-02: sst_registered → basis_period_end 2025-03-31 = Hari Raya (PNG) → shifts to 2025-04-02
   // CP39: 45 employees → due = basis_period_start = 2024-04-01
   C3219876540: {
     entity_tin: 'C3219876540',
@@ -284,7 +291,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'income_tax',
         form: 'CP204',
-        due_date: '2024-03-02',
+        due_date: '2024-03-04',
         rule_id: 'oblig.income_tax.cp204',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -300,7 +307,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'sst',
         form: 'SST-02',
-        due_date: '2025-03-31',
+        due_date: '2025-04-02',
         rule_id: 'oblig.sst.return',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -528,7 +535,8 @@ const MOCK_ENTITIES: Record<string, EntityTaxProfile> = {
     sst_registered: false,
     basis_period_start: '2025-01-01',
     basis_period_end: '2025-12-31',
-    commencement_date: '2022-04-01'
+    commencement_date: '2022-04-01',
+    state: 'KUL'
   },
   C3219876540: {
     tin: 'C3219876540',
@@ -540,7 +548,8 @@ const MOCK_ENTITIES: Record<string, EntityTaxProfile> = {
     sst_registered: true,
     basis_period_start: '2024-04-01',
     basis_period_end: '2025-03-31',
-    commencement_date: '2019-09-01'
+    commencement_date: '2019-09-01',
+    state: 'PNG'
   }
 }
 

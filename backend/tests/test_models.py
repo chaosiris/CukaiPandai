@@ -5,7 +5,7 @@ from core.models import EntityTaxProfile, FigureTrace, FormComputation
 
 def test_entity_profile_roundtrip():
     p = EntityTaxProfile(
-        tin="C123", entity_type="sdn_bhd", msic_codes=["46900"],
+        tin="C1234567890", entity_type="sdn_bhd", msic_codes=["46900"],
         paid_up_capital=1_000_000, gross_income=8_000_000, employee_count=20,
         sst_registered=False, basis_period_start=date(2025, 1, 1),
         basis_period_end=date(2025, 12, 31), commencement_date=date(2018, 3, 1),
