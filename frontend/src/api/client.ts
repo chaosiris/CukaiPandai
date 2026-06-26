@@ -527,6 +527,13 @@ async function ensureSession(): Promise<void> {
         } catch {
           // localStorage unavailable — the token in memory still authorizes this session
         }
+        // Notify AuthContext so the in-session UI (profile popover) flips to Guest immediately,
+        // without waiting for a reload. AuthContext subscribes to this event.
+        try {
+          window.dispatchEvent(new CustomEvent<AuthUser>('cp:guest-session', { detail: res.user }))
+        } catch {
+          // non-browser env (e.g. SSR/tests) — no-op
+        }
       })
       .catch(() => {
         // leave tokenless — the /me call will surface its own error

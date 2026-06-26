@@ -84,6 +84,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // A guest token can be minted on-demand by the API layer (client.ts ensureSession) when an
+  // authenticated /me/* call is made without a session — e.g. saving a profile after entering via
+  // the demo/journey path. Reflect that here so the profile popover flips to Guest immediately.
+  useEffect(() => {
+    function onGuestSession(e: Event) {
+      const u = (e as CustomEvent<AuthUser>).detail
+      if (u) {
+        setUser(u)
+        setIsGuest(true)
+      }
+    }
+    window.addEventListener('cp:guest-session', onGuestSession)
+    return () => window.removeEventListener('cp:guest-session', onGuestSession)
+  }, [])
+
   const value = useMemo<AuthState>(() => {
     const persist = (res: { token: string; user: AuthUser }) => {
       setToken(res.token)
