@@ -331,43 +331,11 @@ export default function AuditDefense() {
   return (
     <>
       <div className="page-head">
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          Audit Assistant
-          <InfoTip content="When LHDN questions a figure on your filing, this assistant generates a citation-grounded justification. Every citation is verified by the deterministic gate against the law corpus. Fabricated clause IDs are stamped REJECTED." />
-        </h1>
+        <h1>Audit Assistant</h1>
         <p className="page-kicker">
-          Select a saved filing to defend its figures with citation-grounded justifications. Every citation is verified;
-          fabricated ones are rejected.
+          When LHDN questions a figure on your filing, get a citation-grounded justification. Select a saved filing to
+          defend; every citation is verified and fabricated clause IDs are rejected.
         </p>
-      </div>
-
-      {/* Trust headline — always visible (AD-1 acceptance criterion) */}
-      <div
-        className="window"
-        style={{ marginBottom: 16, borderColor: 'var(--denim)', background: 'rgba(65,82,110,0.04)' }}
-      >
-        <div className="titlebar" style={{ borderBottomColor: 'var(--denim)' }}>
-          <span className="titlebar-title" style={{ color: 'var(--denim)' }}>
-            Why This Is Trustworthy
-          </span>
-        </div>
-        <div
-          style={{
-            padding: '12px 18px',
-            fontFamily: 'var(--font-body)',
-            fontSize: 13,
-            color: 'var(--ink-soft)',
-            lineHeight: 1.6
-          }}
-        >
-          Every citation is verified by a deterministic gate against the law corpus. If the AI invents a clause ID, the
-          gate stamps it{' '}
-          <span className="verified-stamp unverified-stamp" style={{ verticalAlign: 'middle' }}>
-            REJECTED
-          </span>{' '}
-          and the fabrication is shown in the pack. Use the <strong style={{ color: 'var(--rust)' }}>Trust Demo</strong>{' '}
-          chip after selecting a filing to see this live.
-        </div>
       </div>
 
       {/* AD-1: Filing picker (shown when no filing is selected) */}

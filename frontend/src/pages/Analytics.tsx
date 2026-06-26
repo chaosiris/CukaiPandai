@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
-import { useEntity } from '../hooks/useEntity'
+import { InfoTip } from '../components/Tooltip'
 
-// Shared date helpers (same logic as Dashboard and ObligationRadar — not reinvented)
+// Shared date helpers (same logic as Dashboard and ObligationRadar)
 
 function daysUntil(dueDate: string): number {
   const today = new Date()
@@ -19,19 +19,26 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function fmtRM(n: number): string {
-  return `RM ${n.toLocaleString('en-MY')}`
-}
-
 const URGENT_WINDOW_DAYS = 30
 
-// ---- Stat card ----
+// ---- KPI card ----
 
-function StatCard({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
+interface KpiCardProps {
+  label: string
+  value: string | number
+  sub?: string
+  alert?: boolean
+  tip: string
+}
+
+function KpiCard({ label, value, sub, alert, tip }: KpiCardProps) {
   return (
-    <div className="window" style={{ padding: '16px 18px', display: 'grid', gap: 6 }}>
+    <div className="window" style={{ padding: '16px 18px', display: 'grid', gap: 4 }}>
       <div
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
           fontFamily: 'var(--font-mono)',
           fontSize: 10,
           color: 'var(--ink-soft)',
@@ -39,7 +46,8 @@ function StatCard({ label, value, alert }: { label: string; value: string | numb
           letterSpacing: '0.07em'
         }}
       >
-        {label}
+        <span>{label}</span>
+        <InfoTip content={tip} label={`About ${label}`} />
       </div>
       <div
         style={{
@@ -52,29 +60,174 @@ function StatCard({ label, value, alert }: { label: string; value: string | numb
       >
         {value}
       </div>
+      {sub && (
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--ink-soft)'
+          }}
+        >
+          {sub}
+        </div>
+      )}
     </div>
   )
 }
 
-// ---- Obligation status breakdown ----
+// ---- Overdue Exposure panel ----
+
+function OverdueExposure({ obligations }: { obligations: Obligation[] }) {
+  const overdueRows = obligations
+    .map((o) => ({ ...o, daysOverdue: -daysUntil(o.due_date) }))
+    .filter((o) => o.daysOverdue > 0)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue)
+
+  const maxDays = overdueRows.length > 0 ? overdueRows[0].daysOverdue : 1
+
+  return (
+    <div className="window">
+      <div className="titlebar">
+        <span className="closebox" aria-hidden="true" />
+        <span className="titlebar-title">Overdue Exposure</span>
+        <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          most overdue first
+          <InfoTip
+            content="Each bar shows how many days overdue an obligation is, sorted from most to least overdue. Longer bars need the most urgent attention."
+            label="About Overdue Exposure"
+          />
+        </span>
+      </div>
+
+      {overdueRows.length === 0 ? (
+        <div
+          style={{
+            padding: '24px 18px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            color: 'var(--ink-soft)'
+          }}
+        >
+          All obligations are on track.
+        </div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {overdueRows.map((o) => {
+            const pct = Math.round((o.daysOverdue / maxDays) * 100)
+            return (
+              <li
+                key={`${o.form}-${o.due_date}`}
+                style={{
+                  padding: '10px 18px',
+                  borderTop: 'var(--border)',
+                  transition: 'background-color 160ms ease'
+                }}
+                onMouseEnter={(e) => {
+                  ;(e.currentTarget as HTMLLIElement).style.backgroundColor = 'rgba(65, 82, 110, 0.07)'
+                }}
+                onMouseLeave={(e) => {
+                  ;(e.currentTarget as HTMLLIElement).style.backgroundColor = ''
+                }}
+              >
+                {/* Row header: form badge + obligation type + day count */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    marginBottom: 6
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        padding: '1px 5px',
+                        border: '1px solid var(--rust)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: 'var(--rust)'
+                      }}
+                    >
+                      {o.form}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 12,
+                        color: 'var(--ink)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {o.obligation_type}
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: 'var(--rust)'
+                    }}
+                  >
+                    {o.daysOverdue} day{o.daysOverdue === 1 ? '' : 's'} overdue
+                  </span>
+                </div>
+                {/* Horizontal bar scaled to max overdue */}
+                <div
+                  style={{
+                    height: 6,
+                    border: 'var(--border)',
+                    background: 'var(--screen)',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${pct}%`,
+                      height: '100%',
+                      background: 'var(--rust)',
+                      transition: 'width 300ms ease'
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--ink-soft)'
+                  }}
+                >
+                  Due {formatDate(o.due_date)}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ---- Status Breakdown + By Form Type panels ----
 
 function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
-  // Group by status bucket (overdue / upcoming-30 / pending)
+  const total = obligations.length
+
   const overdue = obligations.filter((o) => daysUntil(o.due_date) < 0)
   const withinThirty = obligations.filter((o) => {
     const d = daysUntil(o.due_date)
     return d >= 0 && d <= URGENT_WINDOW_DAYS
   })
   const later = obligations.filter((o) => daysUntil(o.due_date) > URGENT_WINDOW_DAYS)
-
-  // Group by form type
-  const byForm: Record<string, number> = {}
-  for (const ob of obligations) {
-    byForm[ob.form] = (byForm[ob.form] ?? 0) + 1
-  }
-  const formRows = Object.entries(byForm).sort((a, b) => b[1] - a[1])
-
-  const total = obligations.length
 
   function Bar({ count, color }: { count: number; color: string }) {
     const pct = total > 0 ? Math.round((count / total) * 100) : 0
@@ -110,7 +263,13 @@ function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
       <div className="titlebar">
         <span className="closebox" aria-hidden="true" />
         <span className="titlebar-title">Status Breakdown</span>
-        <span className="titlebar-meta">by deadline window</span>
+        <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          by deadline window
+          <InfoTip
+            content="Counts obligations by how close their due date is: overdue (past due), due within 30 days (act now), or later. Bars show share of total."
+            label="About Status Breakdown"
+          />
+        </span>
       </div>
 
       <div style={{ padding: '14px 18px', display: 'grid', gap: 14 }}>
@@ -150,33 +309,59 @@ function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
 
-      {formRows.length > 0 && (
-        <>
-          <div
-            style={{
-              padding: '10px 18px',
-              borderTop: 'var(--border)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              color: 'var(--ink-soft)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em'
-            }}
-          >
-            By Form Type
-          </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {formRows.map(([form, count]) => (
-              <li
-                key={form}
+function ByFormType({ obligations }: { obligations: Obligation[] }) {
+  const byForm: Record<string, number> = {}
+  for (const ob of obligations) {
+    byForm[ob.form] = (byForm[ob.form] ?? 0) + 1
+  }
+  const formRows = Object.entries(byForm).sort((a, b) => b[1] - a[1])
+
+  if (formRows.length === 0) return null
+
+  const maxCount = formRows[0][1]
+
+  return (
+    <div className="window">
+      <div className="titlebar">
+        <span className="closebox" aria-hidden="true" />
+        <span className="titlebar-title">By Form Type</span>
+        <span className="titlebar-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          obligation count per form
+          <InfoTip
+            content="How many obligations fall under each tax form (e.g. CP204, Form C, SST-02). Sorted most to fewest; bars scaled to the largest count."
+            label="About By Form Type"
+          />
+        </span>
+      </div>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {formRows.map(([form, count]) => {
+          const pct = Math.round((count / maxCount) * 100)
+          return (
+            <li
+              key={form}
+              style={{
+                padding: '10px 18px',
+                borderTop: 'var(--border)',
+                transition: 'background-color 160ms ease'
+              }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLLIElement).style.backgroundColor = 'rgba(65, 82, 110, 0.07)'
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLLIElement).style.backgroundColor = ''
+              }}
+            >
+              <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
+                  display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: 12,
-                  padding: '8px 18px',
-                  borderTop: 'var(--border)'
+                  marginBottom: 6
                 }}
               >
                 <span
@@ -198,129 +383,27 @@ function StatusBreakdown({ obligations }: { obligations: Obligation[] }) {
                 >
                   {count} obligation{count === 1 ? '' : 's'}
                 </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ---- Entity snapshot ----
-
-function EntitySnapshot() {
-  const { entity, loading, error } = useEntity()
-
-  if (loading) {
-    return (
-      <div className="window">
-        <div className="titlebar">
-          <span className="closebox" aria-hidden="true" />
-          <span className="titlebar-title">Entity Snapshot</span>
-        </div>
-        <div style={{ padding: '16px 18px' }}>
-          <div className="barber" style={{ marginTop: 0 }} />
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !entity) {
-    return (
-      <div className="window">
-        <div className="titlebar">
-          <span className="closebox" aria-hidden="true" />
-          <span className="titlebar-title">Entity Snapshot</span>
-        </div>
-        <div style={{ padding: '16px 18px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--rust)' }}>
-          {error ?? 'No entity data.'}
-        </div>
-      </div>
-    )
-  }
-
-  const rows = [
-    { label: 'TIN', value: entity.tin },
-    { label: 'Entity Type', value: entity.entity_type.replace(/_/g, ' ').toUpperCase() },
-    { label: 'MSIC Code(s)', value: entity.msic_codes.join(', ') },
-    { label: 'SST Registered', value: entity.sst_registered ? 'Yes' : 'No' },
-    {
-      label: 'Basis Period',
-      value: entity.basis_period_start
-        ? `${formatDate(entity.basis_period_start)} to ${formatDate(entity.basis_period_end)}`
-        : 'N/A'
-    },
-    { label: 'Employees', value: String(entity.employee_count) },
-    { label: 'Paid-Up Capital', value: fmtRM(entity.paid_up_capital) }
-  ]
-
-  return (
-    <div className="window">
-      <div className="titlebar">
-        <span className="closebox" aria-hidden="true" />
-        <span className="titlebar-title">Entity Snapshot</span>
-        <span className="titlebar-meta" style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>
-          {entity.tin}
-        </span>
-      </div>
-
-      {/* Gross income hero figure */}
-      <div style={{ padding: '14px 18px 12px', borderBottom: 'var(--border)' }}>
-        <div
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 28,
-            fontWeight: 600,
-            color: 'var(--ink)',
-            lineHeight: 1.1
-          }}
-        >
-          {fmtRM(entity.gross_income)}
-        </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--ink-soft)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.07em',
-            marginTop: 3
-          }}
-        >
-          Gross Income · YA2026
-        </div>
-      </div>
-
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        {rows.map((row) => (
-          <li
-            key={row.label}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: 8,
-              padding: '8px 18px',
-              borderBottom: 'var(--border)',
-              alignItems: 'center'
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                color: 'var(--ink-soft)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em'
-              }}
-            >
-              {row.label}
-            </span>
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink)', textAlign: 'right' }}>
-              {row.value}
-            </span>
-          </li>
-        ))}
+              </div>
+              <div
+                style={{
+                  height: 5,
+                  border: 'var(--border)',
+                  background: 'var(--screen)',
+                  overflow: 'hidden'
+                }}
+              >
+                <div
+                  style={{
+                    width: `${pct}%`,
+                    height: '100%',
+                    background: 'var(--denim)',
+                    transition: 'width 300ms ease'
+                  }}
+                />
+              </div>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -353,6 +436,8 @@ export default function Analytics() {
 
   const totalCount = obligations.length
   const overdueCount = obligations.filter((o) => daysUntil(o.due_date) < 0).length
+  const onTrackCount = totalCount - overdueCount
+  const complianceRate = totalCount > 0 ? Math.round((onTrackCount / totalCount) * 100) : 100
   const withinThirtyCount = obligations.filter((o) => {
     const d = daysUntil(o.due_date)
     return d >= 0 && d <= URGENT_WINDOW_DAYS
@@ -366,7 +451,9 @@ export default function Analytics() {
       <header className="page-head">
         <div>
           <h1>Analytics</h1>
-          <div className="page-kicker">{persona.label} · YA2026 Compliance Overview</div>
+          <div className="page-kicker">
+            Your YA2026 compliance at a glance: obligation load, overdue exposure, and what is due next.
+          </div>
         </div>
       </header>
 
@@ -411,54 +498,69 @@ export default function Analytics() {
       {/* Main content */}
       {!loading && !error && totalCount > 0 && (
         <>
-          {/* Stat cards row */}
+          {/* KPI cards row — 5 cards */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: 16,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(148px, 1fr))',
+              gap: 14,
               marginBottom: 24
             }}
           >
-            <StatCard label="Total Obligations" value={totalCount} />
-            <StatCard label="Overdue" value={overdueCount} alert={overdueCount > 0} />
-            <StatCard label="Due within 30 Days" value={withinThirtyCount} alert={withinThirtyCount > 0} />
-            <StatCard label="Next Due Date" value={nextObligation ? formatDate(nextObligation.due_date) : 'None'} />
+            <KpiCard
+              label="Compliance Rate"
+              value={`${complianceRate}%`}
+              sub={`${onTrackCount} of ${totalCount} on track`}
+              alert={complianceRate < 100}
+              tip="Percentage of obligations not yet overdue. Calculated as (total - overdue) / total. A lower rate means more obligations need immediate attention."
+            />
+            <KpiCard
+              label="Total Obligations"
+              value={totalCount}
+              tip="The total number of YA2026 tax obligations derived for this entity, covering all applicable forms and filing types."
+            />
+            <KpiCard
+              label="Overdue"
+              value={overdueCount}
+              alert={overdueCount > 0}
+              tip="Obligations whose due date has already passed. Each one carries potential late-filing penalties; address these first."
+            />
+            <KpiCard
+              label="Due Within 30 Days"
+              value={withinThirtyCount}
+              alert={withinThirtyCount > 0}
+              tip="Obligations due in the next 30 days. These require prompt action to avoid becoming overdue."
+            />
+            <KpiCard
+              label="Next Due Date"
+              value={nextObligation ? formatDate(nextObligation.due_date) : 'None'}
+              sub={nextObligation ? nextObligation.form : undefined}
+              tip="The earliest upcoming due date across all non-overdue obligations. Acts as your next compliance deadline."
+            />
           </div>
 
-          {/* Compliance ratio note */}
-          {overdueCount > 0 && (
-            <div
-              style={{
-                marginBottom: 20,
-                padding: '10px 14px',
-                border: '1px solid var(--rust)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: 'var(--rust)'
-              }}
-            >
-              {overdueCount} of {totalCount} obligation{totalCount === 1 ? '' : 's'} overdue for {persona.label}.
-            </div>
-          )}
+          {/* Overdue Exposure — full width, most impactful analysis */}
+          <div style={{ marginBottom: 20 }}>
+            <OverdueExposure obligations={obligations} />
+          </div>
 
-          {/* Two-column detail grid */}
+          {/* Status Breakdown + By Form Type — balanced two-column grid */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
               gap: 20,
-              alignItems: 'start'
+              alignItems: 'start',
+              marginBottom: 28
             }}
           >
             <StatusBreakdown obligations={obligations} />
-            <EntitySnapshot key={`snap-${persona.tin}`} />
+            <ByFormType obligations={obligations} />
           </div>
 
           {/* Cross-link footer */}
           <div
             style={{
-              marginTop: 28,
               padding: '12px 0',
               borderTop: 'var(--border)',
               display: 'flex',
@@ -470,10 +572,10 @@ export default function Analytics() {
             }}
           >
             <Link to="/obligations" style={{ color: 'var(--denim)', textDecoration: 'none' }}>
-              Open Obligation Calendar →
+              Open Obligation Calendar &rarr;
             </Link>
             <Link to="/filing" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>
-              Start Form C Filing →
+              Start Form C Filing &rarr;
             </Link>
           </div>
         </>

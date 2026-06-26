@@ -182,10 +182,7 @@ export default function FilingRecordPage() {
   return (
     <>
       <div className="page-head">
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {record.label}
-          <InfoTip content="This saved filing record shows the tax computation produced by the deterministic rule-based core for the given trial balance." />
-        </h1>
+        <h1>{record.label}</h1>
         <p className="page-kicker">
           Form C · YA2026 · {record.tin} · Saved {formatDate(record.created_at)}
         </p>

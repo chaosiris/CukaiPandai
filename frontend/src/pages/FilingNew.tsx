@@ -284,11 +284,11 @@ export default function FilingNew() {
   return (
     <>
       <div className="page-head">
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          New Filing
-          <InfoTip content="Classify your trial balance, then compute your Form C tax liability using the deterministic rule-based core. No AI is involved in the tax calculation." />
-        </h1>
-        <p className="page-kicker">Form C · YA2026 · {entity?.tin ?? '...'}</p>
+        <h1>New Filing</h1>
+        <p className="page-kicker">
+          Classify your trial balance, then compute a cited Form C with the deterministic core. Form C · YA2026 ·{' '}
+          {entity?.tin ?? '...'}
+        </p>
       </div>
 
       {displayError && (

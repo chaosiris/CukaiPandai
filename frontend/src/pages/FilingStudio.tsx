@@ -77,11 +77,11 @@ export default function FilingStudio() {
   return (
     <>
       <div className="page-head">
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          Filing Records
-          <InfoTip content="Your saved Form C filings for YA2026. Each record stores the full tax computation and risk assessment produced by the deterministic core." />
-        </h1>
-        <p className="page-kicker">Saved Form C computations -- one-shot, rule-based, citation-grounded</p>
+        <h1>Filing Records</h1>
+        <p className="page-kicker">
+          Your saved Form C filings for YA2026, each with its full tax computation and risk assessment from the
+          deterministic core.
+        </p>
       </div>
 
       {/* Toolbar */}

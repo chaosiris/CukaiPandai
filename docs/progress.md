@@ -1393,3 +1393,31 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `frontend/src/pages/AuditDefense.tsx` (full rewrite -- AD-1 + AD-2)
 - `docs/plan.md` (AD-1/AD-2 all sub-bullets ticked `[x]`)
 - `docs/progress.md` (this entry)
+
+---
+
+## [26/06/26] — Analytics page redesign (data-dense analytical dashboard) `[FE]`
+
+### What changed
+
+- **Removed `EntitySnapshot`** component and the `useEntity` import entirely from `Analytics.tsx` -- the Entity Snapshot now lives on `/entity`. No orphaned imports remain.
+- **Subtitle replaced** from the entity-specific "Acme Trading · YA2026 Compliance Overview" to a general single-line description: "Your YA2026 compliance at a glance: obligation load, overdue exposure, and what is due next."
+- **KPI cards row:** added a lead "Compliance Rate" card (`round((total - overdue) / total * 100)%`, sub-label shows "N of M on track"); kept Total Obligations, Overdue, Due Within 30 Days, Next Due Date. Every KPI card heading carries an `InfoTip`.
+- **Overdue Exposure panel (new):** full-width panel listing overdue obligations sorted most-overdue first. Each row shows form badge (rust-coloured border), obligation type, days-overdue value label, and a horizontal bar scaled to the max overdue in the set. Empty state: "All obligations are on track." Heading carries an `InfoTip`. Grounded in `daysUntil(due_date)` arithmetic only.
+- **Status Breakdown** panel kept and cleaned up; `InfoTip` added to heading.
+- **By Form Type** extracted into its own panel (was a sub-section inside StatusBreakdown); now sits alongside Status Breakdown in a balanced two-column grid. Bars scaled to most-common form count; `InfoTip` on heading.
+- **Row hover highlighting:** `onMouseEnter`/`onMouseLeave` inline style swap (`rgba(65, 82, 110, 0.07)`) with `transition: background-color 160ms ease` on all list rows (no motion on bars -- they already existed). CSS bar transitions already gated by `prefers-reduced-motion` via the global `.reduce-motion` class in `tokens.css`.
+- **Footer quick-links** kept ("Open Obligation Calendar", "Start Form C Filing"); `→` replaced with `&rarr;` to avoid literal arrow character.
+- **InfoTip placement:** every card/panel heading has one `InfoTip`; the `<h1>` "Analytics" has none (per PO requirement).
+- **Non-regressions:** `getObligations` + active-persona wiring + loading barber + empty state all preserved. Light + dark legible (token vars only). No new CSS file, no Tailwind, no charting library.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules**, 351 KB JS, 49 KB CSS, built in 2.18s
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+
+### Files touched
+
+- `frontend/src/pages/Analytics.tsx` (full rewrite)
+- `docs/progress.md` (this entry)

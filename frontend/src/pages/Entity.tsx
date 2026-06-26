@@ -240,28 +240,16 @@ export default function Entity() {
     }
   }
 
-  const isSeed = ['C2581234509', 'C7654321098', 'C3219876540'].includes(persona.tin)
-
   return (
     <>
       <header className="page-head">
         <div>
           <h1>Entity</h1>
-          <div className="page-kicker">Active Company Profile and Tax Configuration</div>
+          <div className="page-kicker">
+            View and edit your active company profile; saved changes apply across all consoles.
+          </div>
         </div>
       </header>
-
-      <p
-        style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          color: 'var(--ink-soft)',
-          marginBottom: 20,
-          lineHeight: 1.5
-        }}
-      >
-        View and edit your active company's SSM profile. Saved changes apply across all compliance consoles.
-      </p>
 
       {/* Snapshot card */}
       <div className="window" style={{ marginBottom: 16 }}>
@@ -291,18 +279,6 @@ export default function Entity() {
           </div>
         </div>
       </div>
-
-      {isSeed && (
-        <div
-          className="window"
-          style={{ marginBottom: 16, borderColor: 'var(--mustard)', background: 'rgba(224,169,59,0.06)' }}
-        >
-          <div style={{ padding: '10px 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
-            You are viewing a seed demo entity. Editing below will save your own profile as "My Company" and switch the
-            active entity. The seed remains selectable from Settings.
-          </div>
-        </div>
-      )}
 
       {saveStatus === 'saved' && (
         <div
@@ -543,18 +519,6 @@ export default function Entity() {
             {saveStatus === 'saving' ? 'Saving…' : 'Save Company Profile'}
           </button>
         </div>
-
-        <p
-          style={{
-            marginTop: 20,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--ink-soft)',
-            lineHeight: 1.5
-          }}
-        >
-          YA2026 · decision-support, not legal advice · edits never overwrite the built-in seed entities
-        </p>
       </form>
     </>
   )
