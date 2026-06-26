@@ -1,14 +1,11 @@
-// JR-3 — First-run welcome screen.
-// Shown to first-run guests (no cp_journey_done) after "Continue as Guest".
-// Returning users (flag set) bypass this and land on /dashboard.
+// Welcome screen — shown after EVERY sign-in (SSO / email / guest), unless the user chose
+// "Don't Show Again" (cp_skip_welcome), in which case AuthScreen routes straight to /dashboard.
 //
 // On-ramps:
 //   "Try sample data" — persona picker (Acme / Sinar / Selera) → /start/obligations
-//   "Use my own company" — stub pointing to /start/custom (JR-6 placeholder)
-//   "Skip to dashboard" — sets cp_journey_done, navigates to /dashboard
-//
-// JR-Q5: cp_journey_done is NOT cleared on Sign-Out (that only clears cp_entered_as_guest).
-// This page does not touch Sign-Out at all.
+//   "Use my own company" — /start/custom
+//   "Skip to Dashboard" — one-time skip (sets cp_journey_done); welcome still shows next sign-in
+//   "Don't Show Again" — sets cp_skip_welcome so future sign-ins go directly to /dashboard
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -17,9 +14,21 @@ import { JourneyMap } from '../components/JourneyProgress'
 import { PERSONAS } from '../personas'
 
 const JOURNEY_DONE_KEY = 'cp_journey_done'
+const SKIP_WELCOME_KEY = 'cp_skip_welcome'
 
 function setJourneyDone() {
   try {
+    localStorage.setItem(JOURNEY_DONE_KEY, '1')
+  } catch {
+    // localStorage may be unavailable
+  }
+}
+
+// "Don't Show Again": persist the skip flag (and mark the journey done) so future sign-ins
+// land on /dashboard instead of /welcome.
+function setSkipWelcome() {
+  try {
+    localStorage.setItem(SKIP_WELCOME_KEY, '1')
     localStorage.setItem(JOURNEY_DONE_KEY, '1')
   } catch {
     // localStorage may be unavailable
@@ -39,6 +48,11 @@ export default function Welcome() {
 
   function handleSkipToDashboard() {
     setJourneyDone()
+    navigate('/dashboard', { replace: true })
+  }
+
+  function handleDontShowAgain() {
+    setSkipWelcome()
     navigate('/dashboard', { replace: true })
   }
 
@@ -255,6 +269,24 @@ export default function Welcome() {
         >
           Skip to Dashboard →
         </button>
+        <div style={{ marginTop: 4 }}>
+          <button
+            type="button"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              color: 'var(--ink-soft)',
+              textDecoration: 'underline',
+              padding: '6px 16px'
+            }}
+            onClick={handleDontShowAgain}
+          >
+            Don't Show Again
+          </button>
+        </div>
         <p
           style={{
             fontFamily: 'var(--font-mono)',

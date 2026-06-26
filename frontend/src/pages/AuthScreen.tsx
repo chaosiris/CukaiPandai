@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { LogoMark } from '../components/icons'
 import './Auth.css'
@@ -24,7 +24,6 @@ declare global {
 
 export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const navigate = useNavigate()
-  const location = useLocation()
   const { signIn, signUp, signInWithGoogle, continueAsGuest } = useAuth()
   const isSignIn = mode === 'sign-in'
 
@@ -35,8 +34,17 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const [busy, setBusy] = useState(false)
   const googleBtnRef = useRef<HTMLDivElement>(null)
 
-  const dest = (location.state as { from?: string } | null)?.from || '/dashboard'
-  const go = () => navigate(dest, { replace: true })
+  // Every sign-in (SSO, email/password, guest) begins at /welcome, unless the user has
+  // chosen "Don't Show Again" (cp_skip_welcome), in which case go straight to /dashboard.
+  const go = () => {
+    let skipWelcome = false
+    try {
+      skipWelcome = localStorage.getItem('cp_skip_welcome') === '1'
+    } catch {
+      // localStorage unavailable; default to the welcome journey
+    }
+    navigate(skipWelcome ? '/dashboard' : '/welcome', { replace: true })
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -109,14 +117,7 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     } finally {
       setBusy(false)
     }
-    // JR-3: first-run guests (no cp_journey_done) go to /welcome; returning users go to /dashboard.
-    let journeyDone = false
-    try {
-      journeyDone = localStorage.getItem('cp_journey_done') === '1'
-    } catch {
-      // localStorage unavailable; default to the welcome journey
-    }
-    navigate(journeyDone ? '/dashboard' : '/welcome', { replace: true })
+    go()
   }
 
   return (
