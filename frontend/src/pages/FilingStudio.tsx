@@ -24,12 +24,17 @@ function riskCount(rec: FilingRecord): number {
   return rec.risk_flags?.length ?? 0
 }
 
+type SortKey = 'newest' | 'oldest' | 'tax-payable'
+
 export default function FilingStudio() {
   const navigate = useNavigate()
   const [records, setRecords] = useState<FilingRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
+  const [filterForm, setFilterForm] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('newest')
 
   useEffect(() => {
     setLoading(true)
@@ -52,11 +57,31 @@ export default function FilingStudio() {
     })
   }
 
+  // Derive unique form types for the form-type filter
+  const formTypes = Array.from(new Set(records.map((r) => r.computation?.form ?? r.tin).filter(Boolean)))
+
+  // Apply filters
+  let visible = records
+  if (filterForm !== 'all') {
+    visible = visible.filter((r) => (r.computation?.form ?? r.tin) === filterForm)
+  }
+  if (filterStatus !== 'all') {
+    visible = visible.filter((r) => (filterStatus === 'draft' ? r.status === 'draft' : r.status === 'final'))
+  }
+  // Apply sort
+  const sorted = [...visible]
+  if (sortKey === 'oldest') {
+    sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  } else if (sortKey === 'tax-payable') {
+    sorted.sort((a, b) => (taxPayable(b) ?? -1) - (taxPayable(a) ?? -1))
+  }
+  // newest is the default API order (already newest first)
+
   function toggleAll() {
-    if (selected.size === records.length) {
+    if (selected.size === sorted.length && sorted.every((r) => selected.has(r.id))) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(records.map((r) => r.id)))
+      setSelected(new Set(sorted.map((r) => r.id)))
     }
   }
 
@@ -72,7 +97,7 @@ export default function FilingStudio() {
     }
   }
 
-  const allSelected = records.length > 0 && selected.size === records.length
+  const allSelected = sorted.length > 0 && sorted.every((r) => selected.has(r.id))
 
   return (
     <>
@@ -84,6 +109,81 @@ export default function FilingStudio() {
         </p>
       </div>
 
+      {/* Filter + sort row */}
+      {!loading && records.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 16,
+            marginBottom: 6,
+            flexWrap: 'wrap'
+          }}
+        >
+          <select
+            value={filterForm}
+            onChange={(e) => setFilterForm(e.target.value)}
+            aria-label="Filter by form type"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              border: 'var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--screen)',
+              color: 'var(--ink)',
+              padding: '4px 8px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All forms</option>
+            {formTypes.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            aria-label="Filter by status"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              border: 'var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--screen)',
+              color: 'var(--ink)',
+              padding: '4px 8px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Pending</option>
+            <option value="final">Final</option>
+          </select>
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            aria-label="Sort by"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              border: 'var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--screen)',
+              color: 'var(--ink)',
+              padding: '4px 8px',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="tax-payable">Tax payable (high to low)</option>
+          </select>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div
         style={{
@@ -91,13 +191,13 @@ export default function FilingStudio() {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          marginTop: 16,
+          marginTop: 4,
           marginBottom: 8,
           flexWrap: 'wrap'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {records.length > 0 && (
+          {sorted.length > 0 && (
             <>
               <input
                 type="checkbox"
@@ -105,7 +205,7 @@ export default function FilingStudio() {
                 checked={allSelected}
                 onChange={toggleAll}
                 style={{ cursor: 'pointer' }}
-                aria-label="Select all filings"
+                aria-label="Select all visible filings"
               />
               <label
                 htmlFor="select-all"
@@ -220,115 +320,142 @@ export default function FilingStudio() {
         <div className="window" style={{ marginTop: 8 }}>
           <div className="titlebar">
             <span className="titlebar-title">
-              {records.length} Filing{records.length !== 1 ? 's' : ''}
+              {sorted.length} of {records.length} Filing{records.length !== 1 ? 's' : ''}
             </span>
-            <InfoTip content="Newest filing appears first. Click a row to open the full record. Use checkboxes to select multiple records for deletion." />
+            <InfoTip content="Click a row to open the full record. Use checkboxes to select multiple records for deletion." />
           </div>
-          {records.map((rec) => {
-            const tp = taxPayable(rec)
-            const rc = riskCount(rec)
-            const isSelected = selected.has(rec.id)
-            return (
-              <div
-                key={rec.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '32px 1fr auto',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 18px',
-                  borderBottom: 'var(--border)',
-                  background: isSelected ? 'var(--screen)' : 'transparent',
-                  transition: 'background 150ms'
-                }}
-              >
-                {/* Checkbox cell */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelect(rec.id)}
-                    style={{ cursor: 'pointer' }}
-                    aria-label={`Select ${rec.label}`}
-                  />
-                </div>
-
-                {/* Label + meta + tax payable: all link to the record */}
-                <Link
-                  to={`/filing/${rec.id}`}
+          {sorted.length === 0 && (
+            <div
+              style={{ padding: '20px 18px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}
+            >
+              No filings match the current filters.
+            </div>
+          )}
+          <div className="row-div-list">
+            {sorted.map((rec) => {
+              const tp = taxPayable(rec)
+              const rc = riskCount(rec)
+              const isSelected = selected.has(rec.id)
+              const isDraft = rec.status === 'draft'
+              return (
+                <div
+                  key={rec.id}
                   style={{
-                    display: 'contents',
-                    textDecoration: 'none',
-                    color: 'inherit'
+                    display: 'grid',
+                    gridTemplateColumns: '32px 1fr auto',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 18px',
+                    background: isSelected ? 'var(--screen)' : 'transparent',
+                    transition: 'background 150ms'
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: 'var(--ink)',
-                        lineHeight: 1.3,
-                        marginBottom: 3
-                      }}
-                    >
-                      {rec.label}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: 'var(--ink-soft)',
-                        display: 'flex',
-                        gap: 12,
-                        flexWrap: 'wrap'
-                      }}
-                    >
-                      <span>{rec.tin}</span>
-                      <span>{formatDate(rec.created_at)}</span>
-                      {rc > 0 && (
-                        <span style={{ color: 'var(--rust)' }}>
-                          {rc} risk flag{rc !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
+                  {/* Checkbox cell */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(rec.id)}
+                      style={{ cursor: 'pointer' }}
+                      aria-label={`Select ${rec.label}`}
+                    />
                   </div>
 
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {tp != null ? (
-                      <>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 10,
-                            color: 'var(--ink-soft)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.06em',
-                            marginBottom: 2
-                          }}
-                        >
-                          Tax Payable
+                  {/* Label + meta + tax payable: all link to the record */}
+                  <Link
+                    to={`/filing/${rec.id}`}
+                    style={{
+                      display: 'contents',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          lineHeight: 1.3,
+                          marginBottom: 3
+                        }}
+                      >
+                        {rec.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--ink-soft)',
+                          display: 'flex',
+                          gap: 12,
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <span>{rec.tin}</span>
+                        <span>{formatDate(rec.created_at)}</span>
+                        {isDraft && (
+                          <span
+                            style={{
+                              padding: '1px 6px',
+                              border: '1px solid var(--mustard)',
+                              color: 'var(--mustard)',
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 9,
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em'
+                            }}
+                          >
+                            Pending
+                          </span>
+                        )}
+                        {rc > 0 && (
+                          <span style={{ color: 'var(--rust)' }}>
+                            {rc} risk flag{rc !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      {tp != null ? (
+                        <>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 10,
+                              color: 'var(--ink-soft)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                              marginBottom: 2
+                            }}
+                          >
+                            Tax Payable
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: 'var(--ink)'
+                            }}
+                          >
+                            RM {tp.toLocaleString()}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                          N/A
                         </div>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: 'var(--ink)'
-                          }}
-                        >
-                          RM {tp.toLocaleString()}
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>N/A</div>
-                    )}
-                  </div>
-                </Link>
-              </div>
-            )
-          })}
+                      )}
+                    </div>
+                  </Link>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </>

@@ -819,9 +819,11 @@ export interface FilingRecord {
   user_id: string
   tin: string
   label: string
-  computation: FormComputation
+  computation: FormComputation | null
   risk_flags: RiskFlag[]
   line_items?: LineItem[]
+  raw_text?: string | null
+  status: 'draft' | 'final'
   created_at: string
 }
 
@@ -857,6 +859,8 @@ export async function saveFiling(body: {
       computation: body.computation,
       risk_flags: body.risk_flags ?? [],
       line_items: body.line_items,
+      raw_text: null,
+      status: 'final',
       created_at: new Date().toISOString()
     }
     _mockFilings = [rec, ..._mockFilings]
@@ -864,6 +868,60 @@ export async function saveFiling(body: {
   }
   await ensureSession()
   return post<FilingRecord>('/me/filings', body)
+}
+
+/** POST /me/filings — create a draft record (no computation yet). Returns the stored draft with its id. */
+export async function createDraftFiling(body: {
+  tin: string
+  label?: string
+  line_items?: LineItem[]
+  raw_text?: string
+}): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const rec: FilingRecord = {
+      id: _mockFilingId(),
+      user_id: 'mock-user',
+      tin: body.tin,
+      label: body.label ?? `Draft ${_mockFilingSeq - 1}`,
+      computation: null,
+      risk_flags: [],
+      line_items: body.line_items,
+      raw_text: body.raw_text ?? null,
+      status: 'draft',
+      created_at: new Date().toISOString()
+    }
+    _mockFilings = [rec, ..._mockFilings]
+    return rec
+  }
+  await ensureSession()
+  return post<FilingRecord>('/me/filings', { ...body, status: 'draft', computation: null })
+}
+
+/** PATCH /me/filings/{id} — upgrade a draft to final (or update any field). */
+export async function upgradeFiling(
+  id: string,
+  patch: {
+    computation?: FormComputation | null
+    risk_flags?: RiskFlag[]
+    line_items?: LineItem[]
+    raw_text?: string | null
+    status?: 'draft' | 'final'
+    label?: string
+  }
+): Promise<FilingRecord> {
+  if (MOCK_MODE) {
+    const idx = _mockFilings.findIndex((r) => r.id === id)
+    if (idx === -1) throw new Error(`404 Filing ${id} not found`)
+    _mockFilings[idx] = { ..._mockFilings[idx], ...patch }
+    return _mockFilings[idx]
+  }
+  await ensureSession()
+  const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(patch)
+  })
+  return handleResponse<FilingRecord>(res)
 }
 
 /** GET /me/filings/{id} — fetch a single filing record. Throws on 404. */

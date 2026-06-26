@@ -388,68 +388,69 @@ export default function AuditDefense() {
                 <span className="titlebar-title">Your Filed Returns</span>
                 <InfoTip content="Select a filing to defend its figures. The assistant will use that filing's actual computed figures as evidence when building justifications." />
               </div>
-              {filings.map((rec) => {
-                const tp = rec.computation?.fields?.tax_payable?.value
-                return (
-                  <div
-                    key={rec.id}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto',
-                      alignItems: 'center',
-                      gap: 16,
-                      padding: '14px 18px',
-                      borderBottom: 'var(--border)'
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: 'var(--ink)',
-                          marginBottom: 4
-                        }}
-                      >
-                        {rec.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          color: 'var(--ink-soft)',
-                          display: 'flex',
-                          gap: 12,
-                          flexWrap: 'wrap'
-                        }}
-                      >
-                        <span>{rec.tin}</span>
-                        <span>{formatDate(rec.created_at)}</span>
-                        {tp != null && <span>Tax payable: {formatRM(tp)}</span>}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => selectFiling(rec)}
+              <div className="row-div-list">
+                {filings.map((rec) => {
+                  const tp = rec.computation?.fields?.tax_payable?.value
+                  return (
+                    <div
+                      key={rec.id}
                       style={{
-                        padding: '8px 16px',
-                        border: 'none',
-                        background: 'var(--denim)',
-                        color: 'var(--paper)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        borderRadius: 'var(--radius)',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
+                        display: 'grid',
+                        gridTemplateColumns: '1fr auto',
+                        alignItems: 'center',
+                        gap: 16,
+                        padding: '14px 18px'
                       }}
                     >
-                      Defend This Filing
-                    </button>
-                  </div>
-                )
-              })}
+                      <div>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: 'var(--ink)',
+                            marginBottom: 4
+                          }}
+                        >
+                          {rec.label}
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            color: 'var(--ink-soft)',
+                            display: 'flex',
+                            gap: 12,
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          <span>{rec.tin}</span>
+                          <span>{formatDate(rec.created_at)}</span>
+                          {tp != null && <span>Tax payable: {formatRM(tp)}</span>}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => selectFiling(rec)}
+                        style={{
+                          padding: '8px 16px',
+                          border: 'none',
+                          background: 'var(--denim)',
+                          color: 'var(--paper)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Defend This Filing
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </>

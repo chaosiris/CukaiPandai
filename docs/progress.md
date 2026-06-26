@@ -1494,3 +1494,51 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - **Before:** 181 passed
 - **After:** 193 passed (+12 new), 0 failed
 - Hard gate: `cd backend && uv run pytest -q` → **193 passed, 1 warning**
+
+---
+
+## [27/06/26] — PR-B: FE-2.1/2.2/2.3/2.4/2.5/2.7 WALKTHROUGH-2 UI refinements `[FE]`
+
+**Branch:** `feat/walkthrough2-fe`.
+
+### What changed
+
+**FE-2.1 — Tooltip viewport-overflow fix (global)**
+
+- `frontend/src/components/Tooltip.tsx`: `reposition()` now applies a viewport-relative `maxWidth` (`Math.min(280, vw - 2*MARGIN)`) directly to the bubble's `style.maxWidth` before measuring; added bottom-edge vertical clamp (`top = vh - bubbleRect.height - MARGIN` when bubble would clip the bottom); added `scroll` + `resize` listeners while open (cleaned up on close). Removed hardcoded `maxWidth: 280` from the bubble's inline style object.
+
+**FE-2.2 -- Row-divider full-bleed CSS (global)**
+
+- `frontend/src/styles/tokens.css`: added `.drawer-hotzone` rule (desktop-only `pointer:fine` + `min-width:768px`); added `.row-list` + `.row-div-list` divider helpers (`* + *` top-border, `:last-child` no bottom border); changed `.requirement-row + .requirement-row` to use `border-top` (removes the doubled bottom-border on the last row).
+- Applied to: `FilingStudio.tsx` (row-div-list on records), `AuditDefense.tsx` (row-div-list on picker rows), `Analytics.tsx` (row-list on ul rows), `FilingPipeline.tsx` (row-div-list on stage rows), `FilingRecord.tsx` (row-div-list on stages).
+
+**FE-2.3 -- Analytics simplification (OQ-1 option b)**
+
+- `frontend/src/pages/Analytics.tsx`: replaced `StatusBreakdown` + `ByFormType` bar-chart components with a single `StatusAndFormCounts` component that renders a 2-column grid of compact `<ul className="row-list">` count rows. `OverdueExposure` remains as the single primary visual with its bar chart. All data signals retained; no bars removed from the primary visual.
+
+**FE-2.4 -- /filing/new auto-save + reorder + provenance InfoTip**
+
+- `frontend/src/api/client.ts`: added `raw_text?: string | null` and `status: 'draft' | 'final'` to `FilingRecord`; added `createDraftFiling()` (POST `/me/filings`, status draft) and `upgradeFiling(id, patch)` (PATCH `/me/filings/{id}`); mock implementations mutate the module-scoped `_mockFilings` store by id.
+- `frontend/src/pages/FilingNew.tsx`: added `draftId` state; resume effect reads `?resume=<id>` param and restores `rawText` + `draftId` from a draft record; `handleClassify` calls `createDraftFiling` best-effort after classify succeeds; `handleCompute` calls `upgradeFiling` (or `saveFiling` fallback) then navigates to `/filing/${targetId}`; removed `handleSave`/`handleReset` and the `'saving'` phase; removed the standalone provenance prose `.window`; result view reordered to ComputationPanel → RiskFlagList → Pipeline card → TechnicalDetailsDisclosure.
+- `frontend/src/components/FilingPipeline.tsx`: `ComputationPanel` gained optional `headingTip?: ReactNode` prop rendered as `<InfoTip>` in the `.titlebar`.
+- `frontend/src/pages/FilingRecord.tsx`: added `Navigate` import; drafts redirect to `/filing/new?resume=${record.id}`; `ComputationPanel` guarded with `{record.computation && ...}`; stages wrapped in `row-div-list`.
+
+**FE-2.5 -- /filing filters**
+
+- `frontend/src/pages/FilingStudio.tsx`: added `SortKey` type + `filterForm`/`filterStatus`/`sortKey` state; derived `formTypes`/`visible`/`sorted` arrays; filter row with three token-CSS `<select>` controls (form type, status, sort); `toggleAll`/`allSelected` operate on `sorted` (visible); draft rows show "Pending" pill (mustard); titlebar shows `{sorted.length} of {records.length} Filings`; records rendered from `sorted`.
+
+**FE-2.7 -- Sidebar reorder + hotzone + wordmark**
+
+- `frontend/src/layouts/AppShell.tsx`: Compliance nav reordered Entity → Obligations → Filing → Audit Defense; `/audit-assistant` added to `WALKTHROUGH_ROUTES`; both brand lockups point to `to="/"`; `drawerPinned` state added (hamburger sets it true; `closeDrawer` clears it); `<div className="drawer-hotzone">` added (invisible, 8px, left edge) with `onMouseEnter` to open the drawer on desktop.
+
+### Deviations from plan
+
+- FE-2.6 (Audit Assistant rename + two-pane workbench) is **out of scope for this PR** (separate PR-C as noted in the plan). The nav label and `WALKTHROUGH_ROUTES` for `/audit-assistant` were added in FE-2.7 in preparation, but the file rename and route change are deferred.
+- `AuditDefense.tsx` picker rows: row-div-list applied to the existing file (not the renamed `AuditAssistant.tsx` -- that rename is in FE-2.6/PR-C).
+- The `drawerPinned` state was added to prevent the hotzone from collapsing a manually-opened drawer, but `closeDrawer` is still triggered on backdrop click as before. The hotzone only triggers open on `mouseEnter`, not close on `mouseLeave` (per OQ-7 lock: "close on click-outside / backdrop close").
+
+### Build + lint status
+
+- `bunx tsc --noEmit` -- clean (0 errors)
+- `bun run build` -- green (83 modules, 0 errors, 0 warnings)
+- `bunx biome check frontend/src` -- **0 errors, 0 warnings**

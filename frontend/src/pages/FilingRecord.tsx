@@ -5,7 +5,7 @@
 // 404 → friendly not-found card.
 
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { type FilingRecord, getFiling } from '../api/client'
 import {
   ComputationPanel,
@@ -177,6 +177,11 @@ export default function FilingRecordPage() {
     )
   }
 
+  // Draft records resume in the editable /filing/new flow
+  if (record.status === 'draft') {
+    return <Navigate to={`/filing/new?resume=${record.id}`} replace />
+  }
+
   const stages = buildFinalizedStages(record)
 
   return (
@@ -204,7 +209,7 @@ export default function FilingRecordPage() {
       </div>
 
       {/* Headline: tax payable card on top */}
-      <ComputationPanel computation={record.computation} title="Tax Computation" />
+      {record.computation && <ComputationPanel computation={record.computation} title="Tax Computation" />}
 
       {/* Provenance note */}
       <div
@@ -258,9 +263,11 @@ export default function FilingRecordPage() {
             FINALIZED
           </span>
         </div>
-        {stages.map((stage) => (
-          <StageRow key={stage.id} stage={stage} isActive={false} />
-        ))}
+        <div className="row-div-list">
+          {stages.map((stage) => (
+            <StageRow key={stage.id} stage={stage} isActive={false} />
+          ))}
+        </div>
 
         {/* Technical details disclosure (collapsible) */}
         <TechnicalDetailsDisclosure computation={record.computation} classifyRouteInfo={null} />

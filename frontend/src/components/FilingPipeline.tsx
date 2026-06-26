@@ -1,8 +1,10 @@
 // Shared pipeline UI primitives reused by /filing/new (creation) and /filing/[id] (saved record).
 // Extracted from FilingStudio.tsx so both pages can import without duplication.
 
+import type { ReactNode } from 'react'
 import type { FormComputation, LineItem, RiskFlag } from '../api/client'
 import { SovereignBadge } from './CitationPanel'
+import { InfoTip } from './Tooltip'
 
 // Figures that represent the final liability
 export const LIABILITY_KEYS = new Set(['tax_payable', 'zakat_offset', 'balance_payable'])
@@ -52,7 +54,6 @@ export function StageRow({ stage, isActive }: { stage: Stage; isActive: boolean 
         alignItems: 'center',
         gap: 12,
         padding: '10px 18px',
-        borderBottom: 'var(--border)',
         background: isActive ? 'var(--screen)' : 'transparent',
         transition: 'background 200ms'
       }}
@@ -208,7 +209,15 @@ export function FigureTraceRow({
 }
 
 /** The main computation card: 96px RM hero + liability + supporting + other figures. */
-export function ComputationPanel({ computation, title }: { computation: FormComputation; title: string }) {
+export function ComputationPanel({
+  computation,
+  title,
+  headingTip
+}: {
+  computation: FormComputation
+  title: string
+  headingTip?: ReactNode
+}) {
   const entries = Object.entries(computation.fields)
   const heroEntry = entries.find(([k]) => k === 'tax_payable')
   const liabilityEntries = entries.filter(([k]) => LIABILITY_KEYS.has(k))
@@ -221,6 +230,7 @@ export function ComputationPanel({ computation, title }: { computation: FormComp
         <span className="titlebar-title">
           {title}: {computation.form}
         </span>
+        {headingTip && <InfoTip content={headingTip} label="How this was calculated" />}
       </div>
 
       {heroEntry && (

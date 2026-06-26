@@ -28,9 +28,15 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
   const reposition = useCallback(() => {
     if (!wrapRef.current || !bubbleRef.current) return
     const triggerRect = wrapRef.current.getBoundingClientRect()
-    const bubbleRect = bubbleRef.current.getBoundingClientRect()
     const vw = window.innerWidth
+    const vh = window.innerHeight
     const MARGIN = 8
+
+    // Apply viewport-relative max-width before measuring so bubbleRect.width reflects wrapping
+    const effectiveMaxWidth = Math.min(280, vw - 2 * MARGIN)
+    bubbleRef.current.style.maxWidth = `${effectiveMaxWidth}px`
+
+    const bubbleRect = bubbleRef.current.getBoundingClientRect()
 
     // Default: centre above the trigger
     let top = triggerRect.top - bubbleRect.height - 6
@@ -39,6 +45,10 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     // Flip below if clips top
     if (top < MARGIN) {
       top = triggerRect.bottom + 6
+    }
+    // Clamp vertically (bottom edge)
+    if (top + bubbleRect.height > vh - MARGIN) {
+      top = vh - bubbleRect.height - MARGIN
     }
     // Clamp horizontally
     if (left < MARGIN) left = MARGIN
@@ -51,7 +61,14 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     if (!open) return
     // Position on next paint once bubble is in the DOM
     const frame = requestAnimationFrame(reposition)
-    return () => cancelAnimationFrame(frame)
+    // Re-clamp on scroll or resize while open
+    window.addEventListener('scroll', reposition, { passive: true })
+    window.addEventListener('resize', reposition, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', reposition)
+      window.removeEventListener('resize', reposition)
+    }
   }, [open, reposition])
 
   // Dismiss on Escape
@@ -89,7 +106,6 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
             top: pos.top,
             left: pos.left,
             zIndex: 200,
-            maxWidth: 280,
             padding: '8px 11px',
             background: 'var(--window)',
             border: 'var(--border)',

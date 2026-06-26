@@ -8,7 +8,15 @@ import { useTheme } from '../hooks/useTheme'
 import { type NotifKind, useNotifications } from '../notifications'
 
 // GR-4: routes where the ? walkthrough button is visible (Workspace + Compliance only)
-const WALKTHROUGH_ROUTES = ['/dashboard', '/analytics', '/obligations', '/filing', '/audit-defense', '/entity']
+const WALKTHROUGH_ROUTES = [
+  '/dashboard',
+  '/analytics',
+  '/obligations',
+  '/filing',
+  '/audit-defense',
+  '/audit-assistant',
+  '/entity'
+]
 
 function isWalkthroughRoute(pathname: string): boolean {
   return WALKTHROUGH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))
@@ -250,7 +258,9 @@ export function AppShell() {
     }
   }, [activePopover])
 
-  const closeDrawer = () => setDrawerOpen(false)
+  const closeDrawer = () => {
+    setDrawerOpen(false)
+  }
 
   function toggleNotifications() {
     setActivePopover((prev) => {
@@ -273,22 +283,24 @@ export function AppShell() {
         <DemoModeBanner />
         <header className="topbar">
           <div className="topbar-inner">
-            {/* Hamburger */}
+            {/* Hamburger — manual open/toggle (also pins so hover-close doesn't fight) */}
             <button
               className="icon-button"
               type="button"
               aria-label="Open navigation"
               aria-expanded={drawerOpen}
               aria-controls="cp-drawer"
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => {
+                setDrawerOpen(true)
+              }}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeLinecap="round" />
               </svg>
             </button>
 
-            {/* Brand lockup */}
-            <Link className="brand-lockup" to="/dashboard" aria-label="CukaiPandai dashboard">
+            {/* Brand lockup — routes to landing page */}
+            <Link className="brand-lockup" to="/" aria-label="CukaiPandai home">
               <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="topbar-wordmark">CukaiPandai</span>
             </Link>
@@ -430,6 +442,16 @@ export function AppShell() {
         </main>
       </div>
 
+      {/* Left-edge hover zone — desktop only (pointer:fine). Opens drawer on hover-in; */}
+      {/* drawer closes via the existing click-outside/backdrop (NOT on cursor-leave). */}
+      <div
+        aria-hidden="true"
+        className="drawer-hotzone"
+        onMouseEnter={() => {
+          if (!drawerOpen) setDrawerOpen(true)
+        }}
+      />
+
       {/* Slide-in navigation drawer */}
       <div className={`drawer-layer${drawerOpen ? ' is-open' : ''}`} aria-hidden={!drawerOpen}>
         <button
@@ -441,12 +463,7 @@ export function AppShell() {
         />
         <aside className="window nav-drawer" id="cp-drawer" aria-label="CukaiPandai navigation">
           <div className="drawer-head">
-            <Link
-              className="brand-lockup drawer-brand"
-              to="/dashboard"
-              aria-label="CukaiPandai dashboard"
-              onClick={closeDrawer}
-            >
+            <Link className="brand-lockup drawer-brand" to="/" aria-label="CukaiPandai home" onClick={closeDrawer}>
               <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
               <span className="drawer-wordmark">CukaiPandai</span>
             </Link>
@@ -465,6 +482,9 @@ export function AppShell() {
 
             <div className="drawer-section">
               <div className="drawer-section-title">Compliance</div>
+              <NavLink className={drawerLinkClass} to="/entity" onClick={closeDrawer}>
+                Entity
+              </NavLink>
               <NavLink className={drawerLinkClass} to="/obligations" onClick={closeDrawer}>
                 Obligations
               </NavLink>
@@ -473,9 +493,6 @@ export function AppShell() {
               </NavLink>
               <NavLink className={drawerLinkClass} to="/audit-defense" onClick={closeDrawer}>
                 Audit Defense
-              </NavLink>
-              <NavLink className={drawerLinkClass} to="/entity" onClick={closeDrawer}>
-                Entity
               </NavLink>
             </div>
 
