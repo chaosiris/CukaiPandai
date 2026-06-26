@@ -1421,3 +1421,49 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 
 - `frontend/src/pages/Analytics.tsx` (full rewrite)
 - `docs/progress.md` (this entry)
+
+---
+
+## [26/06/26] — Settings symmetry, persona "(Demo)" labels, My Company persona, empty-entity guard `[FE]`
+
+### What changed
+
+**1. Settings layout symmetry**
+
+- `Settings.tsx`: added `settings-card--wide` to the Workspace `<section>` so all three cards (Appearance, Workspace, Reset) span both columns and are visually symmetrical.
+
+**2. Seed persona "(Demo)" suffix**
+
+- `personas.ts`: renamed the three seed labels: "Acme Trading" to "Acme Trading (Demo)", "Sinar Digital" to "Sinar Digital (Demo)", "Selera Kita" to "Selera Kita (Demo)". Propagates to the selector and every heading that reads `persona.label`.
+
+**3. Always-present "My Company" persona**
+
+- `personas.ts`: added `EMPTY_CUSTOM_SSM` (blank tin, empty arrays, 0 numerics, false SST, empty dates) and exported `isEntityIncomplete(ssm)` (true when `ssm.tin` does not match `^[A-Z][0-9]{10}$`).
+- `PersonaContext.tsx`: `MY_COMPANY_PLACEHOLDER` constant holds the empty-SSM persona. `allPersonas` is always `[...PERSONAS, customPersona ?? MY_COMPANY_PLACEHOLDER]` -- "My Company" is always the fourth option. `buildCustomPersona` label changed from `My Company (${tin})` to `My Company`. `addCustomPersona` label updated to match. `readDefaultPersona` initializer now searches `[...PERSONAS, MY_COMPANY_PLACEHOLDER]` so a stored `CUSTOM` default resolves correctly on first render.
+- `hooks/useEntity.ts`: replaced `customPersonas.find(...)` logic with an `isMalaysianTin` guard -- any non-Malaysian-format TIN (e.g. `'CUSTOM'`) resolves directly from the `personas` list in context, covering both a hydrated backend profile and the empty placeholder. No network call is made for non-TIN tokens.
+
+**4. Graceful empty My Company handling**
+
+- `Dashboard.tsx`: `isEntityIncomplete(persona.ssm)` computed before the effect; effect returns early when entity is empty (no `getObligations` call); early JSX return renders a `.window` card with "Set up your company to see this. Add your details in the Entity page." and a link to `/entity`.
+- `ObligationRadar.tsx`: same guard pattern -- effect skips `getObligations`; early return renders the same prompt. Added `Link` import from `react-router-dom`.
+- `Analytics.tsx`: same guard -- effect skips `getObligations`; early return before computed KPI variables.
+- `FilingNew.tsx`: early return after `entityEmpty` check -- no classify/upload/compute calls. Added `Link` import from `react-router-dom`.
+- `AuditDefense.tsx`: not guarded (filing-driven, uses `listFilings` not entity TIN directly); confirmed it does not crash with an empty entity -- `useEntity` returns the empty-SSM object, not an error.
+
+### Hard gates
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: **81 modules**, 353 KB JS, 49 KB CSS, built green
+- `bunx biome check frontend/src`: 0 errors (44 files checked)
+
+### Files touched
+
+- `frontend/src/pages/Settings.tsx`
+- `frontend/src/personas.ts`
+- `frontend/src/PersonaContext.tsx`
+- `frontend/src/hooks/useEntity.ts`
+- `frontend/src/pages/Dashboard.tsx`
+- `frontend/src/pages/ObligationRadar.tsx`
+- `frontend/src/pages/Analytics.tsx`
+- `frontend/src/pages/FilingNew.tsx`
+- `docs/progress.md` (this entry)

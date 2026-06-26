@@ -5,7 +5,7 @@
 // "How this was calculated" provenance note: deterministic rule-based core, not the AI.
 
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import {
   type ClassifyResponse,
@@ -30,6 +30,7 @@ import {
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
+import { isEntityIncomplete } from '../personas'
 
 function buildSsm(entity: {
   tin: string
@@ -187,8 +188,54 @@ export default function FilingNew() {
               ? 'finalized'
               : null
 
+  const entityEmpty = entity ? isEntityIncomplete(entity) : false
   const displayError = entityError ?? (phase.tag === 'error' ? phase.message : null)
   const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'computing' || phase.tag === 'saving'
+
+  if (!entityLoading && entityEmpty) {
+    return (
+      <>
+        <div className="page-head">
+          <h1>New Filing</h1>
+          <p className="page-kicker">Classify your trial balance and compute a cited Form C.</p>
+        </div>
+        <div className="window" style={{ marginTop: 16 }}>
+          <div className="titlebar">
+            <span className="titlebar-title">Set Up Your Company</span>
+          </div>
+          <div
+            style={{
+              padding: '20px 18px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.7
+            }}
+          >
+            Set up your company to see this. Add your details in the Entity page.
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            <Link
+              to="/entity"
+              style={{
+                display: 'inline-block',
+                padding: '8px 20px',
+                background: 'var(--denim)',
+                color: 'var(--paper)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+                borderRadius: 'var(--radius)'
+              }}
+            >
+              Go to Entity Page
+            </Link>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   async function handleClassify() {
     if (!entity) return

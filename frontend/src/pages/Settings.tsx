@@ -80,7 +80,7 @@ export default function Settings() {
           </section>
 
           {/* Workspace */}
-          <section className="settings-card" aria-labelledby="workspace-title">
+          <section className="settings-card settings-card--wide" aria-labelledby="workspace-title">
             <div className="settings-card-head">
               <h2 id="workspace-title">Workspace</h2>
               <span className="settings-card-note">Entity</span>

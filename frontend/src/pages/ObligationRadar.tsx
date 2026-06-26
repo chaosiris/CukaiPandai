@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
 import { InfoTip, Tooltip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
+import { isEntityIncomplete } from '../personas'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -277,8 +279,10 @@ export default function ObligationRadar() {
   const [data, setData] = useState<ObligationCalendar | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const entityEmpty = entity ? isEntityIncomplete(entity) : false
+
   useEffect(() => {
-    if (!entity) return
+    if (!entity || entityEmpty) return
     getObligations(entity.tin, {
       tin: entity.tin,
       entity_type: entity.entity_type,
@@ -293,10 +297,55 @@ export default function ObligationRadar() {
     })
       .then(setData)
       .catch((e: Error) => setError(e.message))
-  }, [entity])
+  }, [entity, entityEmpty])
 
   const displayError = entityError ?? error
   const sorted = data ? [...data.obligations].sort((a, b) => a.due_date.localeCompare(b.due_date)) : []
+
+  if (!entityLoading && entityEmpty) {
+    return (
+      <>
+        <div className="page-head">
+          <h1>Obligation Calendar</h1>
+          <p className="page-kicker">YA2026 deadlines derived from your entity profile.</p>
+        </div>
+        <div className="window">
+          <div className="titlebar">
+            <span className="titlebar-title">Set Up Your Company</span>
+          </div>
+          <div
+            style={{
+              padding: '20px 18px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.7
+            }}
+          >
+            Set up your company to see this. Add your details in the Entity page.
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            <Link
+              to="/entity"
+              style={{
+                display: 'inline-block',
+                padding: '8px 20px',
+                background: 'var(--denim)',
+                color: 'var(--paper)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+                borderRadius: 'var(--radius)'
+              }}
+            >
+              Go to Entity Page
+            </Link>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>

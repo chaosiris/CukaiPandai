@@ -12,10 +12,29 @@ export interface Persona {
   demoRawText: string
 }
 
+/** Empty SSM placeholder for My Company before the user fills in their details. */
+export const EMPTY_CUSTOM_SSM: SsmProfile = {
+  tin: '',
+  entity_type: 'sdn_bhd',
+  msic_codes: [],
+  paid_up_capital: 0,
+  gross_income: 0,
+  employee_count: 0,
+  sst_registered: false,
+  basis_period_start: '',
+  basis_period_end: '',
+  commencement_date: ''
+}
+
+/** Returns true when the entity has no valid TIN (blank or malformed). */
+export function isEntityIncomplete(ssm: SsmProfile): boolean {
+  return !/^[A-Z][0-9]{10}$/.test(ssm.tin)
+}
+
 export const PERSONAS: Persona[] = [
   {
     tin: ACME_TIN,
-    label: 'Acme Trading',
+    label: 'Acme Trading (Demo)',
     ssm: ACME_SSM,
     demoRawText: `Revenue  5000000
 Salaries and wages  2000000
@@ -24,7 +43,7 @@ Depreciation  120000`
   },
   {
     tin: 'C7654321098',
-    label: 'Sinar Digital',
+    label: 'Sinar Digital (Demo)',
     ssm: {
       tin: 'C7654321098',
       entity_type: 'sdn_bhd',
@@ -44,7 +63,7 @@ Depreciation  12000`
   },
   {
     tin: 'C3219876540',
-    label: 'Selera Kita',
+    label: 'Selera Kita (Demo)',
     ssm: {
       tin: 'C3219876540',
       entity_type: 'sdn_bhd',

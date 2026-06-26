@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
 import { InfoTip } from '../components/Tooltip'
+import { isEntityIncomplete } from '../personas'
 
 // Shared date helpers (same logic as Dashboard and ObligationRadar)
 
@@ -417,7 +418,10 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const entityEmpty = isEntityIncomplete(persona.ssm)
+
   useEffect(() => {
+    if (entityEmpty) return
     setLoading(true)
     setError(null)
     setCalendar(null)
@@ -430,7 +434,54 @@ export default function Analytics() {
         setError(err.message)
         setLoading(false)
       })
-  }, [persona.tin, persona.ssm])
+  }, [persona.tin, persona.ssm, entityEmpty])
+
+  if (entityEmpty) {
+    return (
+      <>
+        <header className="page-head">
+          <div>
+            <h1>Analytics</h1>
+            <div className="page-kicker">YA2026 compliance at a glance.</div>
+          </div>
+        </header>
+        <div className="window">
+          <div className="titlebar">
+            <span className="titlebar-title">Set Up Your Company</span>
+          </div>
+          <div
+            style={{
+              padding: '20px 18px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.7
+            }}
+          >
+            Set up your company to see this. Add your details in the Entity page.
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            <Link
+              to="/entity"
+              style={{
+                display: 'inline-block',
+                padding: '8px 20px',
+                background: 'var(--denim)',
+                color: 'var(--paper)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+                borderRadius: 'var(--radius)'
+              }}
+            >
+              Go to Entity Page
+            </Link>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   const obligations: Obligation[] = calendar?.obligations ?? []
 

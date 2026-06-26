@@ -5,7 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { type SsmProfile, getMyEntity, putMyEntity } from './api/client'
-import { DEFAULT_PERSONA, PERSONAS, type Persona } from './personas'
+import { DEFAULT_PERSONA, EMPTY_CUSTOM_SSM, PERSONAS, type Persona } from './personas'
 
 export const DEFAULT_PERSONA_KEY = 'cp_default_persona'
 
@@ -24,10 +24,17 @@ function readDefaultPersona(allPersonas: Persona[]): Persona {
 function buildCustomPersona(ssm: SsmProfile): Persona {
   return {
     tin: CUSTOM_PERSONA_TIN,
-    label: `My Company (${ssm.tin})`,
+    label: 'My Company',
     ssm,
     demoRawText: ''
   }
+}
+
+const MY_COMPANY_PLACEHOLDER: Persona = {
+  tin: CUSTOM_PERSONA_TIN,
+  label: 'My Company',
+  ssm: EMPTY_CUSTOM_SSM,
+  demoRawText: ''
 }
 
 interface PersonaContextValue {
@@ -51,7 +58,7 @@ interface PersonaContextValue {
 const PersonaContext = createContext<PersonaContextValue>({
   persona: DEFAULT_PERSONA,
   setPersona: () => undefined,
-  personas: PERSONAS,
+  personas: [...PERSONAS, MY_COMPANY_PLACEHOLDER],
   customPersonas: [],
   addCustomPersona: () => undefined,
   activateCustomPersona: () => undefined,
@@ -77,12 +84,13 @@ export function ActivePersonaProvider({ children }: { children: React.ReactNode 
       })
   }, [])
 
-  const allPersonas = useMemo(() => (customPersona ? [...PERSONAS, customPersona] : PERSONAS), [customPersona])
+  const allPersonas = useMemo(() => [...PERSONAS, customPersona ?? MY_COMPANY_PLACEHOLDER], [customPersona])
 
-  const [persona, setPersonaState] = useState<Persona>(() => readDefaultPersona(PERSONAS))
+  const [persona, setPersonaState] = useState<Persona>(() => readDefaultPersona([...PERSONAS, MY_COMPANY_PLACEHOLDER]))
 
-  // Once the backend hydrates the custom persona, switch to it if nothing else is active
-  // (i.e., the user's last chosen persona was "Custom").
+  // Once the backend hydrates, switch to the real custom persona if the user had "My Company"
+  // selected. If there is no backend profile, the placeholder (empty) remains active as
+  // initialised above -- no switch needed.
   useEffect(() => {
     if (!entityReady) return
     const stored = window.localStorage.getItem(DEFAULT_PERSONA_KEY)
@@ -107,7 +115,7 @@ export function ActivePersonaProvider({ children }: { children: React.ReactNode 
         ...p,
         // Normalise to the stable CUSTOM_PERSONA_TIN so context tracks it consistently.
         tin: CUSTOM_PERSONA_TIN,
-        label: `My Company (${p.ssm.tin})`
+        label: 'My Company'
       }
       setCustomPersona(newPersona)
       setPersona(newPersona)

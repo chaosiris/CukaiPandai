@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
 import { JourneyStrip } from '../components/JourneyProgress'
+import { isEntityIncomplete } from '../personas'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -327,7 +328,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const entityEmpty = isEntityIncomplete(persona.ssm)
+
   useEffect(() => {
+    if (entityEmpty) return
     setLoading(true)
     setError(null)
     setCalendar(null)
@@ -340,11 +344,59 @@ export default function Dashboard() {
         setError(err.message)
         setLoading(false)
       })
-  }, [persona.tin, persona.ssm])
+  }, [persona.tin, persona.ssm, entityEmpty])
 
   const obligations = calendar?.obligations ?? []
   const lead = leadObligation(obligations)
   const overdueCount = obligations.filter((o) => daysUntil(o.due_date) < 0).length
+
+  if (entityEmpty) {
+    return (
+      <>
+        {!journeyDone && <JourneyStrip done={false} currentRoute={location.pathname} />}
+        <div className="dash-head">
+          <h1>{greeting()}</h1>
+          <p className="dash-orient">
+            Your YA2026 tax command center for <strong>{persona.label}</strong>.
+          </p>
+        </div>
+        <div className="window" style={{ padding: '32px 24px', display: 'grid', gap: 12 }}>
+          <div className="titlebar">
+            <span className="titlebar-title">Set Up Your Company</span>
+          </div>
+          <div
+            style={{
+              padding: '20px 18px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.7
+            }}
+          >
+            Set up your company to see this. Add your details in the Entity page.
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            <Link
+              to="/entity"
+              style={{
+                display: 'inline-block',
+                padding: '8px 20px',
+                background: 'var(--denim)',
+                color: 'var(--paper)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: 'none',
+                borderRadius: 'var(--radius)'
+              }}
+            >
+              Go to Entity Page
+            </Link>
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>

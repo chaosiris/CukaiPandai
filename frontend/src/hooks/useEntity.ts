@@ -2,13 +2,15 @@
 // EN-2: the "Custom" persona is now hydrated from the backend (PersonaContext) rather than
 // localStorage, so resolving a custom TIN returns the backend-sourced profile with no
 // white-screen (the data is already in context by the time consoles mount).
+// "My Company" is always present in personas; when no backend profile exists it holds an
+// empty placeholder SSM. Callers check isEntityIncomplete() before fetching.
 
 import { useEffect, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
 import { type EntityTaxProfile, getEntity } from '../api/client'
 
 export function useEntity(tin?: string) {
-  const { persona, customPersonas } = useActivePersona()
+  const { persona, personas } = useActivePersona()
   const resolvedTin = tin ?? persona.tin
 
   const [entity, setEntity] = useState<EntityTaxProfile | null>(null)
@@ -19,11 +21,12 @@ export function useEntity(tin?: string) {
     setLoading(true)
     setError(null)
 
-    // EN-2: if the TIN belongs to the "Custom" persona, resolve from context (backend-sourced)
-    // without any network call — avoids 404 for custom TINs and no white-screen.
-    const customMatch = customPersonas.find((p) => p.tin === resolvedTin)
-    if (customMatch) {
-      setEntity(customMatch.ssm as EntityTaxProfile)
+    // EN-2: if the TIN is not a real Malaysian TIN (e.g. 'CUSTOM'), resolve from the personas
+    // list in context — covers both a hydrated backend profile and the empty My Company placeholder.
+    const isMalaysianTin = /^[A-Z][0-9]{10}$/.test(resolvedTin)
+    if (!isMalaysianTin) {
+      const match = personas.find((p) => p.tin === resolvedTin)
+      setEntity((match?.ssm ?? null) as EntityTaxProfile | null)
       setLoading(false)
       return
     }
@@ -38,7 +41,7 @@ export function useEntity(tin?: string) {
         setError(err.message)
         setLoading(false)
       })
-  }, [resolvedTin, customPersonas])
+  }, [resolvedTin, personas])
 
   return { entity, error, loading }
 }
