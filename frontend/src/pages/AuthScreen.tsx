@@ -76,10 +76,12 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         client_id: GOOGLE_CLIENT_ID as string,
         callback: (r) => void handleGoogleCredential(r.credential)
       })
+      // Match the full width of the inputs/buttons below (GIS takes a fixed px width, clamped 200–400).
+      const width = Math.min(400, Math.max(200, Math.round(googleBtnRef.current.offsetWidth) || 360))
       window.google.accounts.id.renderButton(googleBtnRef.current, {
         theme: 'outline',
         size: 'large',
-        width: 320,
+        width,
         text: isSignIn ? 'signin_with' : 'signup_with'
       })
     }
