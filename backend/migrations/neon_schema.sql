@@ -66,5 +66,16 @@ CREATE TABLE IF NOT EXISTS filing_records (
     computation jsonb,
     risk_flags  jsonb,
     line_items  jsonb,
-    created_at  timestamptz NOT NULL DEFAULT now()
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    -- BE-2.1 (additive): status tracks draft→final lifecycle; raw_text stores the
+    -- original trial-balance input for full resume. Existing rows backfill status='final'
+    -- and raw_text=NULL — no row becomes invalid; computation stays nullable as-is.
+    status     text NOT NULL DEFAULT 'final',
+    raw_text   text
 );
+
+-- BE-2.1 — additive migration for existing filing_records tables (idempotent).
+-- Existing rows backfill status='final'; computation was already nullable; no column is
+-- dropped or retyped. Safe to run on any DB that has filing_records already created.
+ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'final';
+ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS raw_text text;

@@ -1467,3 +1467,30 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `frontend/src/pages/Analytics.tsx`
 - `frontend/src/pages/FilingNew.tsx`
 - `docs/progress.md` (this entry)
+
+---
+
+## [27/06/26] — BE-2.1: filing draft/pending persistence + PATCH upgrade endpoint `[BE]`
+
+**Branch:** `feat/filing-draft-persistence` (PR-A; not yet merged).
+
+### What changed
+
+- `backend/migrations/neon_schema.sql`: added `status text NOT NULL DEFAULT 'final'` and `raw_text text` to the `CREATE TABLE IF NOT EXISTS filing_records` inline DDL, plus two additive `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for existing tables. Existing rows backfill `status='final'`; `raw_text` stays `NULL`. No column dropped or retyped.
+- `backend/api/schemas.py`: made `FilingRecordReq.computation` optional (`dict | None = None`); added `status: str = "final"` and `raw_text: str | None = None` to `FilingRecordReq`; added new `FilingRecordPatch` model (all fields optional: `computation`, `risk_flags`, `line_items`, `status`, `label`, `raw_text`).
+- `backend/api/persistence.py` (`FilingRepository`): `_ensure_table` now includes `status`/`raw_text` columns + runs the additive `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migrations on connect. `create()` threads `status` (defaulting to `"final"`) and `raw_text` into both in-memory and Neon INSERT. `list()`/`get()` SELECTs include `status`/`raw_text` with `COALESCE(status, 'final')` for legacy Neon rows. Added `_coalesce()` helper to backfill legacy in-memory records without `status`/`raw_text` keys. Added `update(owner, rec_id, patch)` method: in-memory update first, then best-effort Neon `UPDATE ... RETURNING`; returns `None` if not owned/absent.
+- `backend/api/main.py`: imported `FilingRecordPatch`; added `PATCH /me/filings/{rec_id}` endpoint (owner via `_owner` dependency; partial body; 404 on missing/foreign; 422 on bad body).
+- `backend/tests/api/test_me_filings_endpoint.py`: updated `_BAD_BODY` to use `computation: "not-a-dict"` (old body was `{"tin": "X"}` which tested `computation` required -- now optional by design).
+- `backend/tests/api/test_filing_drafts.py`: NEW file, 12 tests covering: create-draft returns status/id; draft in list; PATCH draft-to-final same id; list length unchanged after upgrade; PATCH foreign owner 404; PATCH missing id 404; PATCH no token 401; PATCH bad computation type 422; legacy record without status reads final; legacy final POST defaults status; per-owner isolation; multi-delete on draft.
+
+### Deviations from plan
+
+- Gate-1 Resolution OQ-3b/OQ-4 (FULL RESUME): `raw_text` additive column added (per the Gate-1 lock); `FilingRecordReq`/`FilingRecordPatch` carry it through.
+- No `id` field on `FilingRecordReq` -- the plan notes either path param or an id field is acceptable; path param (`PATCH /me/filings/{rec_id}`) was used as planned.
+- `test_create_bad_body_422` in the existing test file updated (not a regression -- the old sentinel body became valid after `computation` was made optional; the test now uses an actually-invalid body).
+
+### Test status
+
+- **Before:** 181 passed
+- **After:** 193 passed (+12 new), 0 failed
+- Hard gate: `cd backend && uv run pytest -q` → **193 passed, 1 warning**
