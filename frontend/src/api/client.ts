@@ -505,6 +505,39 @@ function authHeaders(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
+/**
+ * Guarantee a session token before an authenticated `/me/*` request. The app is guest-first: a user
+ * can reach the consoles via the demo persona / journey path (or after their token was cleared)
+ * without ever clicking "Continue as Guest", which previously made `/me/*` fail with
+ * "Missing bearer token". Mint a shared-guest token on demand instead. Best-effort: if the mint
+ * fails, the caller still surfaces its own auth error. Concurrent callers de-dupe on one in-flight mint.
+ */
+let _guestMint: Promise<void> | null = null
+async function ensureSession(): Promise<void> {
+  if (MOCK_MODE || getToken()) return
+  if (!_guestMint) {
+    _guestMint = authGuest()
+      .then((res) => {
+        setToken(res.token)
+        // Persist the guest markers so AuthContext hydrates consistently on the next load
+        // (keys mirror AuthContext: cp_user + cp_entered_as_guest).
+        try {
+          localStorage.setItem('cp_user', JSON.stringify(res.user))
+          localStorage.setItem('cp_entered_as_guest', '1')
+        } catch {
+          // localStorage unavailable — the token in memory still authorizes this session
+        }
+      })
+      .catch(() => {
+        // leave tokenless — the /me call will surface its own error
+      })
+      .finally(() => {
+        _guestMint = null
+      })
+  }
+  await _guestMint
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { headers: { ...authHeaders() } })
   return handleResponse<T>(res)
@@ -752,6 +785,7 @@ export async function getMyEntity(): Promise<EntityTaxProfile> {
     if (!_mockMyEntity) throw new Error('404 No entity profile saved')
     return _mockMyEntity
   }
+  await ensureSession()
   return get<EntityTaxProfile>('/me/entity')
 }
 
@@ -761,6 +795,7 @@ export async function putMyEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
     _mockMyEntity = { ...ssm }
     return _mockMyEntity
   }
+  await ensureSession()
   const res = await fetch(`${BASE_URL}/me/entity`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -794,6 +829,7 @@ function _mockFilingId(): string {
 /** GET /me/filings — list the current user's filing records, newest first. */
 export async function listFilings(): Promise<FilingRecord[]> {
   if (MOCK_MODE) return [..._mockFilings]
+  await ensureSession()
   return get<FilingRecord[]>('/me/filings')
 }
 
@@ -819,6 +855,7 @@ export async function saveFiling(body: {
     _mockFilings = [rec, ..._mockFilings]
     return rec
   }
+  await ensureSession()
   return post<FilingRecord>('/me/filings', body)
 }
 
@@ -829,6 +866,7 @@ export async function getFiling(id: string): Promise<FilingRecord> {
     if (!rec) throw new Error(`404 Filing ${id} not found`)
     return rec
   }
+  await ensureSession()
   return get<FilingRecord>(`/me/filings/${id}`)
 }
 
@@ -838,6 +876,7 @@ export async function deleteFiling(id: string): Promise<{ deleted: string }> {
     _mockFilings = _mockFilings.filter((r) => r.id !== id)
     return { deleted: id }
   }
+  await ensureSession()
   const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
     method: 'DELETE',
     headers: { ...authHeaders() }
@@ -851,6 +890,7 @@ export async function deleteFilings(ids: string[]): Promise<{ deleted: string[] 
     _mockFilings = _mockFilings.filter((r) => !ids.includes(r.id))
     return { deleted: ids }
   }
+  await ensureSession()
   const res = await fetch(`${BASE_URL}/me/filings`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
