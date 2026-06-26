@@ -1397,12 +1397,24 @@ a {
 }
 
 /* primary zone: dominant hero + secondary console rail */
-.dash-primary-grid {
+.dash-main-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
-  gap: 20px;
+  column-gap: 20px;
+  row-gap: 22px;
   margin-top: 8px;
   align-items: stretch;
+}
+
+.dash-main-lead {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.dash-main-deadlines {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
 }
 
 /* the hero: the one visually dominant next-step card */
@@ -1571,9 +1583,11 @@ a {
 
 /* secondary console rail — clear hierarchy, not three flat cards */
 .dash-consoles {
+  grid-column: 2;
+  grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .dash-consoles-head {
@@ -1587,7 +1601,11 @@ a {
 }
 
 .dash-console {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 0;
+  min-height: 0;
   padding: 13px 15px;
   border: var(--border);
   border-radius: var(--radius);
@@ -1595,8 +1613,28 @@ a {
   box-shadow: var(--shadow);
   color: var(--ink);
   text-decoration: none;
+  overflow: hidden;
   transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 140ms cubic-bezier(0.4, 0, 0.2, 1), border-color
     140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-console-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dash-console-mascot {
+  flex-shrink: 0;
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  align-self: center;
+  pointer-events: none;
+}
+
+.dash-console.is-primary .dash-console-mascot {
+  width: 92px;
+  height: 92px;
 }
 
 .dash-console:hover {
@@ -1642,25 +1680,30 @@ a {
   color: var(--denim);
 }
 
-/* overview row — balanced columns, equal heights */
-.dash-overview-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
-  gap: 20px;
-  margin-top: 22px;
-  align-items: stretch;
-}
-
 .dash-panel {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 @media (max-width: 900px) {
-  .dash-primary-grid,
-  .dash-overview-grid {
+  .dash-main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dash-main-lead,
+  .dash-main-deadlines,
+  .dash-consoles {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  /* stacked single column: cards size to content instead of stretching equally */
+  .dash-console {
+    flex: 0 0 auto;
+    min-height: auto;
   }
 
   .dash-hero-rail {

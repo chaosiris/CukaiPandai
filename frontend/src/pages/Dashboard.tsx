@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
-import { JourneyStrip } from '../components/JourneyProgress'
 import { isEntityIncomplete } from '../personas'
 
 function greeting(): string {
@@ -140,7 +139,8 @@ const PRIMARY_CONSOLE = {
   to: '/filing',
   title: 'Cited Form C Filing',
   desc: 'Classify your trial balance and step through the human-approval gate to a cited Form C.',
-  kicker: 'Review and Approve · ILMU nemo-super'
+  kicker: 'Review and Approve · ILMU nemo-super',
+  mascot: '/mascots/pandai-writing.png'
 }
 
 const SECONDARY_CONSOLES = [
@@ -148,13 +148,15 @@ const SECONDARY_CONSOLES = [
     to: '/obligations',
     title: 'Obligation Calendar',
     desc: 'Every YA2026 deadline derived from your entity profile.',
-    kicker: 'Deterministic · LHDN-sourced'
+    kicker: 'Deterministic · LHDN-sourced',
+    mascot: '/mascots/pandai-calendar.png'
   },
   {
     to: '/audit-defense',
     title: 'Audit Defense',
     desc: 'Build a citation-grounded defense pack; fabricated clauses are rejected.',
-    kicker: 'RAG · ground_citation gate'
+    kicker: 'RAG · ground_citation gate',
+    mascot: '/mascots/pandai-assistant.png'
   }
 ]
 
@@ -164,16 +166,22 @@ function QuickAccess() {
       <div className="dash-consoles-head">What You Can Do</div>
 
       <Link to={PRIMARY_CONSOLE.to} className="dash-console is-primary">
-        <div className="dash-console-title">{PRIMARY_CONSOLE.title}</div>
-        <p className="dash-console-desc">{PRIMARY_CONSOLE.desc}</p>
-        <div className="dash-console-kicker">{PRIMARY_CONSOLE.kicker}</div>
+        <div className="dash-console-body">
+          <div className="dash-console-title">{PRIMARY_CONSOLE.title}</div>
+          <p className="dash-console-desc">{PRIMARY_CONSOLE.desc}</p>
+          <div className="dash-console-kicker">{PRIMARY_CONSOLE.kicker}</div>
+        </div>
+        <img className="dash-console-mascot" src={PRIMARY_CONSOLE.mascot} alt="" aria-hidden="true" />
       </Link>
 
       {SECONDARY_CONSOLES.map((c) => (
         <Link key={c.to} to={c.to} className="dash-console">
-          <div className="dash-console-title">{c.title}</div>
-          <p className="dash-console-desc">{c.desc}</p>
-          <div className="dash-console-kicker">{c.kicker}</div>
+          <div className="dash-console-body">
+            <div className="dash-console-title">{c.title}</div>
+            <p className="dash-console-desc">{c.desc}</p>
+            <div className="dash-console-kicker">{c.kicker}</div>
+          </div>
+          <img className="dash-console-mascot" src={c.mascot} alt="" aria-hidden="true" />
         </Link>
       ))}
     </div>
@@ -310,20 +318,10 @@ function DeadlinesPanel({
   )
 }
 
-function readJourneyDone(): boolean {
-  try {
-    return localStorage.getItem('cp_journey_done') === '1'
-  } catch {
-    return false
-  }
-}
-
 // ---- Dashboard ----
 
 export default function Dashboard() {
   const { persona } = useActivePersona()
-  const location = useLocation()
-  const journeyDone = readJourneyDone()
   const [calendar, setCalendar] = useState<ObligationCalendar | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -353,7 +351,6 @@ export default function Dashboard() {
   if (entityEmpty) {
     return (
       <>
-        {!journeyDone && <JourneyStrip done={false} currentRoute={location.pathname} />}
         <div className="dash-head">
           <h1>{greeting()}</h1>
           <p className="dash-orient">
@@ -400,9 +397,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* GR-1: hide the journey strip once the walkthrough is complete */}
-      {!journeyDone && <JourneyStrip done={false} currentRoute={location.pathname} />}
-
       <div className="dash-head">
         <h1>{greeting()}</h1>
         <p className="dash-orient">
@@ -411,14 +405,16 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="dash-primary-grid">
-        <PrimaryAction lead={lead} overdueCount={overdueCount} />
+      {/* Left column stacks the next-step hero over Upcoming Deadlines; the quick-access
+          rail spans both rows on the right, so its last card aligns with the deadlines panel. */}
+      <div className="dash-main-grid">
+        <div className="dash-main-lead">
+          <PrimaryAction lead={lead} overdueCount={overdueCount} />
+        </div>
         <QuickAccess />
-      </div>
-
-      {/* GR-5: Entity Snapshot removed (lives on /entity). Deadlines + Audit Defense align at bottom. */}
-      <div className="dash-overview-grid">
-        <DeadlinesPanel calendar={calendar} loading={loading} error={error} />
+        <div className="dash-main-deadlines">
+          <DeadlinesPanel calendar={calendar} loading={loading} error={error} />
+        </div>
       </div>
     </>
   )
