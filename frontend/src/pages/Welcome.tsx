@@ -61,33 +61,13 @@ export default function Welcome() {
     <div
       className="welcome-layout"
       style={{
-        maxWidth: 980,
+        maxWidth: 680,
         margin: '0 auto',
-        padding: '40px 0 80px',
-        display: 'grid',
-        gridTemplateColumns: 'min(220px, 28vw) minmax(0, 680px)',
-        gap: '40px',
-        alignItems: 'start'
+        padding: '40px 0 80px'
       }}
     >
-      {/* Mascot column — decorative, desktop only */}
-      <div
-        className="welcome-mascot-col"
-        aria-hidden="true"
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          paddingTop: 8,
-          position: 'sticky',
-          top: 32
-        }}
-      >
-        <img
-          src="/pandai-waving.png"
-          alt=""
-          style={{ width: '100%', maxWidth: 200, height: 'auto', objectFit: 'contain' }}
-        />
-      </div>
+      {/* Mascot — decorative, pinned to the viewport (fixed) beside the centered content on wide screens */}
+      <img className="welcome-mascot-fixed" src="/pandai-waving.png" alt="" aria-hidden="true" />
 
       {/* Content column */}
       <div>

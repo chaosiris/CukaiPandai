@@ -1,10 +1,19 @@
-/* Collapse mascot column on narrow screens */
-@media (max-width: 700px) {
-  .welcome-layout {
-    grid-template-columns: 1fr !important;
-  }
+/* Mascot is pinned to the viewport (fixed) so it stays put as the page scrolls, while the
+   content column stays centered. Hidden below 1080px, where there isn't room beside the content. */
+.welcome-mascot-fixed {
+  display: none;
+}
 
-  .welcome-mascot-col {
-    display: none !important;
+@media (min-width: 1080px) {
+  .welcome-mascot-fixed {
+    display: block;
+    position: fixed;
+    top: 50%;
+    right: calc(50% + 360px);
+    transform: translateY(-50%);
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+    pointer-events: none;
   }
 }
