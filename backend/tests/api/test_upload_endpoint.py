@@ -22,8 +22,8 @@ _FIXTURE_DIR = Path(__file__).parent
 
 _CLASSIFY_RESPONSE = (
     '{"line_items":['
-    '{"code":"4000","description":"Revenue","amount":500000,"category":"income"},'
-    '{"code":"5100","description":"Staff Costs","amount":120000,"category":"deductible"}'
+    '{"code":"rev_sales","description":"Revenue","amount":500000,"category":"income"},'
+    '{"code":"staff_salaries","description":"Staff Costs","amount":120000,"category":"deductible"}'
     "]}"
 )
 

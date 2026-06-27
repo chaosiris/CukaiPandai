@@ -65,3 +65,33 @@ withholding_tax: # VERIFIED (LHDN; PwC) — domestic non-resident statutory rate
     on_employees: 0.03
   remit_within: '1 month of paying/crediting the non-resident'
   note: 'DTA may reduce rates if the recipient supplies a valid Certificate of Residence (COR)'
+
+# Capital allowances (Schedule 3, ITA 1967). VERIFIED 2026-06-27 vs PwC WWTS + hasilnet + EY/Crowe/Grant Thornton.
+# ia/aa = initial/annual allowance fractions; the engine grants a year-1 allowance of (ia+aa) of qualifying
+# expenditure (capped where a cost_cap_rm applies). cost_cap_rm: 0 means NO cap (unlimited qualifying cost).
+# small_value: 100% in the year of acquisition (PR 3/2021); per-asset <= RM2,000; aggregate RM20,000 cap for
+# NON-SMEs only (SMEs are exempt -> unlimited). renovation: the general Renovation & Refurbishment special
+# deduction expired 31 Dec 2022 and the only live YA2026 window is MOTAC-tourism-restricted, so the engine
+# grants NO automatic renovation allowance (ia/aa = 0). Source URLs in docs (research 2026-06-27).
+capital_allowances:
+  plant_machinery: { ia: 0.20, aa: 0.14, cost_cap_rm: 0 } # general P&M (PwC; hasilnet)
+  motor_vehicle: { ia: 0.20, aa: 0.20, cost_cap_rm: 50000 } # Sch3 para2(2) base cap RM50k; RM100k ONLY if new AND on-road <= RM150k (engine uses the conservative base)
+  furniture_office: { ia: 0.20, aa: 0.10, cost_cap_rm: 0 } # 'Others' class (hasilnet)
+  ict_software: { ia: 0.40, aa: 0.20, cost_cap_rm: 0 } # ICT ACA Rules 2024 (PwC; EY; Acclime)
+  industrial_building: { ia: 0.10, aa: 0.03, cost_cap_rm: 0 } # IBA, ~33yr write-off (Crowe)
+  small_value: { rate: 1.00, per_asset_cap_rm: 2000, aggregate_cap_rm: 20000, sme_aggregate_cap_applies: false } # PR 3/2021 (EY)
+  renovation: { ia: 0.00, aa: 0.00, cost_cap_rm: 0 } # general R&R deduction EXPIRED 31 Dec 2022; no YA2026 auto-allowance (EY)
+  unabsorbed_carryforward_max_years: 10 # Finance Act 2018, eff YA2019 (PwC); same-business + continuity tests. (FLAG: some pre-2019 sources say indefinite)
+
+# Reliefs / caps (further deductions + below-the-line s.44). VERIFIED 2026-06-27 vs LHDN + PwC/EY/Grant Thornton.
+# pct values are fractions; *_rm values are ringgit caps. Donation (10%) and zakat (2.5%) caps are measured
+# against AGGREGATE INCOME. For a company, zakat is an aggregate-income deduction (s.44(11A)), NOT a rebate.
+reliefs:
+  epf_remuneration_cap_pct: 0.19 # s.34(4) employer EPF deduction cap (PwC)
+  secretarial_taxfiling_cap_rm: 15000 # combined secretarial + tax-filing cap/YA (P.U.(A)162/2020 amended; in force YA2026) (EY)
+  esg_further_deduction_cap_rm: 50000 # ESG further deduction/YA, YA2024-YA2027 (P.U.(A)193/2025) (Grant Thornton)
+  rd_double_deduction_pct: 2.00 # s.34A/34B qualifying R&D double deduction (overseas R&D capped 30% of total) (LHDN PR10/2021)
+  donation_aggregate_income_cap_pct: 0.10 # s.44(6) approved cash donations, max 10% of aggregate income (LHDN)
+  zakat_aggregate_income_cap_pct: 0.025 # s.44(11A) business zakat, max 2.5% of aggregate income (PwC)
+  group_relief_max_pct: 0.70 # s.44A: up to 70% of the SURRENDERING company's current-year loss; BOTH companies need paid-up > RM2.5m (i.e. NOT SMEs) (LHDN PR2/2025)
+  loss_carryforward_max_years: 10 # s.44(5F) unabsorbed business loss, max 10 consecutive YAs (eff YA2019) (PwC)

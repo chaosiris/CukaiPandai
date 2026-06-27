@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from api.llm import FakeLLMClient
 from api.main import app, get_llm
 
-_OBJ = '{"line_items":[{"code":"4000","description":"Revenue","amount":500000,"category":"income"}]}'
+_OBJ = '{"line_items":[{"code":"rev_sales","description":"Revenue","amount":500000,"category":"income"}]}'
 
 
 def test_classify_returns_line_items_and_route_info():
@@ -17,7 +17,7 @@ def test_classify_returns_line_items_and_route_info():
         )
         assert r.status_code == 200
         body = r.json()
-        assert body["line_items"][0]["code"] == "4000"
+        assert body["line_items"][0]["code"] == "rev_sales"
         # BE-6: AI responses report the active route.
         assert "sovereign" in body and "active_model" in body
     finally:

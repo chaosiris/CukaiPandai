@@ -8,8 +8,17 @@ import { InfoTip } from './Tooltip'
 
 // Figures that represent the final liability
 export const LIABILITY_KEYS = new Set(['tax_payable', 'zakat_offset', 'balance_payable'])
-// Figures that are upstream computations
-export const UPSTREAM_KEYS = new Set(['gross_income', 'adjusted_income', 'chargeable_income'])
+// Figures that are upstream computations (the YA2026 ascertainment chain, in stage order)
+export const UPSTREAM_KEYS = new Set([
+  'gross_income',
+  'business_income',
+  'adjusted_income',
+  'capital_allowances',
+  'statutory_income',
+  'aggregate_income',
+  'total_income',
+  'chargeable_income'
+])
 
 // Stage identifiers in execution order (one-shot pipeline: no Human Approval)
 export type StageId = 'classify' | 'compute' | 'risk' | 'finalized'
@@ -345,19 +354,29 @@ export function ComputationPanel({
   )
 }
 
-/** Stage 1 detail: classified line items with sovereign badge. */
+/**
+ * Stage 1 detail: the line items.
+ * `manual` = entered directly through the structured form (deterministic, no AI) -> show a neutral
+ * note instead of the sovereign-model badge, since no LLM classified anything.
+ */
 export function Stage1Detail({
   classifyResult,
-  lineItems
+  lineItems,
+  manual = false
 }: {
   classifyResult: { sovereign: boolean; active_model: string }
   lineItems: LineItem[]
+  manual?: boolean
 }) {
   return (
     <div className="window" style={{ marginTop: 12 }}>
       <div className="titlebar">
-        <span className="titlebar-title">Classified Line Items</span>
-        <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
+        <span className="titlebar-title">{manual ? 'Line Items' : 'Classified Line Items'}</span>
+        {manual ? (
+          <span className="titlebar-meta">entered directly · no AI</span>
+        ) : (
+          <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
+        )}
       </div>
       <ul className="req-list">
         {lineItems.map((item) => (

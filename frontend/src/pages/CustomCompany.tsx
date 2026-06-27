@@ -186,7 +186,7 @@ export default function CustomCompany() {
       tin: ssm.tin,
       label: `My Company (${ssm.tin})`,
       ssm,
-      demoRawText: ''
+      demoItems: []
     }
 
     // EN-2: addCustomPersona does PUT /me/entity (best-effort) + sets active.

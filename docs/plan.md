@@ -305,3 +305,62 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 - **OQ-6 (item 6, FE-2.6) — (a) fully rename the file, and (b) where does the absurd-figure root-cause fix belong?** (a) The plan **renames** `AuditDefense.tsx` → `AuditAssistant.tsx` (cleanest) vs. keeping the filename and only changing route/label — confirm the rename is wanted (it's a larger diff but removes the stale name). (b) The figure guard in FE-2.6 is a **render-layer** safety net. The true root cause (a saved record / custom entity with an overflowing gross income, e.g. TIN `Z0000000001`) may warrant a guard at the **save path or custom-entity validation** instead/also. **Assumption:** render-layer guard now; deeper validation flagged as a follow-on unless the PO wants it in-scope.
 - **OQ-7 (item 7b, FE-2.7) — what is the desktop "sidebar" that hover-expands?** **This is the biggest ambiguity.** Today the sidebar IS the slide-in drawer behind a hamburger — there is **no persistent collapsed rail** on desktop to hover-expand. Options: (a) introduce a NEW always-visible **collapsed icon-rail** on desktop that expands to the full drawer on hover and collapses on cursor-leave (the hamburger becomes the mobile-only trigger) — this is a real new affordance, larger scope; (b) keep the hamburger-drawer and only add hover-to-open on a thin left-edge hot-zone (expand on hover-in, collapse on hover-out past the right boundary) without a persistent rail; (c) defer 7b and ship only 7a + 7c this iteration. **Assumption if unanswered:** (b) — a left-edge hover hot-zone that opens/closes the existing drawer on desktop, hamburger retained as the manual pin, mobile untouched. Please confirm — this materially changes the AppShell + tokens.css work.
 - **OQ-8 (sequencing/coordination) — PR-A merge timing vs. Chaos's shared backend lane.** PR-A is additive and isolated to `filing_records` + its repo/endpoints, but it still merges into the shared `backend/`. Confirm: PM coordinates PR-A's open + merge with Chaos (read latest PRs/commits first per the root convention), and FE-2.4/FE-2.5 may proceed **mock-first** against the contract before PR-A merges, then wire live once it lands. **Assumption:** yes — FE builds mock-first; PR-A merges before the FE live-wire; no force-push, Gate-2 authorizes each merge.
+
+---
+
+# STRUCTURED FILING INPUT + FULL TAX ENGINE `[BE]` `[FE]` `[TD]`
+
+> **NEW section (27/06/26).** Walkthrough-3 feedback: the `/filing/new` **free-form `AccountName Amount` textarea is too lax** — users type non-financial gibberish (emojis, "tung tung tung sahur") and still get a classification. Replace it with **fixed, selectable account fields** so only coherent line items can be entered, and make the upload path extract/classify ONLY meaningful, taxonomy-aligned fields. Deep online research produced a tax-accurate **62-field, 14-group master account list** (cross-checked vs LHDN + PwC/EY/KPMG/Deloitte/Grant Thornton/Crowe; full categorized list in `progress.md`/spec).
+>
+> **Locked PO decisions (do NOT re-open):**
+> 1. **Full engine, all in one go (not phased).** Build the real Schedule-3 capital-allowance schedule AND the aggregate-income / s.44 reliefs stages so the `[CA]` + `[REL]` account groups actually compute — not just the simplified `income − deductible`. (PO chose this over phasing despite the prelim being 28/06.)
+> 2. **Two-level selectable manual entry:** the user first picks one of the **14 groups**, then an **individual account** within that group — never a flat 62-item dropdown.
+> 3. **Curated upload document types + constrained agent.** No single standardized MY line-item tax FORM exists (SMEs file Form C derived from financial statements), so uploads accept a **curated set of standard documents** — Income Statement / Statement of P&L (the line-item source, MPERS), Trial Balance (alt source), SSM Company Profile / e-Info (the entity-identity analogue of an IC) — and the extract/classify **agent is constrained to the 62-account taxonomy**: it maps each extracted row to the nearest known account and **drops anything that isn't a genuine accounting line** (no amount / non-financial noise).
+> 4. **Citation discipline:** every CA rate + relief cap is **re-verified against LHDN before hard-coding** (the research flagged them as needing re-verification); the deterministic core stays authoritative; the golden Acme `tax_payable RM31,000` MUST still resolve.
+>
+> **Hard gates:** every BE task `cd backend && uv run pytest -q` (must not regress the existing suite; new tests added). Every FE task `bunx tsc --noEmit` + `bun run build` + `bunx biome check frontend/src` clean. **No new tax figure/rate/cap without a verified source.** Subagent-audit after each task. Token-CSS only; two-level picker reuses existing primitives (no Tailwind/shadcn/chart lib).
+
+### SFI-0 `[BE]`/`[TD]` — Verify YA2026 CA rates + s.44 relief caps (citation-grounded) _(DONE — workflow `w5fzrr9qw`)_
+
+- [x] Parallel research lenses (capital-allowance IA/AA rates + cost caps per asset class; s.44 relief caps — donations 10%, zakat 2.5%, secretarial+tax RM15k, EPF 19%, ESG RM50k, loss carry-forward 10 YA, group relief 70%; the exact ordered computation stages + SME bands) → one merged **cited** rate/cap config with a `source_url` + confidence per figure; low-confidence figures flagged `verify_before_hardcode`. **Confirmed: P&M 20/14, MV 20/20 (RM50k cap), F&F 20/10, ICT 40/20, IBA 10/3, SVA 100% (SME uncapped), renovation deduction EXPIRED 2022; donations 10%/zakat 2.5% vs aggregate income; zakat is a deduction not a rebate; company total=chargeable; group relief needs paid-up >RM2.5m (inverse of SME).**
+
+**Acceptance:** a cited YA2026 rate/cap config + a confirmed stage order; no figure enters the engine uncited.
+
+### SFI-1 `[BE]` — Account taxonomy module (62 fixed accounts · 14 groups) _(shared source of truth)_
+
+- [x] `backend/core/tax_accounts.py`: the **88** accounts (the research's "62" undercount — actual full set is 88 across 14 groups) as typed records — `code`, `label`, `group`, `category` (`income`|`exempt_income`|`deductible`|`non_deductible`|`capital_allowance`|`special_deduction`), `note`, plus engine metadata (`ca_class` for `[CA]` assets → SFI-2 rate config; `relief_key` for `[REL]` items → caps). Helpers: `by_code`, `by_group`, `allowed_codes`, `GROUPS`. **+ `frontend/src/lib/taxAccounts.ts` mirror** (code/label/group/category/note + `CATEGORY_LABEL`).
+
+**Acceptance:** one canonical, typed 88-account taxonomy in `core/` mirrored on the FE; full coverage of the researched groups; unique codes; engine-ready metadata.
+
+### SFI-2 `[BE]` — `ya_2026.yaml` capital-allowance rates + relief caps (cited) _(depends on SFI-0)_
+
+- [x] Extended `backend/core/config/ya_2026.yaml` with a `capital_allowances` block (IA/AA per `ca_class` + MV/small-value caps) and a `reliefs` block (donation 10%, zakat 2.5%, secretarial+tax RM15k, EPF 19%, ESG RM50k, loss carry-forward years, group relief %), each cited inline, mirroring the file's style. Version kept `YA2026.1` (additive config only, no existing computation value changed).
+
+**Acceptance:** the engine's new rates/caps live in the cited YA2026 config, not as magic numbers.
+
+### SFI-3 `[BE]` — Full tax engine: capital allowances + aggregate-income / s.44 reliefs _(depends on SFI-1/2)_
+
+- [x] Extended the deterministic core (`compute_form_c` / `core/computation.py`) to the real ordered computation: business income − allowable deductions − further/double deductions = **adjusted income** → + balancing charge − capital allowances (Schedule-3 IA+AA per `ca_class`, MV cost cap, SVA SME-uncapped, IBA, renovation=0; − balancing allowance − unabsorbed CA b/f) = **statutory income** → − current-year loss = **aggregate income** → − b/f loss − zakat (2.5% AI) − donations (10% AI) − group relief = **total = chargeable income** → SME two-tier / flat 24% = **tax payable**. Exempt credit items (dividend, gain on disposal, unrealised forex gain) excluded. 8 stage fields exposed for the FigureTrace UI; **golden RM31,000 + non-SME 240,000 preserved**; +9 stage tests.
+- [x] Backward-compat: `chargeable_income`+`tax_payable` keys retained; HITL graph, `/filings/form-c/*`, `assess_risk`, personas, `LineItem` consumers intact (new categories additive). **Full suite 236 green; backend audit subagent returned GO (no blocking issues).**
+
+**Acceptance:** the core computes the full Malaysian corporate tax stack (CA + s.44 reliefs) from taxonomy line items, every stage traceable + cited, golden figure preserved, suite green.
+
+### SFI-4 `[FE]` — Structured two-level manual entry (replaces the free-text textarea) _(depends on SFI-1)_
+
+- [x] `frontend/src/lib/taxAccounts.ts`: synced mirror of the taxonomy (code/label/group/category/note) for the picker + deterministic LineItem build.
+- [x] Replaced the `FilingNew.tsx` free-form `rawText` textarea with **structured rows**: each row = **group select → account select (scoped) → amount**; add/remove; account label+code+category from the taxonomy (no free text); `buildLineItems` builds `LineItem[]` deterministically (**no LLM on the manual path**). Personas now carry `demoItems` (replaced `demoRawText`). Honest UI: manual entry shows "entered directly · no AI" (no sovereign-model badge), hides the AI route-info, and the provenance tip says no AI was involved; the AI/sovereign path is shown only for uploads. Resume rehydrates rows from stored line_items; "Edit Line Items" preserves rows + the one draft id. `tsc`/`build`/`biome` clean.
+
+**Acceptance:** manual entry is a fixed two-level (group → account) + amount form producing deterministic, taxonomy-valid line items; free-text gibberish is impossible; the rest of the filing flow is unchanged.
+
+### SFI-5 `[BE]`/`[FE]` — Constrained upload: curated document types + taxonomy-locked agent _(depends on SFI-1)_
+
+- [x] Constrained the classify/extract agent (`backend/api/agents/documents.py`): injects the allowed 88-account catalogue into the system prompt; instructs it to map every extracted row to the closest known code and drop rows that aren't genuine accounting lines. Server-side enforcement: **drops codes not in the taxonomy, drops rows with no/zero numeric amount, and takes category authoritatively from the taxonomy (never the model)**. Kept JSON-mode + 502 guard. +1 test (`test_classify_drops_unknown_codes_and_amountless_rows`); scripted-classify tests updated to taxonomy codes.
+- [x] FE upload UX: drop-zone names the curated documents (Income Statement / P&L, Trial Balance); AI extracts + maps into the taxonomy and **pre-fills the structured rows** so the user reviews/edits before computing; mock classify (`MOCK_CLASSIFY_BY_TIN` + `makeMockClassify`) aligned to taxonomy codes + valid categories.
+
+**Acceptance:** uploads accept the curated standard documents and the agent returns only meaningful, taxonomy-aligned line items (noise dropped); no free-form classification of gibberish.
+
+### SFI-6 `[TD]` — Audit each task + full suite + docs _(throughout / final)_
+
+- [ ] Subagent-audit after each SFI task (correctness + tax-treatment + no-regression); final `pytest` green + FE `tsc`/`build`/`biome` clean; update `docs/trd.md` (the new computation stages + the taxonomy + the constrained-upload contract) + `progress.md` → verify: every task audited GO; suite green; docs reflect the new engine + input.
+
+**Acceptance:** each task subagent-verified GO; suite + FE build green; trd/progress updated; no attribution in any commit.

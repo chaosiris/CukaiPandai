@@ -35,8 +35,8 @@ CORPUS = LawCorpus.load(_FIX / "lawcorpus_seed.json")
 
 # Scripted LLM output the document-understanding agent would return for the trial balance.
 _LINE_ITEMS_JSON = (
-    '[{"code":"4000","description":"Revenue","amount":500000,"category":"income"},'
-    '{"code":"5000","description":"Allowable operating expenses","amount":300000,"category":"deductible"}]'
+    '[{"code":"rev_sales","description":"Revenue","amount":500000,"category":"income"},'
+    '{"code":"cos_purchases","description":"Allowable operating expenses","amount":300000,"category":"deductible"}]'
 )
 
 

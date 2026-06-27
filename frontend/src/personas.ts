@@ -8,8 +8,8 @@ export interface Persona {
   tin: string
   label: string
   ssm: SsmProfile
-  /** Pre-filled trial-balance text for the Filing Studio. */
-  demoRawText: string
+  /** Pre-filled structured line items for the Filing Studio (taxonomy account codes). */
+  demoItems: { code: string; amount: number }[]
 }
 
 /** Empty SSM placeholder for My Company before the user fills in their details. */
@@ -38,10 +38,12 @@ export const PERSONAS: Persona[] = [
     tin: ACME_TIN,
     label: 'Acme Trading (Demo)',
     ssm: ACME_SSM,
-    demoRawText: `Revenue  5000000
-Salaries and wages  2000000
-Repairs and maintenance  4800
-Depreciation  120000`
+    demoItems: [
+      { code: 'rev_sales', amount: 5000000 },
+      { code: 'staff_salaries', amount: 2000000 },
+      { code: 'rep_maintenance', amount: 4800 },
+      { code: 'dep_depreciation', amount: 120000 }
+    ]
   },
   {
     tin: 'C7654321098',
@@ -59,10 +61,12 @@ Depreciation  120000`
       commencement_date: '2022-04-01',
       state: 'KUL'
     },
-    demoRawText: `Revenue  380000
-Salaries and wages  120000
-Software subscriptions  18000
-Depreciation  12000`
+    demoItems: [
+      { code: 'rev_sales', amount: 380000 },
+      { code: 'staff_salaries', amount: 120000 },
+      { code: 'admin_software_saas', amount: 18000 },
+      { code: 'dep_depreciation', amount: 12000 }
+    ]
   },
   {
     tin: 'C3219876540',
@@ -80,11 +84,13 @@ Depreciation  12000`
       commencement_date: '2019-09-01',
       state: 'PNG'
     },
-    demoRawText: `Revenue  2500000
-Salaries and wages  900000
-Food and beverage purchases  800000
-Rental  120000
-Utilities  60000`
+    demoItems: [
+      { code: 'rev_sales', amount: 2500000 },
+      { code: 'staff_salaries', amount: 900000 },
+      { code: 'cos_purchases', amount: 800000 },
+      { code: 'prem_rent', amount: 120000 },
+      { code: 'prem_utilities', amount: 60000 }
+    ]
   }
 ]
 

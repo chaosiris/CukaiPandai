@@ -26,7 +26,7 @@ function buildCustomPersona(ssm: SsmProfile): Persona {
     tin: CUSTOM_PERSONA_TIN,
     label: 'My Company',
     ssm,
-    demoRawText: ''
+    demoItems: []
   }
 }
 
@@ -34,7 +34,7 @@ const MY_COMPANY_PLACEHOLDER: Persona = {
   tin: CUSTOM_PERSONA_TIN,
   label: 'My Company',
   ssm: EMPTY_CUSTOM_SSM,
-  demoRawText: ''
+  demoItems: []
 }
 
 interface PersonaContextValue {

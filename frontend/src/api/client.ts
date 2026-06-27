@@ -386,13 +386,23 @@ const MOCK_FILING_RESUME: FilingResumeResponse = {
 // Each set uses the entity's own gross_income as the revenue figure — not a static Acme amount.
 // Line items are the user's own input categories/amounts; no invented tax rates or thresholds.
 const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
-  // Acme: gross_income=5,000,000; 12 employees
+  // Acme: gross_income=5,000,000; 12 employees. Codes map to the fixed tax-account taxonomy.
   [ACME_TIN]: {
     line_items: [
-      { code: 'REV', description: 'Trade revenue', amount: 5000000, category: 'revenue' },
-      { code: 'SAL', description: 'Salaries and wages', amount: 2000000, category: 'expense' },
-      { code: 'REP', description: 'Repairs and maintenance', amount: 4800, category: 'expense' },
-      { code: 'DEP', description: 'Depreciation', amount: 120000, category: 'expense' }
+      { code: 'rev_sales', description: 'Sales / turnover', amount: 5000000, category: 'income' },
+      {
+        code: 'staff_salaries',
+        description: 'Salaries, wages, bonuses & commissions',
+        amount: 2000000,
+        category: 'deductible'
+      },
+      { code: 'rep_maintenance', description: 'Repairs & maintenance', amount: 4800, category: 'deductible' },
+      {
+        code: 'dep_depreciation',
+        description: 'Depreciation of property, plant & equipment',
+        amount: 120000,
+        category: 'non_deductible'
+      }
     ],
     sovereign: true,
     active_model: 'nemo-super'
@@ -400,10 +410,25 @@ const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
   // Sinar: gross_income=380,000; 3 employees
   C7654321098: {
     line_items: [
-      { code: 'REV', description: 'IT services revenue', amount: 380000, category: 'revenue' },
-      { code: 'SAL', description: 'Salaries and wages', amount: 120000, category: 'expense' },
-      { code: 'SUB', description: 'Software subscriptions', amount: 18000, category: 'expense' },
-      { code: 'OFF', description: 'Office expenses', amount: 9600, category: 'expense' }
+      { code: 'rev_sales', description: 'Sales / turnover', amount: 380000, category: 'income' },
+      {
+        code: 'staff_salaries',
+        description: 'Salaries, wages, bonuses & commissions',
+        amount: 120000,
+        category: 'deductible'
+      },
+      {
+        code: 'admin_software_saas',
+        description: 'Software subscriptions / SaaS / e-invoicing',
+        amount: 18000,
+        category: 'deductible'
+      },
+      {
+        code: 'admin_office_supplies',
+        description: 'Printing, stationery, postage & supplies',
+        amount: 9600,
+        category: 'deductible'
+      }
     ],
     sovereign: true,
     active_model: 'nemo-super'
@@ -411,11 +436,26 @@ const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
   // Selera: gross_income=2,500,000; 45 employees
   C3219876540: {
     line_items: [
-      { code: 'REV', description: 'Food and beverage revenue', amount: 2500000, category: 'revenue' },
-      { code: 'SAL', description: 'Salaries and wages', amount: 900000, category: 'expense' },
-      { code: 'COG', description: 'Cost of goods sold', amount: 850000, category: 'expense' },
-      { code: 'REN', description: 'Rental expense', amount: 120000, category: 'expense' },
-      { code: 'UTL', description: 'Utilities', amount: 48000, category: 'expense' }
+      { code: 'rev_sales', description: 'Sales / turnover', amount: 2500000, category: 'income' },
+      {
+        code: 'staff_salaries',
+        description: 'Salaries, wages, bonuses & commissions',
+        amount: 900000,
+        category: 'deductible'
+      },
+      {
+        code: 'cos_purchases',
+        description: 'Purchases of goods / raw materials',
+        amount: 850000,
+        category: 'deductible'
+      },
+      { code: 'prem_rent', description: 'Business premises rent / lease', amount: 120000, category: 'deductible' },
+      {
+        code: 'prem_utilities',
+        description: 'Utilities (electricity, water, gas)',
+        amount: 48000,
+        category: 'deductible'
+      }
     ],
     sovereign: true,
     active_model: 'nemo-super'
@@ -424,13 +464,23 @@ const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
 
 function makeMockClassify(tin: string, entityProfile?: EntityTaxProfile): ClassifyResponse {
   if (MOCK_CLASSIFY_BY_TIN[tin]) return MOCK_CLASSIFY_BY_TIN[tin]
-  // Custom entity: derive revenue from gross_income; keep other lines proportional
+  // Custom entity: derive revenue from gross_income; keep other lines proportional (taxonomy codes)
   const revenue = entityProfile?.gross_income ?? 1000000
   return {
     line_items: [
-      { code: 'REV', description: 'Revenue', amount: revenue, category: 'revenue' },
-      { code: 'SAL', description: 'Salaries and wages', amount: Math.round(revenue * 0.35), category: 'expense' },
-      { code: 'OPX', description: 'Operating expenses', amount: Math.round(revenue * 0.12), category: 'expense' }
+      { code: 'rev_sales', description: 'Sales / turnover', amount: revenue, category: 'income' },
+      {
+        code: 'staff_salaries',
+        description: 'Salaries, wages, bonuses & commissions',
+        amount: Math.round(revenue * 0.35),
+        category: 'deductible'
+      },
+      {
+        code: 'admin_office_supplies',
+        description: 'Printing, stationery, postage & supplies',
+        amount: Math.round(revenue * 0.12),
+        category: 'deductible'
+      }
     ],
     sovereign: true,
     active_model: 'nemo-super'

@@ -1,8 +1,9 @@
 // FM-2 — /filing/new: one-shot Form C creation pipeline.
-// Pipeline: Classify Line Items → Compute Form C → Risk Assessment → Finalized (no Human Approval).
-// Guided input: trial-balance textarea (persona demoRawText pre-filled), CSV/XLSX/PDF as secondary.
-// On finalize: saveFiling() → navigate to /filing/[id].
-// "How this was calculated" provenance note: deterministic rule-based core, not the AI.
+// Pipeline: Line Items → Compute Form C → Risk Assessment → Finalized (no Human Approval).
+// Manual entry is STRUCTURED: pick a group, then an account from the fixed taxonomy, then the amount.
+// This is deterministic (no AI) — only valid tax accounts can be entered, so gibberish is impossible.
+// Uploading a financial document (Income Statement / Trial Balance) instead uses the AI to extract +
+// classify the figures into the same taxonomy. On compute: auto-save (upgrade draft) → /filing/[id].
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -11,7 +12,6 @@ import {
   type ClassifyResponse,
   type FormCResponse,
   type LineItem,
-  classifyTrialBalance,
   createDraftFiling,
   getFiling,
   getFormC,
@@ -32,8 +32,12 @@ import {
 } from '../components/FilingPipeline'
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
+import { CATEGORY_LABEL, TAX_GROUPS, accountByCode, accountsInGroup } from '../lib/taxAccounts'
 import { useNotifications } from '../notifications'
 import { isEntityIncomplete } from '../personas'
+
+// Sentinel "model" for deterministically-entered line items (no LLM was involved).
+const MANUAL_MODEL = 'structured-entry'
 
 function buildSsm(entity: {
   tin: string
@@ -61,6 +65,51 @@ function buildSsm(entity: {
   }
 }
 
+// --- Structured line-item rows ---
+interface Row {
+  key: string
+  group: string
+  code: string
+  amount: string
+}
+
+let _rowSeq = 0
+function rid(): string {
+  _rowSeq += 1
+  return `r${_rowSeq}`
+}
+
+function blankRow(): Row {
+  return { key: rid(), group: '', code: '', amount: '' }
+}
+
+function rowsFromItems(items: { code: string; amount: number }[]): Row[] {
+  const rows = items
+    .map((it) => {
+      const acct = accountByCode(it.code)
+      if (!acct) return null
+      return { key: rid(), group: acct.group, code: it.code, amount: String(it.amount) }
+    })
+    .filter((r): r is Row => r !== null)
+  return rows.length > 0 ? rows : [blankRow()]
+}
+
+function seedRows(persona: { demoItems?: { code: string; amount: number }[] }): Row[] {
+  return rowsFromItems(persona.demoItems ?? [])
+}
+
+/** Build deterministic LineItems from the structured rows (category comes from the taxonomy). */
+function buildLineItems(rows: Row[]): LineItem[] {
+  const items: LineItem[] = []
+  for (const r of rows) {
+    const acct = accountByCode(r.code)
+    const amount = Number(r.amount)
+    if (!acct || !r.amount.trim() || !Number.isFinite(amount) || amount <= 0) continue
+    items.push({ code: acct.code, description: acct.label, amount, category: acct.category })
+  }
+  return items
+}
+
 // One-shot pipeline phases (no Human Approval)
 type Phase =
   | { tag: 'idle' }
@@ -72,7 +121,7 @@ type Phase =
 
 function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): Stage[] {
   const base: Stage[] = [
-    { id: 'classify' as StageId, num: 1, name: 'Classify Line Items', status: 'pending' as StageStatus },
+    { id: 'classify' as StageId, num: 1, name: 'Line Items', status: 'pending' as StageStatus },
     { id: 'compute' as StageId, num: 2, name: 'Compute Form C', status: 'pending' as StageStatus },
     { id: 'risk' as StageId, num: 3, name: 'Risk Assessment', status: 'pending' as StageStatus },
     { id: 'finalized' as StageId, num: 4, name: 'Finalized', status: 'pending' as StageStatus }
@@ -88,14 +137,14 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
   if (phase.tag === 'classified' && classifyResult) {
     const n = classifyResult.line_items.length
     base[0].status = 'complete'
-    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} classified`
+    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} ready`
     return base
   }
 
   if (phase.tag === 'computing') {
     const n = classifyResult?.line_items.length ?? 0
     base[0].status = 'complete'
-    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} classified`
+    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} ready`
     base[1].status = 'running'
     return base
   }
@@ -103,7 +152,7 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
   if (phase.tag === 'done') {
     const n = classifyResult?.line_items.length ?? 0
     base[0].status = 'complete'
-    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} classified`
+    base[0].writeBack = `${n} line item${n !== 1 ? 's' : ''} ready`
     const comp = phase.result.computation
     const taxPayable = comp.fields.tax_payable?.value
     const chargeableIncome = comp.fields.chargeable_income?.value
@@ -142,13 +191,25 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
   return base
 }
 
+const selectStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 12,
+  padding: '7px 8px',
+  background: 'var(--screen)',
+  border: 'var(--border)',
+  borderRadius: 'var(--radius)',
+  color: 'var(--ink)',
+  width: '100%'
+}
+
 export default function FilingNew() {
   const { persona } = useActivePersona()
   const { entity, error: entityError, loading: entityLoading } = useEntity()
   const [searchParams] = useSearchParams()
-  const [rawText, setRawText] = useState(persona.demoRawText)
+  const [rows, setRows] = useState<Row[]>(() => seedRows(persona))
   const [classifyResult, setClassifyResult] = useState<ClassifyResponse | null>(null)
   const [lineItems, setLineItems] = useState<LineItem[]>([])
+  const [aiClassified, setAiClassified] = useState(false)
   const [phase, setPhase] = useState<Phase>({ tag: 'idle' })
   const [latestResult, setLatestResult] = useState<FormCResponse | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -158,21 +219,20 @@ export default function FilingNew() {
   const { notify } = useNotifications()
   const navigate = useNavigate()
 
-  // Resume a draft: rehydrate raw_text + classified line_items so the user lands on the
-  // "classified, ready to compute" stage (or idle if no line_items yet).
+  // Resume a draft: rehydrate the structured rows from the stored line_items so the user lands on
+  // the editable form (and the "classified" stage if items exist) and can edit then re-compute.
   const resumeId = searchParams.get('resume')
   useEffect(() => {
     if (!resumeId) return
     getFiling(resumeId)
       .then((rec) => {
         if (rec.status !== 'draft') return
-        if (rec.raw_text) setRawText(rec.raw_text)
         setDraftId(rec.id)
-        // If classified line_items are stored, land on the "classified" stage —
-        // user can review/edit and then compute, or edit raw text and re-classify.
         if (rec.line_items && rec.line_items.length > 0) {
-          setClassifyResult({ line_items: rec.line_items, sovereign: true, active_model: 'draft' })
+          setRows(rowsFromItems(rec.line_items))
+          setClassifyResult({ line_items: rec.line_items, sovereign: true, active_model: MANUAL_MODEL })
           setLineItems(rec.line_items)
+          setAiClassified(false)
           setPhase({ tag: 'classified' })
         }
       })
@@ -183,9 +243,10 @@ export default function FilingNew() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when persona switches
   useEffect(() => {
-    setRawText(persona.demoRawText)
+    setRows(seedRows(persona))
     setClassifyResult(null)
     setLineItems([])
+    setAiClassified(false)
     setPhase({ tag: 'idle' })
     setLatestResult(null)
     setDraftId(null)
@@ -208,13 +269,14 @@ export default function FilingNew() {
   const entityEmpty = entity ? isEntityIncomplete(entity) : false
   const displayError = entityError ?? (phase.tag === 'error' ? phase.message : null)
   const isLoading = entityLoading || phase.tag === 'classifying' || phase.tag === 'computing'
+  const validItems = buildLineItems(rows)
 
   if (!entityLoading && entityEmpty) {
     return (
       <>
         <div className="page-head">
           <h1>New Filing</h1>
-          <p className="page-kicker">Classify your trial balance and compute a cited Form C.</p>
+          <p className="page-kicker">Enter your line items and compute a cited Form C.</p>
         </div>
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar">
@@ -254,31 +316,35 @@ export default function FilingNew() {
     )
   }
 
-  async function handleClassify() {
+  function updateRow(key: string, patch: Partial<Row>) {
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  }
+
+  function handleManualSubmit() {
     if (!entity) return
+    const items = buildLineItems(rows)
+    if (items.length === 0) return
     setUploadError(null)
-    setPhase({ tag: 'classifying' })
-    try {
-      const result = await classifyTrialBalance(entity.tin, rawText, entity)
-      setClassifyResult(result)
-      setLineItems(result.line_items)
-      setPhase({ tag: 'classified' })
-      // Create draft record on classify (best-effort: a transient BE error must not block UI)
-      const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    const result: ClassifyResponse = { line_items: items, sovereign: true, active_model: MANUAL_MODEL }
+    setClassifyResult(result)
+    setLineItems(items)
+    setAiClassified(false)
+    setPhase({ tag: 'classified' })
+    // Persist a draft (best-effort: a transient BE error must not block the UI). Reuse the existing
+    // draft id if we already have one (edit -> re-submit) so we keep ONE record.
+    const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    void (async () => {
       try {
-        const draft = await createDraftFiling({
-          tin: entity.tin,
-          label,
-          line_items: result.line_items,
-          raw_text: rawText
-        })
-        setDraftId(draft.id)
+        if (draftId) {
+          await upgradeFiling(draftId, { line_items: items, status: 'draft', label })
+        } else {
+          const draft = await createDraftFiling({ tin: entity.tin, label, line_items: items })
+          setDraftId(draft.id)
+        }
       } catch {
-        // Silently ignore — draft creation failure does not block classify flow
+        // Silently ignore — draft persistence failure does not block the flow
       }
-    } catch (e) {
-      setPhase({ tag: 'error', message: (e as Error).message })
-    }
+    })()
   }
 
   async function handleUpload(file: File) {
@@ -286,22 +352,24 @@ export default function FilingNew() {
     const allowed = ['.csv', '.xlsx', '.pdf']
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
     if (!allowed.includes(ext)) {
-      setUploadError(`Unsupported file type "${ext}". Upload a CSV, XLSX, or PDF trial balance.`)
+      setUploadError(`Unsupported file type "${ext}". Upload a CSV, XLSX, or PDF financial statement.`)
       return
     }
     setUploadError(null)
     setPhase({ tag: 'classifying' })
     try {
       const result = await uploadDocument(entity.tin, file, entity)
+      // Pre-fill the structured rows from the AI-extracted items so the user can review/edit them.
+      setRows(rowsFromItems(result.line_items))
       setClassifyResult(result)
       setLineItems(result.line_items)
+      setAiClassified(true)
       setPhase({ tag: 'classified' })
       notify({
-        title: 'File Classified',
-        body: `${file.name} classified into ${result.line_items.length} line items.`,
+        title: 'Document Classified',
+        body: `${file.name} mapped to ${result.line_items.length} line items.`,
         kind: 'success'
       })
-      // Create draft record (best-effort)
       const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
       try {
         const draft = await createDraftFiling({ tin: entity.tin, label, line_items: result.line_items })
@@ -311,7 +379,7 @@ export default function FilingNew() {
       }
     } catch (e) {
       const msg = (e as Error).message
-      setUploadError(`Upload failed: ${msg}. Paste the trial balance text below instead.`)
+      setUploadError(`Upload failed: ${msg}. Enter the line items manually above instead.`)
       setPhase({ tag: 'idle' })
     }
   }
@@ -344,7 +412,6 @@ export default function FilingNew() {
             label
           })
         } else {
-          // No draft was created (e.g. BE was down during classify) — create the final record now
           const rec = await saveFiling({
             tin: entity.tin,
             label,
@@ -364,12 +431,11 @@ export default function FilingNew() {
     }
   }
 
-  function handleReset() {
+  function handleEditItems() {
+    // Return to the editable form, preserving the rows + the draft id so the same record is reused.
     setPhase({ tag: 'idle' })
     setClassifyResult(null)
     setLineItems([])
-    setLatestResult(null)
-    setDraftId(null)
   }
 
   return (
@@ -377,7 +443,7 @@ export default function FilingNew() {
       <div className="page-head">
         <h1>New Filing</h1>
         <p className="page-kicker">
-          Classify your trial balance, then compute a cited Form C with the deterministic core. Form C · YA2026 ·{' '}
+          Add your line items, then compute a cited Form C with the deterministic core. Form C · YA2026 ·{' '}
           {entity?.tin ?? '...'}
         </p>
       </div>
@@ -391,68 +457,146 @@ export default function FilingNew() {
         </div>
       )}
 
-      {/* Stage 1: Trial Balance Input */}
+      {/* Stage 1: structured line-item entry */}
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="titlebar-title">Stage 01 - Trial Balance</span>
-            <InfoTip content="Provide your trial balance -- a list of account names and their balances for the assessment year. The AI will classify each line; the tax computation is then done by the deterministic rule-based core." />
-            <span className="titlebar-meta">paste or upload</span>
+            <span className="titlebar-title">Stage 01 - Line Items</span>
+            <InfoTip content="Pick each account from the fixed list and enter its amount -- only valid tax accounts can be added, so there is no free-text guessing. Your entries feed the deterministic rule-based core directly. Uploading a financial document instead uses AI to extract and classify the figures into these same accounts." />
+            <span className="titlebar-meta">structured entry</span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
-            {/* Primary: guided textarea */}
-            <div>
-              <div
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--ink)',
+                fontWeight: 600
+              }}
+            >
+              Add each account from your trial balance or P&amp;L
+            </div>
+
+            {/* Column headings */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                gap: 8,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--ink-soft)'
+              }}
+            >
+              <span>Category group</span>
+              <span>Account</span>
+              <span>Amount (RM)</span>
+              <span />
+            </div>
+
+            {/* Rows */}
+            <div style={{ display: 'grid', gap: 10 }}>
+              {rows.map((r) => {
+                const acct = r.code ? accountByCode(r.code) : undefined
+                return (
+                  <div key={r.key} style={{ display: 'grid', gap: 4 }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                        gap: 8,
+                        alignItems: 'center'
+                      }}
+                    >
+                      <select
+                        value={r.group}
+                        onChange={(e) => updateRow(r.key, { group: e.target.value, code: '' })}
+                        style={selectStyle}
+                      >
+                        <option value="">Group…</option>
+                        {TAX_GROUPS.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={r.code}
+                        onChange={(e) => updateRow(r.key, { code: e.target.value })}
+                        disabled={!r.group}
+                        style={{ ...selectStyle, opacity: r.group ? 1 : 0.5 }}
+                      >
+                        <option value="">{r.group ? 'Account…' : 'Pick a group first'}</option>
+                        {accountsInGroup(r.group).map((a) => (
+                          <option key={a.code} value={a.code}>
+                            {a.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        value={r.amount}
+                        onChange={(e) => updateRow(r.key, { amount: e.target.value })}
+                        placeholder="0"
+                        style={{ ...selectStyle, textAlign: 'right' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}
+                        aria-label="Remove line item"
+                        title="Remove line item"
+                        style={{
+                          border: 'var(--border)',
+                          background: 'var(--window)',
+                          color: 'var(--ink-soft)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 14,
+                          lineHeight: 1,
+                          height: 30,
+                          cursor: 'pointer',
+                          borderRadius: 'var(--radius)'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    {acct && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, minHeight: 16 }}>
+                        <span className="kind-tag">{CATEGORY_LABEL[acct.category]}</span>
+                        <InfoTip content={acct.note} />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setRows((rs) => [...rs, blankRow()])}
                 style={{
+                  padding: '7px 14px',
+                  border: 'var(--border)',
+                  background: 'var(--window)',
+                  color: 'var(--ink)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12,
-                  color: 'var(--ink)',
-                  marginBottom: 6,
-                  fontWeight: 600
-                }}
-              >
-                Provide your trial balance -- one account per line
-              </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  color: 'var(--ink-soft)',
-                  marginBottom: 8,
-                  padding: '6px 10px',
-                  background: 'var(--screen)',
-                  border: 'var(--border)',
+                  cursor: 'pointer',
                   borderRadius: 'var(--radius)'
                 }}
               >
-                Format: AccountName &nbsp; Amount (e.g. "Revenue &nbsp; 5000000")
-              </div>
-              <textarea
-                value={rawText}
-                onChange={(e) => setRawText(e.target.value)}
-                rows={8}
-                style={{
-                  width: '100%',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  background: 'var(--screen)',
-                  border: 'var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '10px 12px',
-                  color: 'var(--ink)',
-                  resize: 'vertical'
-                }}
-                placeholder="Revenue  5000000
-Salaries and wages  2000000
-Repairs and maintenance  4800
-Depreciation  120000"
-              />
+                + Add line item
+              </button>
               <button
                 type="button"
-                onClick={() => void handleClassify()}
-                disabled={!rawText.trim()}
+                onClick={handleManualSubmit}
+                disabled={validItems.length === 0}
                 style={{
-                  marginTop: 10,
                   padding: '8px 20px',
                   border: 'var(--border)',
                   background: 'var(--denim)',
@@ -460,13 +604,16 @@ Depreciation  120000"
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: rawText.trim() ? 'pointer' : 'not-allowed',
+                  cursor: validItems.length === 0 ? 'not-allowed' : 'pointer',
                   borderRadius: 'var(--radius)',
-                  opacity: rawText.trim() ? 1 : 0.5
+                  opacity: validItems.length === 0 ? 0.5 : 1
                 }}
               >
-                Classify
+                Continue
               </button>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                {validItems.length} valid line item{validItems.length !== 1 ? 's' : ''}
+              </span>
             </div>
 
             {/* Divider */}
@@ -481,12 +628,12 @@ Depreciation  120000"
                   letterSpacing: '0.06em'
                 }}
               >
-                or upload a file (secondary)
+                or upload a financial document
               </span>
               <div style={{ flex: 1, height: 1, background: 'var(--grid)' }} />
             </div>
 
-            {/* Secondary: file drop */}
+            {/* Secondary: file drop (AI extract + classify into the taxonomy) */}
             <button
               type="button"
               onDragOver={(e) => {
@@ -514,10 +661,11 @@ Depreciation  120000"
                   color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
                 }}
               >
-                Drop a CSV, XLSX, or PDF trial balance here
+                Drop your Income Statement / P&amp;L or Trial Balance (CSV, XLSX, or PDF)
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 4 }}>
-                or click to browse
+                AI extracts the figures and maps them to the accounts above -- non-financial rows are dropped. Or click
+                to browse.
               </div>
               <input
                 ref={fileInputRef}
@@ -559,7 +707,7 @@ Depreciation  120000"
             <div className="window" style={{ marginTop: 16 }}>
               <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="titlebar-title">Filing Pipeline</span>
-                <InfoTip content="The AI classifies your line items (Step 1). Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI is involved in computing the tax figure." />
+                <InfoTip content="Line items come from your structured entries (deterministic) or from AI classification of an uploaded document. Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI computes the tax figure." />
                 {isLoading && <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />}
               </div>
               <div className="row-div-list">
@@ -570,12 +718,12 @@ Depreciation  120000"
             </div>
           )}
 
-          {/* Stage 1 detail: classified line items */}
+          {/* Stage 1 detail: line items */}
           {classifyResult && phase.tag !== 'classifying' && (
             <>
-              <Stage1Detail classifyResult={classifyResult} lineItems={lineItems} />
+              <Stage1Detail classifyResult={classifyResult} lineItems={lineItems} manual={!aiClassified} />
 
-              {/* Compute button -- shown once classify completes, before computing */}
+              {/* Compute button -- shown once line items are ready, before computing */}
               {phase.tag === 'classified' && (
                 <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
                   <button
@@ -597,7 +745,7 @@ Depreciation  120000"
                   </button>
                   <button
                     type="button"
-                    onClick={handleReset}
+                    onClick={handleEditItems}
                     style={{
                       padding: '8px 16px',
                       border: 'var(--border)',
@@ -609,7 +757,7 @@ Depreciation  120000"
                       borderRadius: 'var(--radius)'
                     }}
                   >
-                    Edit Trial Balance
+                    Edit Line Items
                   </button>
                 </div>
               )}
@@ -623,7 +771,11 @@ Depreciation  120000"
               <ComputationPanel
                 computation={latestResult.computation}
                 title="Stage 02-03 - Computed"
-                headingTip="The tax figure was computed by the deterministic, rule-based core -- not the AI. The AI only classified your trial-balance line items in Step 1. Every figure traces to a specific rule ID and config version. Expand technical details below to see the full per-figure trace."
+                headingTip={
+                  aiClassified
+                    ? 'The tax figure was computed by the deterministic, rule-based core -- not the AI. The AI only classified your uploaded document into line items; every figure then traces to a specific rule ID and config version. Expand technical details below to see the full per-figure trace.'
+                    : 'The tax figure was computed entirely by the deterministic, rule-based core -- no AI was involved at any step. You entered the line items directly; every figure traces to a specific rule ID and config version. Expand technical details below to see the full per-figure trace.'
+                }
               />
 
               {/* Risk assessment (if any) */}
@@ -645,15 +797,18 @@ Depreciation  120000"
               <div className="window" style={{ marginTop: 12 }}>
                 <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="titlebar-title">Filing Pipeline</span>
-                  <InfoTip content="The AI classifies your line items (Step 1). Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI is involved in computing the tax figure." />
+                  <InfoTip content="Line items come from your structured entries (deterministic) or from AI classification of an uploaded document. Steps 2-4 are performed entirely by the deterministic rule-based core -- no AI computes the tax figure." />
                 </div>
                 <div className="row-div-list">
                   {stages.map((stage) => (
                     <StageRow key={stage.id} stage={stage} isActive={activeStageId === stage.id} />
                   ))}
                 </div>
-                {/* Technical details disclosure */}
-                <TechnicalDetailsDisclosure computation={latestResult.computation} classifyRouteInfo={classifyResult} />
+                {/* Technical details disclosure (Route Info only shown for the AI upload path) */}
+                <TechnicalDetailsDisclosure
+                  computation={latestResult.computation}
+                  classifyRouteInfo={aiClassified ? classifyResult : null}
+                />
               </div>
             </>
           )}

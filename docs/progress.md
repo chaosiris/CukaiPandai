@@ -1750,3 +1750,35 @@ In `frontend/src/pages/Landing.css`: removed `.lp-finale`, `.lp-finale-inner`, `
 - `cd frontend && bunx tsc --noEmit` -- **0 errors**
 - `bun run build` -- **green** (83 modules, 2.09s)
 - `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
+
+---
+
+## [27/06/26] — Structured filing input + full corporate-tax engine (SFI-0…SFI-6) `[BE/FE/TD]`
+
+**Why:** the `/filing/new` free-text `AccountName Amount` textarea was too lax — users typed non-financial gibberish (emojis, "tung tung tung sahur") and still got a classification. Replaced it with fixed, selectable accounts; PO chose to ALSO build the real Schedule-3 capital-allowance + s.44 reliefs engine (not just `income − deductible`).
+
+### Research (SFI-0) — cited YA2026 rates/caps
+Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, s.44 relief caps, and the 7-stage computation order vs LHDN + PwC/EY/KPMG/Deloitte/Grant Thornton/Crowe. Locked: P&M 20/14, MV 20/20 (RM50k base cap), F&F 20/10, ICT 40/20, IBA 10/3, SVA 100% (SME aggregate-cap-exempt), **renovation general deduction EXPIRED 31/12/2022 → no auto-allowance**; donation 10% + zakat 2.5% both vs **aggregate** income; **company zakat is a deduction not a rebate**; **company total income = chargeable income**; **group relief needs paid-up >RM2.5m (inverse of SME)**.
+
+### Taxonomy (SFI-1)
+- `backend/core/tax_accounts.py` — **88 fixed accounts across 14 groups** (research summary's "62" was an undercount); typed `TaxAccount`, `category` ∈ {income, exempt_income, deductible, non_deductible, capital_allowance, special_deduction} + `ca_class`/`relief_key`; helpers `by_code`/`by_group`/`allowed_codes`.
+- `frontend/src/lib/taxAccounts.ts` — mirror (code/label/group/category/note + `CATEGORY_LABEL`). MUST stay in sync (audit verified 88/88 codes, 0 category/group mismatches).
+
+### Config (SFI-2)
+- `core/config/ya_2026.yaml` — added cited `capital_allowances` (IA/AA + caps per `ca_class`) and `reliefs` (EPF 19%, secretarial RM15k, ESG RM50k, donation 10%, zakat 2.5%, group relief 70%, loss/CA carry-forward 10y). Version unchanged (`YA2026.1`; additive only).
+
+### Engine (SFI-3)
+- Rewrote `core/computation.py` `compute_form_c` to the full ascertainment chain (business income → adjusted → statutory[+balancing charge −CA] → aggregate[−CY loss] → total[−b/f loss −zakat −donations −group relief] → chargeable → tax). Exempt credit items (dividend, gain on disposal, unrealised forex gain) excluded. 8 stage fields exposed for the FigureTrace UI; `chargeable_income`+`tax_payable` keys retained. +9 stage tests. **Golden RM31,000 + non-SME RM240,000 preserved.**
+
+### Structured manual entry (SFI-4)
+- `FilingNew.tsx`: free-text textarea → **two-level structured rows** (group → account → amount). `buildLineItems` builds `LineItem[]` deterministically from the taxonomy (**no LLM on the manual path**). Personas carry `demoItems` (replaced `demoRawText` everywhere). **Honest UI:** manual shows "entered directly · no AI", hides the AI route-info, provenance tip states no AI involved; sovereign/AI shown only for uploads. Resume rehydrates rows from line_items; "Edit Line Items" preserves rows + the one draft id. `FilingPipeline.Stage1Detail` gained a `manual` prop; `UPSTREAM_KEYS` extended for ordered stage display.
+
+### Constrained upload (SFI-5)
+- `documents.py`: injects the 88-account catalogue into the prompt; **server-side drops codes outside the taxonomy + non-finite/zero amounts, and sets category authoritatively from the taxonomy** (never the model). Drop-zone names the curated docs (Income Statement/P&L, Trial Balance); AI extract pre-fills the rows for review. Mock classify aligned to taxonomy codes + valid categories.
+
+### Audits (SFI-6)
+- Backend tax-engine audit → **GO**. FE + upload audit → **GO** (taxonomy sync verified programmatically; honesty contract holds; determinism + state-flow correct; no regressions). Hardened `documents.py` to reject NaN/Infinity per the audit note.
+
+### Verify results
+- `backend`: `python -m pytest -q` (repo `.venv`) → **236 passed**.
+- `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` (root-pinned 1.9.4) 0 errors on all changed files.
