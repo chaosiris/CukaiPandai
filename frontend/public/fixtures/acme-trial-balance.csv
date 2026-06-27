@@ -7,7 +7,8 @@ AccNo,Description,Debit,Credit
 312-010,Cash at bank,350000.00,
 300-000,Trade receivables,640000.00,
 330-400,Inventory (closing stock),720000.00,
-200-010,"Property, plant & equipment (net)",900000.00,
+200-010,"Property, plant & equipment b/f (net)",600000.00,
+200-020,"Plant & machinery additions (current year)",300000.00,
 400-000,Trade payables,,520000.00
 400-000,Accruals & other payables,,85000.00
 450-000,Bank loan / borrowings,,470000.00

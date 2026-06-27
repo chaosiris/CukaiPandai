@@ -340,34 +340,61 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
 // Fallback for unknown TINs
 const MOCK_OBLIGATIONS = MOCK_OBLIGATIONS_BY_TIN[ACME_TIN]
 
+// Mirrors the deterministic core's exact output for Acme's classified line items
+// (incl. a RM300,000 plant & machinery acquisition -> RM102,000 capital allowance at
+// 20% IA + 14% AA). Field names / rule_ids / config_version match core.computation so the
+// offline mock is faithful to what the live engine produces.
 const MOCK_FORM_C: FormCResponse = {
   computation: {
-    form: 'Form C',
+    form: 'C',
     fields: {
-      gross_income: { value: 5000000, inputs: ['revenue'], rule_id: 'ITA_s4', config_version: 'ya_2026_v1' },
+      business_income: { value: 5000000, inputs: ['income'], rule_id: 'cit.business_income', config_version: 'YA2026.1' },
       adjusted_income: {
-        value: 4800000,
-        inputs: ['gross_income', 'allowable_deductions'],
-        rule_id: 'ITA_s33',
-        config_version: 'ya_2026_v1'
+        value: 535200,
+        inputs: ['business_income', 'deductible', 'special_deduction'],
+        rule_id: 'cit.adjusted_income',
+        config_version: 'YA2026.1'
+      },
+      capital_allowances: {
+        value: 102000,
+        inputs: ['capital_allowance'],
+        rule_id: 'cit.capital_allowances',
+        config_version: 'YA2026.1'
+      },
+      statutory_income: {
+        value: 433200,
+        inputs: ['adjusted_income', 'capital_allowances'],
+        rule_id: 'cit.statutory_income',
+        config_version: 'YA2026.1'
+      },
+      aggregate_income: {
+        value: 433200,
+        inputs: ['statutory_income'],
+        rule_id: 'cit.aggregate_income',
+        config_version: 'YA2026.1'
+      },
+      total_income: {
+        value: 433200,
+        inputs: ['aggregate_income', 'special_deduction'],
+        rule_id: 'cit.total_income',
+        config_version: 'YA2026.1'
       },
       chargeable_income: {
-        value: 200000,
-        inputs: ['adjusted_income', 'capital_allowances'],
-        rule_id: 'ITA_s43',
-        config_version: 'ya_2026_v1'
+        value: 433200,
+        inputs: ['total_income'],
+        rule_id: 'cit.chargeable_income',
+        config_version: 'YA2026.1'
       },
-      tax_payable: { value: 31000, inputs: ['chargeable_income'], rule_id: 'ITA_s4_sch1', config_version: 'ya_2026_v1' }
+      tax_payable: {
+        value: 70644,
+        inputs: ['chargeable_income'],
+        rule_id: 'cit.rate.sme',
+        config_version: 'YA2026.1'
+      }
     }
   },
   requires_approval: true,
-  risk_flags: [
-    {
-      code: 'gross_chargeable_gap',
-      message: 'Large gap between gross income (RM5,000,000) and chargeable income (RM200,000): deductions exceed 95%.',
-      severity: 'high'
-    }
-  ]
+  risk_flags: []
 }
 
 const MOCK_FILING_START: FilingStartResponse = {
@@ -391,9 +418,15 @@ const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
     line_items: [
       { code: 'rev_sales', description: 'Sales / turnover', amount: 5000000, category: 'income' },
       {
+        code: 'cos_purchases',
+        description: 'Purchases of goods (cost of sales)',
+        amount: 3800000,
+        category: 'deductible'
+      },
+      {
         code: 'staff_salaries',
         description: 'Salaries, wages, bonuses & commissions',
-        amount: 2000000,
+        amount: 660000,
         category: 'deductible'
       },
       { code: 'rep_maintenance', description: 'Repairs & maintenance', amount: 4800, category: 'deductible' },
@@ -402,6 +435,12 @@ const MOCK_CLASSIFY_BY_TIN: Record<string, ClassifyResponse> = {
         description: 'Depreciation of property, plant & equipment',
         amount: 120000,
         category: 'non_deductible'
+      },
+      {
+        code: 'ca_plant_machinery',
+        description: 'Plant & machinery additions (current year)',
+        amount: 300000,
+        category: 'capital_allowance'
       }
     ],
     sovereign: true,

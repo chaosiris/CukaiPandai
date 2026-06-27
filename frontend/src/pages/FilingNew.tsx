@@ -42,7 +42,7 @@ const MANUAL_MODEL = 'structured-entry'
 // Per-persona sample financial statements shipped in /public/fixtures (generated, taxonomy-aligned).
 // Lets a demo user try the upload pipeline with a realistic document for their own company.
 const SAMPLE_DOCS: Record<string, { file: string; label: string }> = {
-  C2581234509: { file: 'acme-income-statement.pdf', label: 'Acme Trading — Statement of Profit or Loss' },
+  C2581234509: { file: 'acme-trial-balance.csv', label: 'Acme Trading — Trial Balance' },
   C7654321098: { file: 'sinar-income-statement.pdf', label: 'Sinar Digital — Statement of Profit or Loss' },
   C3219876540: { file: 'selera-income-statement.pdf', label: 'Selera Kita — Statement of Profit or Loss' }
 }
@@ -409,7 +409,12 @@ export default function FilingNew() {
       const res = await fetch(`/fixtures/${sample.file}`)
       if (!res.ok) throw new Error(`could not load sample (${res.status})`)
       const blob = await res.blob()
-      await handleUpload(new File([blob], sample.file, { type: 'application/pdf' }))
+      const mime = sample.file.endsWith('.csv')
+        ? 'text/csv'
+        : sample.file.endsWith('.xlsx')
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf'
+      await handleUpload(new File([blob], sample.file, { type: mime }))
     } catch (e) {
       setUploadError(`Could not load the sample document: ${(e as Error).message}`)
     }
