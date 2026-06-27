@@ -1,0 +1,10 @@
+/* Collapse mascot column on narrow screens */
+@media (max-width: 700px) {
+  .welcome-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .welcome-mascot-col {
+    display: none !important;
+  }
+}

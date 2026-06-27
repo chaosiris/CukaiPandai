@@ -155,7 +155,7 @@ const SECONDARY_CONSOLES = [
   {
     to: '/audit-assistant',
     title: 'Audit Assistant',
-    desc: 'Build a citation-grounded defense pack; fabricated clauses are rejected.',
+    desc: 'Ask about any figure on your filing and get a citation-grounded answer; fabricated clauses are rejected.',
     kicker: 'RAG · ground_citation gate',
     mascot: '/mascots/pandai-assistant.png'
   }
