@@ -7,7 +7,7 @@
 //       memory via GET /me/filings/{id}/conversation; follow-up chips after each answer.
 
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   type AuditDefenseResponse,
   type Citation,
@@ -454,11 +454,15 @@ function UserBubble({ text, isFabrication }: { text: string; isFabrication?: boo
 export default function AuditAssistant() {
   const { error: entityError } = useEntity()
   const { notify } = useNotifications()
+  const [searchParams] = useSearchParams()
+  const deepLinkFilingId = searchParams.get('filing')
 
   // Filing picker state
   const [filings, setFilings] = useState<FilingRecord[]>([])
   const [filingsLoading, setFilingsLoading] = useState(true)
   const [selectedFiling, setSelectedFiling] = useState<FilingRecord | null>(null)
+  // Track whether the deep-link preselect has been attempted (once per mount)
+  const deepLinkApplied = useRef(false)
 
   // Chat state
   const [thread, setThread] = useState<ChatMessage[]>([])
@@ -478,12 +482,24 @@ export default function AuditAssistant() {
       .catch(() => setFilingsLoading(false))
   }, [])
 
+  // Deep-link preselect: once filings have loaded and ?filing=<id> is in the URL,
+  // auto-select that filing (skip the picker and go straight to the workbench).
+  // Falls back to normal picker if the id is not found or filings are still loading.
+  useEffect(() => {
+    if (!deepLinkFilingId || filingsLoading || deepLinkApplied.current || selectedFiling) return
+    const match = filings.find((r) => r.id === deepLinkFilingId)
+    if (!match) return
+    deepLinkApplied.current = true
+    void selectFiling(match)
+  }, [filings, filingsLoading, deepLinkFilingId, selectedFiling])
+
   // Reset when persona switches (entity error guard)
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional reset when entity changes
   useEffect(() => {
     setThread([])
     setInputText('')
     setSelectedFiling(null)
+    deepLinkApplied.current = false
     setFilingsLoading(true)
     listFilings()
       .then((recs) => {
