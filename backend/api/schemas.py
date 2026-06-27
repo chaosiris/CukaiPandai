@@ -60,6 +60,7 @@ class AuditDefenseReq(BaseModel):
     query: str
     evidence: list[list[str]]
     inject_fabricated: bool = False
+    filing_id: str | None = None
 
 
 class FilingResumeReq(BaseModel):

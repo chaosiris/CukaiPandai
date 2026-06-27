@@ -1192,3 +1192,61 @@ Money-shot path (BE-18 fabricated-citation rejection in Audit), sovereign badge,
 **Smoke test:** `cd frontend && bunx tsc --noEmit` exit 0 · `bun run build` exit 0 (83 modules) · `bunx biome check frontend/src` 0 errors/0 warnings.
 
 **Return to PM:** **Approve with comments — Gate-2.** PR-B is correct and complete against the locked Gate-1 resolutions for FE-2.1/2.2/2.3/2.4/2.5/2.7; FE-2.6 is correctly deferred (file/route/plan-boxes confirm it). All three hard gates pass. The CRITICAL `/audit-assistant` probe is **clear** — it lives only in the passive `WALKTHROUGH_ROUTES` matcher, is not a rendered nav link, and cannot 404. The only substantive note is **Minor M1: `drawerPinned` is dead state** (declared + written, never read; zero behavioral effect under OQ-7) — recommend deleting it (or wiring it) in this PR; the three Trivial items are cosmetic. No Critical, no Major, no regression. Recommend the human authorize the squash-merge, optionally after the 1-line `drawerPinned` cleanup.
+
+---
+
+## QA Verdict — PR-C backend (BE-2.2 + BE-2.3) — Pandai persona + per-filing memory · 27/06/26
+
+**Scope:** `feat/audit-pandai-backend`, uncommitted vs `main`. New: `api/agents/pandai_persona.py`, `api/agents/pandai_primer.md`, `tests/api/test_pandai_persona.py`, `tests/api/test_audit_conversation.py`. Modified: `audit_defense.py`, `main.py`, `persistence.py`, `schemas.py`, `core/models.py`, `migrations/neon_schema.sql`.
+
+**Verdict: PASS — Approve. Recommend Gate-2 authorization.**
+
+**Smoke test:** `cd backend && uv run pytest -q` → **227 passed**, 1 warning (preexisting Starlette/httpx deprecation), 8.74s. Matches the expected 227.
+
+### IRON citation rule (CRITICAL) — PASS
+
+- Primer (`pandai_primer.md`) is figure-free. Programmatic scan confirms: **no `%`, no `RM` amounts, no comma-formatted thresholds, no `ITA-YYYY-sNN` authoritative IDs, no `## Research sources` section.** The only section references are `s.33`/`s.39` (`pandai_primer.md:115,119`), both presented "conceptually" as orientation — explicitly permitted by the primer's own standing rule (`pandai_primer.md:222`: name a section for orientation, never as authority). Not in the gate's authoritative `ITA-YYYY-sNN` format.
+- Standing "never assert a figure/clause; say unavailable" instruction present in both the primer (§8, `pandai_primer.md:204-209`) and the assembler Hard Rules (`pandai_persona.py:88-90`, rule 7).
+- The regression test genuinely enforces this: `test_primer_has_no_asserted_numeric_figures` / `_has_no_authoritative_clause_ids` / `_research_sources_stripped` (`test_pandai_persona.py:23-61`) would fail if a `%`, `RM`, comma-threshold, `ITA-YYYY-sNN` ID, or the sources section were re-introduced. Confirmed against the real shipped `.md`.
+
+### 5-layer assembler — PASS
+
+- `build_pandai_system(filing_digest, *, history=None, locale="en")` (`pandai_persona.py:24-29`) — signature accepts `history` + `locale`. All 5 layers present IN ORDER (Language → Persona → Hard Rules → Primer (lru_cached via `_load_primer`) → Live Digest), enforced by `test_layers_in_order` (`test_pandai_persona.py:85-93`). Hard Rules carry no-greeting (rule 6), cite-the-filing's-own-numbers (rule 5), and no-figures-from-memory (rule 7).
+- Note (informational, not a defect): `history` is accepted and bounded by the caller but is **not** injected into the system string (docstring `pandai_persona.py:36-38` says so explicitly — it is reserved for callers building the user-turn history). Bounded history is computed in `build_defense` (`audit_defense.py:35`, last `_MAX_HISTORY_TURNS=8`) and threaded through, satisfying the "only last N turns feed the prompt / bounded context" criterion.
+
+### Citation gate preserved (BE-18 money-shot) — PASS
+
+- `verify_claim` + `thread_provenance` + the `inject_fabricated` probe are byte-for-byte unchanged in flow (`audit_defense.py:51-63`); only the system prompt source and the JSON schema (added `answer`/`followups`) changed. `test_fabricated_probe_still_rejected_with_persona` (`test_pandai_persona.py:221-245`) confirms the fabricated clause is still `verified=False` under the new persona prompt. The new `answer`/`followups` are extracted post-gate and cannot bypass it.
+- `followups` guaranteed exactly 3 via `(followups + ["","",""])[:3]` with a non-list guard (`audit_defense.py:66-70`). Verified for 1→3 (pad) and 3→3 by `test_build_defense_pads_followups_to_three` / `test_build_defense_returns_answer_and_followups`. A 5-followup model response is truncated to 3 (slice). A 0-followup response yields three empty strings.
+
+### DefensePack additions / core purity — PASS
+
+- `core/models.py` adds `answer: str = ""` and `followups: list[str] = []` — both optional with defaults, so no existing caller/test breaks (227 green, including all prior DefensePack callers). No LLM call added to `core/`; the deterministic core stays pure.
+
+### Conversation memory (BE-2.3) — PASS
+
+- Migration is additive: `CREATE TABLE IF NOT EXISTS audit_conversations`, PK `(user_id, filing_id)` (`neon_schema.sql`), mirrored exactly in `ConversationRepository._ensure_table` (`persistence.py`). Fresh-install DDL and the runtime `_ensure_table` agree (columns, types, PK). Nothing existing is altered.
+- `ConversationRepository` is fallback-first: in-memory dict updated first, then best-effort Neon in a try/except-pass. `get`/`append`/`delete` round-trip in memory; per-owner isolation holds (`test_per_owner_isolation`).
+- `GET /me/filings/{rec_id}/conversation` is `_owner`-scoped (`main.py:385-392`): 401 without token (via `_owner` → `_bearer_user`/`decode_token`), 404 for foreign/absent filing (filing lookup enforces ownership), `[]` when empty. All three covered by endpoint tests.
+- Turns persisted on the audit path (user Q + assistant A with `citations`) only when `owner and filing_id` (`main.py:441-451`). Cascade-delete wired on **both** delete endpoints — single (`main.py:281`) and multi (`main.py:288`) — via `FilingRepository.delete(..., conversation_repo=_CONVERSATION_REPO)`; `test_cascade_delete_endpoint_clears_conversation` + `test_cascade_delete_via_filing_repo` confirm.
+
+### Deviation #3 (auth-OPTIONAL audit-defense) — PASS
+
+- The endpoint resolves owner from the bearer if present, else None, by wrapping `_owner(authorization=...)` in `try/except HTTPException` (`main.py:404-409`). An unauthenticated call simply skips digest load, history load, and persistence — no crash, no 401 where none was required before (`test_audit_defense_without_filing_id_no_persistence` and the existing unauthenticated audit-defense tests stay green). Per-owner isolation on the authenticated path verified.
+
+### Findings (non-blocking)
+
+- **[LOW] `persistence.py` `ConversationRepository.get` does not fall back to memory when a DB row already exists but a later `append` failed to persist.** With a live `DATABASE_URL`, `get` returns the DB row whenever one exists (`get` early-returns on `row is not None`); if an intermittent DB error caused an in-memory-only append after the row was created, that turn is silently absent from `get`. Only reachable under partial Neon failure with a pre-existing row; the hermetic suite forces in-memory so it is untested. Suggested: on the live path, merge/prefer whichever is longer, or document the "DB is source of truth when reachable" semantics. Severity LOW (degraded-DB only).
+- **[LOW] Orphan conversation rows for foreign `filing_id`.** An authenticated user who passes a `filing_id` they don't own gets `filing_digest=None` (correct), but the bottom `if owner and filing_id:` still appends a thread under `(owner, foreign_id)` (`main.py:441`). Harmless — keyed to that owner, and the GET 404s because the filing isn't owned — but it writes an unreachable row. Suggested: gate persistence on `filing_digest is not None` (i.e. only persist when the owner actually owns the filing). Severity LOW.
+- **[TRIVIAL] Empty follow-up chips.** Padding emits `""` chips when the model returns fewer than 3 (`audit_defense.py:70`). The FE (FE-2.6) should filter falsy chips before rendering tappable elements, else a blank chip shows. Cross-layer note for FE-2.6; production FakeLLM scripts always return 3.
+- **[TRIVIAL] Weak assertion in `test_hard_rules_cite_filing_numbers`** (`test_pandai_persona.py:143-145`): `"filing" in s and ("figure" in s or "filing" in s)` — the second disjunct is tautological once the first passes, so the test cannot detect loss of the "figure" wording. Tighten to assert both `filing` and `figure` independently. No behavioral impact.
+
+### Edge cases reasoned (no defects)
+
+- **Draft filing (no computation) as digest** — `_layer_live_digest` guards `computation.get("fields") or {}` and `line_items or []`; a draft renders meta-only without KeyError. OK.
+- **History longer than N** — sliced to last 8 in `build_defense` before assembly. OK.
+- **Concurrent guest writes to the shared `(guest, filing_id)` thread** — documented honestly in the migration comment and BE-2.3 shared-guest caveat; guests intentionally share guest threads, real `sub` users isolated. Accepted by plan; flagged for TD-2.7.
+- **0 / 5 followups from the model** — pad-then-slice yields exactly 3 in both directions. OK.
+- **lru_cached primer in tests** — `test_primer_cached` asserts cache-hit identity; the regression tests read the `.md` directly (not via cache), so a stale cache cannot mask a regressed file. OK.
+
+**Return to PM:** **PASS — Approve, Gate-2.** PR-C backend fully satisfies BE-2.2 + BE-2.3 against the locked Gate-1 resolutions: the primer is shipped figure-free with a real enforcing regression test, the 5-layer ordered assembler is correct, and the BE-18 fabrication gate is preserved intact (still rejects the fake clause under the new persona prompt). Conversation memory is additive, fallback-first, owner-scoped (401/404/[]), bounded, and cascades on both delete endpoints; the auth-optional audit path degrades cleanly for guests. **227/227 tests pass.** No Critical/Major findings; two LOW notes (degraded-DB get-fallback; orphan-row on foreign filing_id) and two TRIVIAL nits — all safe to address in a follow-up or with a one-line tweak. Recommend the human authorize the squash-merge via `gh pr` (PR-C ships alone; coordinate with Chaos).

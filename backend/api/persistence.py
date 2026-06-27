@@ -404,7 +404,7 @@ class FilingRepository:
 
         return mem_rec
 
-    def delete(self, owner: str, ids: list[str]) -> None:
+    def delete(self, owner: str, ids: list[str], conversation_repo: "ConversationRepository | None" = None) -> None:
         url = database_url()
         if url:
             try:
@@ -420,3 +420,91 @@ class FilingRepository:
         # Always apply to in-memory (may be the only store if DB is down)
         if owner in self._mem:
             self._mem[owner] = [r for r in self._mem[owner] if r["id"] not in ids]
+        # Cascade: drop conversation rows for deleted filings.
+        if conversation_repo is not None:
+            for rec_id in ids:
+                conversation_repo.delete(owner, rec_id)
+
+
+class ConversationRepository:
+    """BE-2.3 — per-(owner, filing_id) audit conversation history.
+
+    In-memory dict first (always consistent); best-effort Neon write/read on top.
+    ``messages`` = list of {role, content, citations?, ts} dicts.
+    """
+
+    def __init__(self):
+        # (owner, filing_id) -> list of message dicts
+        self._mem: dict[tuple[str, str], list[dict]] = {}
+
+    def _ensure_table(self, conn) -> None:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_conversations ("
+            "user_id text NOT NULL, filing_id text NOT NULL, "
+            "messages jsonb NOT NULL DEFAULT '[]', "
+            "updated_at timestamptz DEFAULT now(), "
+            "PRIMARY KEY (user_id, filing_id))"
+        )
+
+    def get(self, owner: str, filing_id: str) -> list[dict]:
+        """Return the conversation thread; [] if none exists."""
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    row = conn.execute(
+                        "SELECT messages FROM audit_conversations "
+                        "WHERE user_id=%s AND filing_id=%s",
+                        (owner, filing_id),
+                    ).fetchone()
+                    if row is not None:
+                        msgs = row["messages"]
+                        return msgs if isinstance(msgs, list) else []
+            except Exception:
+                pass
+        return list(self._mem.get((owner, filing_id), []))
+
+    def append(self, owner: str, filing_id: str, turn: dict) -> None:
+        """Append one turn to the thread. Falls back to in-memory on DB error."""
+        import json as _json
+        from datetime import datetime, timezone
+
+        # Timestamp if not provided
+        if "ts" not in turn:
+            turn = {**turn, "ts": datetime.now(timezone.utc).isoformat()}
+
+        key = (owner, filing_id)
+        existing = list(self._mem.get(key, []))
+        existing.append(turn)
+        self._mem[key] = existing
+
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    conn.execute(
+                        "INSERT INTO audit_conversations (user_id, filing_id, messages, updated_at) "
+                        "VALUES (%s, %s, %s::jsonb, now()) "
+                        "ON CONFLICT (user_id, filing_id) DO UPDATE "
+                        "SET messages = audit_conversations.messages || %s::jsonb, updated_at = now()",
+                        (owner, filing_id, _json.dumps([turn]), _json.dumps([turn])),
+                    )
+            except Exception:
+                pass  # in-memory already updated above
+
+    def delete(self, owner: str, filing_id: str) -> None:
+        """Remove the conversation thread for (owner, filing_id). Used for cascade-delete."""
+        self._mem.pop((owner, filing_id), None)
+        url = database_url()
+        if url:
+            try:
+                with _connect(url) as conn:
+                    self._ensure_table(conn)
+                    conn.execute(
+                        "DELETE FROM audit_conversations WHERE user_id=%s AND filing_id=%s",
+                        (owner, filing_id),
+                    )
+            except Exception:
+                pass

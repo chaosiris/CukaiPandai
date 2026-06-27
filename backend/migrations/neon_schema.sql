@@ -79,3 +79,16 @@ CREATE TABLE IF NOT EXISTS filing_records (
 -- dropped or retyped. Safe to run on any DB that has filing_records already created.
 ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'final';
 ALTER TABLE filing_records ADD COLUMN IF NOT EXISTS raw_text text;
+
+-- BE-2.3 — per-user, per-filing audit conversation history (separate table).
+-- messages = JSON array of {role, content, citations?, ts}.
+-- Additive; no existing table is altered. Safe to run on any existing DB (CREATE IF NOT EXISTS).
+-- NOTE: guest is a shared public user; guests share guest conversations (by design -- the same
+-- GUEST_USER_ID sub keys all guest conversation rows). Real sub users are isolated.
+CREATE TABLE IF NOT EXISTS audit_conversations (
+    user_id    text NOT NULL,
+    filing_id  text NOT NULL,
+    messages   jsonb NOT NULL DEFAULT '[]',
+    updated_at timestamptz DEFAULT now(),
+    PRIMARY KEY (user_id, filing_id)
+);
