@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { type FilingRecord, getFiling } from '../api/client'
+import { type FilingRecord, getFiling, getFilingReport } from '../api/client'
 import {
   ComputationPanel,
   RiskFlagList,
@@ -89,6 +89,9 @@ export default function FilingRecordPage() {
   const [record, setRecord] = useState<FilingRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [reportUrl, setReportUrl] = useState<string | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -104,6 +107,13 @@ export default function FilingRecordPage() {
         setLoading(false)
       })
   }, [id])
+
+  // Free the blob URL when it changes or the page unmounts.
+  useEffect(() => {
+    return () => {
+      if (reportUrl) URL.revokeObjectURL(reportUrl)
+    }
+  }, [reportUrl])
 
   if (loading) {
     return (
@@ -184,6 +194,20 @@ export default function FilingRecordPage() {
 
   const stages = buildFinalizedStages(record)
 
+  async function handleGenerateReport() {
+    if (!id) return
+    setReportError(null)
+    setReportLoading(true)
+    try {
+      const blob = await getFilingReport(id)
+      setReportUrl(URL.createObjectURL(blob)) // previous URL is revoked by the cleanup effect
+    } catch (e) {
+      setReportError((e as Error).message)
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="page-head">
@@ -231,6 +255,90 @@ export default function FilingRecordPage() {
           </div>
           <div style={{ padding: '12px 18px' }}>
             <RiskFlagList flags={record.risk_flags} />
+          </div>
+        </div>
+      )}
+
+      {/* Filing draft pack — WeasyPrint PDF preview + download (a preparation aid; never submitted) */}
+      {record.computation && (
+        <div className="window" style={{ marginTop: 12 }}>
+          <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="titlebar-title">Filing Draft Pack</span>
+            <InfoTip content="A printable Form C tax-computation working paper -- entity particulars, the computation working sheet, capital-allowance schedule and a Form C field summary -- to review and take to LHDN or your tax agent. CukaiPandai never submits on your behalf: Malaysia uses self-assessment, so you (or an authorised agent) file via MyTax. Every page is watermarked DRAFT - NOT FOR SUBMISSION." />
+            <span className="titlebar-meta">draft · not submitted</span>
+          </div>
+          <div style={{ padding: '16px 18px', display: 'grid', gap: 12 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+              Generate a Form C draft pack as a PDF for review before filing. This is a preparation aid only -- it is
+              not submitted to LHDN.
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => void handleGenerateReport()}
+                disabled={reportLoading}
+                style={{
+                  padding: '8px 20px',
+                  border: 'var(--border)',
+                  background: 'var(--denim)',
+                  color: 'var(--paper)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: reportLoading ? 'not-allowed' : 'pointer',
+                  borderRadius: 'var(--radius)',
+                  opacity: reportLoading ? 0.6 : 1
+                }}
+              >
+                {reportLoading ? 'Generating…' : reportUrl ? 'Regenerate draft pack' : 'Generate draft pack'}
+              </button>
+              {reportUrl && (
+                <a
+                  href={reportUrl}
+                  download={`CukaiPandai-FormC-Draft-${record.tin}-YA2026.pdf`}
+                  style={{
+                    padding: '8px 18px',
+                    border: 'var(--border)',
+                    background: 'var(--window)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius)'
+                  }}
+                >
+                  Download PDF
+                </a>
+              )}
+            </div>
+            {reportError && (
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--rust)',
+                  padding: '8px 12px',
+                  border: '1px solid var(--rust)',
+                  borderRadius: 'var(--radius)',
+                  background: 'rgba(181,80,60,0.04)'
+                }}
+              >
+                {reportError}
+              </div>
+            )}
+            {reportUrl && (
+              <iframe
+                title="Form C draft pack preview"
+                src={reportUrl}
+                style={{
+                  width: '100%',
+                  height: 620,
+                  border: 'var(--border)',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--paper)'
+                }}
+              />
+            )}
           </div>
         </div>
       )}

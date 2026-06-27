@@ -385,3 +385,14 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 - [x] +5 computation tests (incl. the 20-line scenario → chargeable RM1,901,500); golden RM31,000 preserved; **241 backend tests**; FE green.
 
 **Acceptance:** the deterministic core auto-applies the entertainment 50% rule + EPF cap (input-path-agnostic), surfaces + flags the add-backs, and the cold-backend UX is calm; suites green; taxonomy in sync.
+
+### SFI-9 `[BE]`/`[FE]`/`[TD]`/`[DO]` — Filing draft-pack report (WeasyPrint PDF) _(DONE)_
+
+> A finalized Form C filing renders to a printable **draft pack** (tax-computation working paper) the SME reviews and takes to LHDN / its tax agent. It is a **preparation aid — never auto-submitted** (Malaysia is self-assessment; the taxpayer/authorised agent files via MyTax). Patterned on `../myai-future-hackathon` (WeasyPrint + blob-URL `<iframe>` preview + download); format grounded in online research (LHDN HK-1 working sheet + tax-agent working-paper convention).
+
+- [x] **Backend** `api/report.py`: `build_report_html(filing, entity)` (pure) → cover + DRAFT watermark, entity particulars, tax-computation working sheet (figures sourced only from the engine's `computation.fields`, reconciling), capital-allowance schedule, line-item schedule, Form C field summary, self-assessment disclaimer; `render_pdf` (lazy WeasyPrint import). `GET /me/filings/{id}/report` (owner-scoped) → inline `application/pdf`, `Cache-Control: no-store`; 404/409/503.
+- [x] **Deps/deploy:** `weasyprint>=62` in pyproject; Dockerfile installs the Pango/Cairo/HarfBuzz/GDK-PixBuf native libs + fonts. Lazy import means the API still boots if a lib is missing (endpoint 503s). _(uv.lock not regenerated — sandbox offline; harmless: the image uses `uv pip install -e .` which resolves from pyproject.)_
+- [x] **FE** (`FilingRecord.tsx` + `client.ts`): "Filing Draft Pack" card on `/filing/[id]` — `getFilingReport` authed-fetches the PDF → blob URL → inline `<iframe>` preview + Download PDF; blob URL revoked on unmount; mock mode degrades with a clear message.
+- [x] +5 tests (HTML builder + 401/404/409 + PDF render, which skips where native libs absent); **246 backend tests**; FE `tsc`/`build`/`biome` green; end-to-end render verified (valid 3-page PDF with all sections + add-back lines).
+
+**Acceptance:** a finalized filing previews + downloads as a watermarked DRAFT Form C tax-computation pack; figures reconcile to the deterministic core; the "never submitted / self-assessment" framing is explicit; suites green; the deploy installs the PDF engine's native libs.

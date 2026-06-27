@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from pydantic import ValidationError
@@ -28,6 +28,7 @@ from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
 from api.persistence import ConversationRepository, EntityRepository, FilingRepository, UserEntityRepository, UserRepository, make_checkpointer
+from api.report import build_report_html, render_pdf
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
@@ -263,6 +264,30 @@ def get_my_filing(rec_id: str, owner: str = Depends(_owner)) -> dict:
     if rec is None:
         raise HTTPException(status_code=404, detail="Filing record not found")
     return rec
+
+
+@app.get("/me/filings/{rec_id}/report")
+def filing_report(rec_id: str, owner: str = Depends(_owner)) -> Response:
+    """Render a finalized filing as a Form C draft pack (inline PDF). A preparation aid only —
+    CukaiPandai never submits to LHDN. 404 if not owned/absent; 409 if not yet computed; 503 if the
+    PDF engine's native libraries are unavailable."""
+    rec = _FILING_REPO.get(owner, rec_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Filing record not found")
+    if not rec.get("computation"):
+        raise HTTPException(status_code=409, detail="This draft has no computed Form C yet")
+    entity = _ENTITY_REPO.get(rec.get("tin", "")) or _USER_ENTITY_REPO.get(owner)
+    html_str = build_report_html(rec, entity)
+    try:
+        pdf = render_pdf(html_str)
+    except (ImportError, OSError) as e:
+        raise HTTPException(status_code=503, detail=f"PDF rendering is unavailable on the server: {e}") from e
+    filename = f"CukaiPandai-FormC-Draft-{rec.get('tin', 'entity')}-YA2026.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"},
+    )
 
 
 @app.patch("/me/filings/{rec_id}")

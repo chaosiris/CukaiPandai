@@ -1830,3 +1830,25 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 ### Verify results
 - `backend`: `python -m pytest -q` → **241 passed**.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors. Taxonomy diff backend↔FE = 0.
+
+---
+
+## [27/06/26] — Filing draft-pack report (WeasyPrint PDF) (SFI-9) `[BE/FE/DO/TD]`
+
+**Why:** give the SME a printable Form C **draft pack** (tax-computation working paper) to review and take to LHDN / a tax agent. A preparation aid — **never auto-submitted** (Malaysia self-assessment; the taxpayer/authorised agent files via MyTax). Pattern mirrors `../myai-future-hackathon` (WeasyPrint + blob-URL iframe preview + download); format grounded in online research (LHDN HK-1 + tax-agent working-paper convention).
+
+### Merges first
+Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `main` (now `60a000c`) and pushed.
+
+### Backend
+- `api/report.py`: `build_report_html(filing, entity)` — pure HTML builder (cover + diagonal "DRAFT - NOT FOR SUBMISSION" watermark on every page via `position:fixed`; entity particulars; tax-computation working sheet; capital-allowance schedule; line-item schedule; Form C field summary; self-assessment disclaimer). All figures sourced from the engine's `computation.fields` (no re-derivation; inter-stage deltas reconcile). All interpolated values HTML-escaped. `render_pdf` lazily imports WeasyPrint so the API still boots if a native lib is missing.
+- `main.py`: `GET /me/filings/{id}/report` (owner-scoped) → inline `application/pdf`, `Cache-Control: no-store`; 404 (absent/foreign), 409 (no computation yet), 503 (PDF engine libs unavailable — caught ImportError/OSError so genuine bugs still 500).
+- Deps/deploy: `weasyprint>=62` in `pyproject`; Dockerfile installs Pango/Cairo/PangoFT2/HarfBuzz/GDK-PixBuf/libffi + DejaVu/Liberation fonts. `uv.lock` NOT regenerated (sandbox offline) — harmless: the image uses `uv pip install -e .` (resolves from pyproject), not `uv sync`.
+
+### Frontend
+- `client.ts` `getFilingReport(id): Promise<Blob>` (authed fetch; mock degrades with a clear message). `FilingRecord.tsx` "Filing Draft Pack" card: Generate → blob → `URL.createObjectURL` → inline `<iframe>` preview + Download PDF (`<a download>`); blob URL revoked on unmount.
+
+### Verify results
+- `backend`: `python -m pytest -q` → **246 passed** (+5 report tests; PDF-render test skips where WeasyPrint native libs absent).
+- End-to-end: a real Acme filing renders to a valid **3-page PDF** with every section + the entertainment-restricted / EPF-cap add-back lines + disclaimer.
+- `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors.

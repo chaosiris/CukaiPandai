@@ -6,6 +6,14 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
+# WeasyPrint native dependencies (Pango / Cairo / GDK-PixBuf / libffi) + a base font, for the
+# filing draft-pack PDF renderer. Installed before the Python deps so this layer caches well.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 libharfbuzz0b \
+    libgdk-pixbuf-2.0-0 libcairo2 libffi8 \
+    shared-mime-info fonts-dejavu-core fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install deps first (better layer caching), then the package.
 COPY pyproject.toml uv.lock ./
 COPY core ./core
