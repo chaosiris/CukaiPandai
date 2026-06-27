@@ -8,7 +8,6 @@
 //   "Don't Show Again" — sets cp_skip_welcome so future sign-ins go directly to /dashboard
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { JourneyMap } from '../components/JourneyProgress'
@@ -67,12 +66,8 @@ export default function Welcome() {
         padding: '40px 0 80px'
       }}
     >
-      {/* Mascot — decorative, pinned to the viewport beside the centered content on wide screens.
-          Portaled to <body> so no ancestor's transform/filter can turn `fixed` into scroll-with-content. */}
-      {createPortal(
-        <img className="welcome-mascot-fixed" src="/pandai-waving.png" alt="" aria-hidden="true" />,
-        document.body
-      )}
+      {/* Mascot — decorative, pinned to the viewport beside the centered content on wide screens. */}
+      <img className="welcome-mascot-fixed" src="/pandai-waving.png" alt="" aria-hidden="true" />
 
       {/* Content column */}
       <div>
