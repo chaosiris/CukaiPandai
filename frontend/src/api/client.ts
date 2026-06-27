@@ -119,7 +119,20 @@ export interface RouteInfo {
   active_model: string
 }
 
-export interface AuditDefenseResponse extends DefensePack, RouteInfo {}
+export interface AuditDefenseResponse extends DefensePack, RouteInfo {
+  /** Pandai's conversational answer (PR-C); falls back to exposure_note on older BE. */
+  answer?: string
+  /** Up to 3 follow-up question suggestions (may contain empty-string padding — filter on FE). */
+  followups?: string[]
+}
+
+/** A single persisted conversation turn (PR-C BE-2.3). */
+export interface ConversationTurn {
+  role: 'user' | 'assistant'
+  content: string
+  citations?: Citation[]
+  ts?: string
+}
 
 export interface ClassifyResponse extends RouteInfo {
   line_items: LineItem[]
@@ -443,9 +456,16 @@ const MOCK_DEFENSE_FAKE_CITATION: Citation = {
   verified: false
 }
 
-function makeMockDefense(injectFabricated: boolean): AuditDefenseResponse {
+function makeMockDefense(injectFabricated: boolean, query?: string): AuditDefenseResponse {
+  const isFollowup = query && query.length > 0
+  const answerBody = injectFabricated
+    ? 'The clause ITA-1967-s999-FAKE you cited does not exist in the verified law corpus. The deterministic ground_citation gate has rejected it. Your RM4,800 repairs deduction is legitimately supported under Section 33(1)(a) of the Income Tax Act 1967, which covers outgoings wholly and exclusively incurred in the production of gross income.'
+    : isFollowup
+      ? 'Based on the figures in your filing, here is the relevant guidance for your question. The deduction you are asking about falls within the scope of Malaysian tax law as verified in the law corpus. Your filing shows consistent figures that support the claimed treatment. Where LHDN raises a query, citing the relevant ITA section and your supporting invoices is the appropriate response.'
+      : 'No material audit risk has been identified for the RM4,800 repairs and maintenance deduction. This amount is categorised as revenue expenditure under Section 33(1)(a) of the Income Tax Act 1967. Outgoings wholly and exclusively incurred in the production of gross income are deductible. Ensure you retain the relevant invoices and contracts as supporting documentation in the event of an LHDN query.'
+
   return {
-    query: 'Justify your RM4,800 repairs deduction',
+    query: query ?? 'Justify your RM4,800 repairs deduction',
     items: [
       {
         contested_item: 'RM4,800 repairs and maintenance deduction',
@@ -455,12 +475,20 @@ function makeMockDefense(injectFabricated: boolean): AuditDefenseResponse {
     citations: injectFabricated
       ? [MOCK_DEFENSE_VERIFIED_CITATION, MOCK_DEFENSE_FAKE_CITATION]
       : [MOCK_DEFENSE_VERIFIED_CITATION],
-    exposure_note:
-      'No material audit risk identified for this deduction. The repairs are categorised as revenue expenditure under s33(1)(a) ITA 1967.',
+    exposure_note: answerBody,
+    answer: answerBody,
+    followups: [
+      'What supporting documents should I keep for this deduction?',
+      'Is there a threshold above which capital allowances apply instead?',
+      'How does LHDN typically audit repairs and maintenance claims?'
+    ],
     sovereign: true,
     active_model: 'nemo-super'
   }
 }
+
+// Module-scoped in-memory mock store for conversation history keyed by filing id.
+const _mockConversations: Record<string, ConversationTurn[]> = {}
 
 const MOCK_MSIC: Record<string, unknown> = {
   code: '46900',
@@ -648,14 +676,37 @@ export async function getAuditDefense(
   tin: string,
   query: string,
   evidence: [string, string][],
-  injectFabricated = false
+  injectFabricated = false,
+  filing_id?: string
 ): Promise<AuditDefenseResponse> {
-  if (MOCK_MODE) return makeMockDefense(injectFabricated)
+  if (MOCK_MODE) {
+    const res = makeMockDefense(injectFabricated, query)
+    // Persist to mock conversation store if a filing_id is supplied
+    if (filing_id) {
+      if (!_mockConversations[filing_id]) _mockConversations[filing_id] = []
+      _mockConversations[filing_id].push({ role: 'user', content: query, ts: new Date().toISOString() })
+      _mockConversations[filing_id].push({
+        role: 'assistant',
+        content: res.answer ?? res.exposure_note,
+        citations: res.citations,
+        ts: new Date().toISOString()
+      })
+    }
+    return res
+  }
   return post<AuditDefenseResponse>(`/entities/${tin}/audit-defense`, {
     query,
     evidence,
-    ...(injectFabricated && { inject_fabricated: true })
+    ...(injectFabricated && { inject_fabricated: true }),
+    ...(filing_id && { filing_id })
   })
+}
+
+/** GET /me/filings/{id}/conversation — load the persisted conversation history for a filing. */
+export async function getFilingConversation(id: string): Promise<ConversationTurn[]> {
+  if (MOCK_MODE) return [...(_mockConversations[id] ?? [])]
+  await ensureSession()
+  return get<ConversationTurn[]>(`/me/filings/${id}/conversation`)
 }
 
 /** GET /reference/msic/{code} — look up an MSIC activity code (BE-4). */

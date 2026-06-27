@@ -1250,3 +1250,52 @@ Money-shot path (BE-18 fabricated-citation rejection in Audit), sovereign badge,
 - **lru_cached primer in tests** — `test_primer_cached` asserts cache-hit identity; the regression tests read the `.md` directly (not via cache), so a stale cache cannot mask a regressed file. OK.
 
 **Return to PM:** **PASS — Approve, Gate-2.** PR-C backend fully satisfies BE-2.2 + BE-2.3 against the locked Gate-1 resolutions: the primer is shipped figure-free with a real enforcing regression test, the 5-layer ordered assembler is correct, and the BE-18 fabrication gate is preserved intact (still rejects the fake clause under the new persona prompt). Conversation memory is additive, fallback-first, owner-scoped (401/404/[]), bounded, and cascades on both delete endpoints; the auth-optional audit path degrades cleanly for guests. **227/227 tests pass.** No Critical/Major findings; two LOW notes (degraded-DB get-fallback; orphan-row on foreign filing_id) and two TRIVIAL nits — all safe to address in a follow-up or with a one-line tweak. Recommend the human authorize the squash-merge via `gh pr` (PR-C ships alone; coordinate with Chaos).
+
+---
+
+## [27/06/26] — FE-2.6 + PR-C FE — Audit Assistant rename + two-pane figure workbench + Pandai persona + per-filing conversation memory + follow-up chips
+
+**Reviewer:** QA (Opus/high) · **Branch:** `feat/audit-assistant-fe` (uncommitted vs `main`) · **Scope:** `git diff main -- frontend/ docs/` (FE only; PR-C backend was reviewed separately above).
+
+### Verdict: **PASS — Approve** (Gate-2 ready)
+
+All three FE gates green; every FE-2.6 + PR-C-FE acceptance criterion is genuinely satisfied (not just ticked). No Critical/Major findings. Three LOW/INFO notes below, none blocking.
+
+### Gates (run by QA)
+
+| Gate  | Command                                     | Result                                                             |
+| ----- | ------------------------------------------- | ------------------------------------------------------------------ |
+| Types | `cd frontend && bunx tsc --noEmit`          | **PASS** (exit 0)                                                  |
+| Build | `cd frontend && bun run build`              | **PASS** (83 modules; JS 361.65 kB / 102.40 kB gzip; CSS 50.46 kB) |
+| Lint  | `bunx biome check frontend/src` (repo root) | **PASS** (46 files, 0 errors/fixes)                                |
+
+### Criteria verification
+
+- **(6a) Rename/redirect — PASS.** `git status` records `AuditDefense.tsx -> AuditAssistant.tsx` as a staged rename (history preserved via `git mv`; the `--find-renames` stat shows it as add+delete only because >50% of the body changed, which is expected for the workbench rewrite). Old file gone from disk. `/audit-defense -> /audit-assistant` updated in App.tsx route (`:62`), AppShell nav label+to (`:494`), Dashboard quick-action (`Dashboard.tsx:152-153`), WizardLayout step 3 (`:21`), JourneyProgress step 3 (`:32`). Legacy `<Route path="/audit-defense" element={<Navigate to="/audit-assistant" replace />} />` present (App.tsx:66) with `Navigate` imported (`:1`); `/audit-assistant` added to `WALKTHROUGH_ROUTES` while `/audit-defense` is intentionally retained (AppShell:16-17) so the redirect route still shows the `?`. Residual `/audit-defense` matches are all legitimate: the backend endpoint path `/entities/{tin}/audit-defense` + the `AuditDefenseResponse` type name (client.ts — backend contract, not a route/nav), the retained WALKTHROUGH_ROUTES entry, and prose mentions of "audit-defense pack" in marketing copy (Landing/About/Privacy/Entity/faqData/AppShell:99) which are out of scope. No dangling nav/route link to the old path remains.
+- **(6b) Two-pane workbench — PASS.** `.audit-workbench` grid `minmax(0,1fr) minmax(0,2fr)` collapses to `1fr` at `<=680px` (tokens.css:1771-1784). LEFT pane (`.row-div-list`) lists computation fields + up to 5 classified line items as clickable rows; click calls `handleChip(row.question)` → `sendMessage` → answer renders in the RIGHT thread. Chips + composer + Send all live in the RIGHT column. Empty-figures state renders "No figures available for this filing."
+- **(6c) Figure guard — PASS.** `isPlausibleFigure` (finite + `|value| <= RM100bn`) and `isPlaceholderTin` (`Z0000000001`/`Z0000000000`) applied in `deriveFigureRows`, `filingEvidence`, `seedQuestions`, and the picker tax-payable display (`:648-649`). A corrupt record yields no figure rows (neutral fallback); a normal Acme record renders verbatim. The `value: unknown` signature on `isPlausibleFigure` defends against runtime-bad data even though the static type is `number`.
+- **Persona — PASS.** Each assistant turn renders `PandaiHeader` (`/logo.png` avatar — asset present, 12.1 kB — + "Pandai" name + SovereignBadge). The conversational `answer` (`data.answer ?? data.exposure_note`) is the body, replacing the old structured panel. Citations are inline `CitationChip`s with verified=denim / rejected=rust borders. The fabricated-clause money-shot is preserved: Trust Demo sends `isFabrication`, the rejected rust chip renders, and the live-session "Trust Payoff: Fabricated Clause Blocked" window shows. User messages render via `UserBubble` with no avatar.
+- **Conversation memory — PASS.** `selectFiling` calls `getFilingConversation(rec.id)` (which calls `ensureSession()` internally before `/me/filings/{id}/conversation`) and rehydrates via `turnsToMessages`. `filing_id` is passed to every `getAuditDefense` call (`:530`) and forwarded in the live POST body (`client.ts:701`). After a reply the turn appends locally; switching filings resets the thread and reloads the correct one. Load failure is caught (non-fatal → empty thread).
+- **Follow-up chips — PASS.** 3 seeded suggestions on an empty thread; after each answer the contextual `followups` render (up to 3), with empty-string padding filtered at `:531` so no blank chips appear and the chip row never breaks.
+- **Mock fidelity — PASS.** In `VITE_API_MOCK=1`, `makeMockDefense` returns a believable conversational `answer`, 3 `followups`, a verified citation (+ a rejected one when `injectFabricated`), and `getAuditDefense` persists user+assistant turns into module-scoped `_mockConversations`, which `getFilingConversation` reads back — the full select→ask→follow-up→switch flow is demoable with no backend. `client.ts` types match the BE contract (`AuditDefenseResponse.answer?`/`.followups?`, `ConversationTurn`).
+
+### Edge cases reasoned (no defects)
+
+- **Draft (null computation) selected** — impossible to select: the picker filters to `status === 'final' && computation != null`; all figure helpers are `computation?.fields ?? {}` null-safe regardless. OK.
+- **All-corrupt-figures record** — `deriveFigureRows` returns `[]` → LEFT pane shows the neutral "No figures available" fallback. OK.
+- **`followups` all empty strings** — filtered to `[]` → falls back to the seed questions; no blank/broken chip row. OK.
+- **Deep-link `/audit-defense`** — client-side `<Navigate replace>` redirects in-app to `/audit-assistant` (SPA equivalent of a 301). OK.
+- **Conversation network failure** — try/catch in `selectFiling`, page does not crash. OK.
+
+### Findings (non-blocking)
+
+- **[LOW] Rehydrated fabrication turns lose the emphasis window (not the rejected chip).** `turnsToMessages` does not restore `isFabrication`, so on reloading a persisted conversation the special "Trust Payoff: Fabricated Clause Blocked" `.window` does not re-render. The rejected (rust) citation chip DOES survive rehydration via the normal `CitationChip` path, so the money-shot requirement ("Trust Demo still shows a rejected chip") holds; only the extra live-session emphasis card is absent on reload. The actual demo path (run Trust Demo live) is fully intact. Suggested (optional): infer `isFabrication` from any `citations.some(c => !c.verified)` when mapping persisted assistant turns. Severity LOW (cosmetic, reload-only).
+- **[INFO] Mock filing picker is empty on a fresh `VITE_API_MOCK=1` session.** `_mockFilings` seeds empty and is only populated by `createDraftFiling`/`saveFiling` (FE-2.4), so the Audit Assistant shows "No saved filings found" until a filing is created via `/filing/new`. This matches the established Wave-4 `/filing` behavior and is out of FE-2.6's scope; the demo flow (create a filing first, then defend it) is intact. Not a defect — flagged so the demo script (TD-2.7) sequences "create filing -> Audit Assistant".
+- **[INFO] `key={`${msg.role}-${idx}`}` uses array index** for thread items (`:886`). Acceptable here because the thread is append-only (items never reorder/insert mid-list), so React reconciliation is stable. No action required.
+
+### Boundary / contract alignment
+
+- ILMU-first / sovereignty: `SovereignBadge` driven by `data.sovereign` + `data.active_model` from `route_info()`; no FE-side tax figures or invented citations — the FE renders only what the deterministic BE gate verified. Consistent with the TRD core↔api seam.
+- Error handling at boundaries: `getAuditDefense` failures surface as an in-thread error bubble; `getFilingConversation` failures are swallowed to an empty thread; `ensureSession` mints a guest token before `/me/*`. Appropriate boundary handling, no internal try/catch noise.
+
+**Return to PM:** **PASS — Approve, Gate-2.** PR-C frontend fully satisfies FE-2.6 + the PR-C FE addendum against the locked Gate-1 resolutions: the page is renamed (route + file + redirect + every internal link), the workbench is a responsive two-pane figure bench with the guard applied in all derivation paths, Pandai's persona + inline verified/rejected citation chips replace the structured panel with the BE-18 fabrication money-shot preserved, per-filing memory loads via `GET /me/filings/{id}/conversation` (with `ensureSession`) and `filing_id` is sent per question, and follow-up chips render with empty-string padding filtered. **tsc + build + biome all green.** No Critical/Major findings; one LOW (reload-only loss of the fabrication emphasis card — the rejected chip itself survives) and two INFO notes, all safe for a follow-up. Recommend the human authorize the squash-merge via `gh pr` (FE PR depends on PR-C BE having landed for the live `answer`/`followups`/conversation endpoints; mock-mode is fully self-sufficient for the demo).

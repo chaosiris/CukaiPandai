@@ -4,7 +4,7 @@
 // Adds a Step X of 3 progress header above the console and a next/back footer.
 // Pins one entity for the entire wizard run (T2 — FilingStudio resets on persona switch).
 // Finish / Skip sets cp_journey_done and navigates to /dashboard.
-// Standalone console routes (/obligations, /filing, /audit-defense) stay untouched.
+// Standalone console routes (/obligations, /filing, /audit-assistant) stay untouched.
 
 import { useEffect, useRef } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -21,7 +21,7 @@ interface WizardStep {
 const WIZARD_STEPS: WizardStep[] = [
   { route: '/start/obligations', label: 'Obligation Calendar', num: 1 },
   { route: '/start/filing/new', label: 'Form C Filing', num: 2 },
-  { route: '/start/audit-defense', label: 'Audit Defense Pack', num: 3 }
+  { route: '/start/audit-assistant', label: 'Audit Assistant', num: 3 }
 ]
 
 function graduate(navigate: ReturnType<typeof useNavigate>) {

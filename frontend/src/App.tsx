@@ -7,7 +7,7 @@ import { WizardLayout } from './layouts/WizardLayout'
 import { NotificationProvider } from './notifications'
 import About from './pages/About'
 import Analytics from './pages/Analytics'
-import AuditDefense from './pages/AuditDefense'
+import AuditAssistant from './pages/AuditAssistant'
 import CustomCompany from './pages/CustomCompany'
 import Dashboard from './pages/Dashboard'
 import Entity from './pages/Entity'
@@ -61,7 +61,9 @@ export default function App() {
                 <Route path="/filing/new" element={<FilingNew />} />
                 {/* FM-3: /filing/:id = saved record view */}
                 <Route path="/filing/:id" element={<FilingRecord />} />
-                <Route path="/audit-defense" element={<AuditDefense />} />
+                <Route path="/audit-assistant" element={<AuditAssistant />} />
+                {/* Legacy redirect: keep old /audit-defense links from 404-ing */}
+                <Route path="/audit-defense" element={<Navigate to="/audit-assistant" replace />} />
                 <Route path="/entity" element={<Entity />} />
 
                 {/* Guided wizard routes (JR-2): wizard chrome wrapping the same console components */}
@@ -69,7 +71,7 @@ export default function App() {
                   <Route path="obligations" element={<ObligationRadar />} />
                   {/* FM-2 creation flow in the wizard (Wave 3 repoint) */}
                   <Route path="filing/new" element={<FilingNew />} />
-                  <Route path="audit-defense" element={<AuditDefense />} />
+                  <Route path="audit-assistant" element={<AuditAssistant />} />
                 </Route>
 
                 {/* JR-6: "Use my own company" form (outside WizardLayout; standalone page) */}

@@ -1578,3 +1578,56 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 ### Build status (BE)
 
 - `cd backend && uv run pytest -q` -- **227 passed, 1 warning** (no failures)
+
+---
+
+## [27/06/26] -- FE-2.6 + PR-C FE: Audit Assistant rename + two-pane workbench + Pandai persona + conversation memory `[FE]`
+
+**Branch:** `feat/audit-assistant-fe`
+
+### FE-2.6 (6a) -- Rename + redirect + links
+
+- `git mv frontend/src/pages/AuditDefense.tsx frontend/src/pages/AuditAssistant.tsx` (history preserved).
+- `frontend/src/App.tsx`: import renamed to `AuditAssistant`; route `/audit-defense` -> `/audit-assistant`; legacy redirect `<Route path="/audit-defense" element={<Navigate to="/audit-assistant" replace />} />` added (mirrors the `/login` -> `/sign-in` pattern).
+- Wizard child route updated: `path="audit-defense"` -> `path="audit-assistant"`.
+- `frontend/src/layouts/AppShell.tsx`: NavLink `to`/label updated to `/audit-assistant` / "Audit Assistant".
+- `frontend/src/pages/Dashboard.tsx`: quick-action card `to` updated to `/audit-assistant`.
+- `frontend/src/layouts/WizardLayout.tsx`: wizard step 3 route updated to `/start/audit-assistant`.
+- `frontend/src/components/JourneyProgress.tsx`: step 3 route updated to `/start/audit-assistant`.
+
+### FE-2.6 (6b) -- Two-pane figure workbench
+
+- New `AuditAssistant.tsx` (complete rewrite): responsive two-column `.audit-workbench` grid (1fr + 2fr; stacks to 1 col at <=680px).
+- LEFT pane: `deriveFigureRows()` pulls `computation.fields` + `rec.line_items`; each row is a button that calls `handleChip(row.question)`. Uses `.row-div-list` helper for full-bleed dividers.
+- RIGHT pane: suggested-question chips (empty thread) or follow-up chips (post-reply), Trust Demo chip, conversation thread, composer + Send.
+- `tokens.css`: added `.audit-workbench` CSS rule + 680px mobile stack breakpoint.
+
+### FE-2.6 (6c) -- Figure guard
+
+- `isPlausibleFigure()`: guards non-finite + |value| > RM 100 billion.
+- `isPlaceholderTin()`: guards known placeholder TINs (Z0000000001, Z0000000000).
+- Applied in `deriveFigureRows()` (figure rows), `filingEvidence()` (evidence pairs for audit call), and filing picker's tax-payable display.
+
+### PR-C FE -- Pandai persona + conversation memory + follow-up chips
+
+- **Pandai avatar + name**: `PandaiHeader` component (`/logo.png` 28px circle + "Pandai" label + `SovereignBadge`) shown above each assistant answer bubble.
+- **Conversational answer**: `AssistantTurn` renders `data.answer ?? data.exposure_note` as the message body (plain prose); structured `CitationPanel` replaced by inline `CitationChip` components (verified/rejected state, expandable source detail).
+- **Fabrication money-shot preserved**: `isFabrication` + rejected citations still render the "Trust Payoff: Fabricated Clause Blocked" window.
+- **Conversation memory**: `selectFiling()` calls `getFilingConversation(rec.id)` (new client method) and rehydrates prior turns as `ChatMessage[]`. Switching filings switches threads.
+- **Persistence**: `getAuditDefense()` now accepts optional `filing_id`; in live mode this is passed in the POST body so BE persists the turn. In mock mode `_mockConversations[filing_id]` stores turns for round-trip fidelity.
+- **Follow-up chips**: `sendMessage()` extracts `(res.followups ?? []).filter(f => f.trim().length > 0)` and stores on the `ChatMessage`; chips panel swaps from "Suggested Questions" to "Follow-up Questions" after the first reply.
+
+### client.ts additions
+
+- `AuditDefenseResponse`: added `answer?: string` and `followups?: string[]` fields.
+- `ConversationTurn` interface (new).
+- `makeMockDefense`: extended to accept `query` param and return believable `answer` + 3 `followups`; mock also persists to `_mockConversations`.
+- `_mockConversations`: module-scoped in-memory store for mock conversation history.
+- `getAuditDefense`: added optional `filing_id` param.
+- `getFilingConversation`: new export -- `GET /me/filings/{id}/conversation`; mock reads from `_mockConversations`.
+
+### Verify results
+
+- `cd frontend && bunx tsc --noEmit` -- **0 errors**
+- `bun run build` -- **green** (83 modules, 2.15s)
+- `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
