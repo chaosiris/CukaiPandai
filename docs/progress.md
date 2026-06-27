@@ -1958,3 +1958,50 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - `bunx tsc --noEmit`: clean
 - `bun run build`: green (85 modules, 0 errors)
 - `bunx biome check frontend/src`: 0 errors
+
+---
+
+## [27/06/26] — PR-G2: Filing-new upload doc-type picker + preview modal + back link `[FE]`
+
+**Branch:** `feat/filing-upload-redesign`
+
+### 1. Upload Document tab redesign (item 4, Option 1)
+
+- Replaced the single open-ended dropzone in Stage 01's Upload Document tab with a guided two-step flow.
+- Step A: two selectable doc-type option cards ("Income Statement / P&L" / "Trial Balance") with one-line captions ("revenue & expense lines" / "all ledger account balances"). Token-CSS `aria-pressed` segmented buttons; one selected at a time.
+- Step B: revealed once a type is picked — a tailored dropzone whose headline copy matches the selected type ("Drop your Income Statement (P&L) · CSV, XLSX, or PDF" vs "Drop your Trial Balance · ...") plus a type-matched "Use sample document" button (wired to the per-type fixture from the updated `SAMPLE_DOCS` map, falls back gracefully if only one type has a sample).
+- `SAMPLE_DOCS` updated from a flat per-persona record to `Partial<Record<DocType, ...>>` — all 3 personas now have both `income-statement` and `trial-balance` fixture entries.
+- `DOC_TYPE_META` constant carries label/caption/dropCopy/formats per type; picker is data-driven.
+- Existing `handleUpload`/`handleDrop`, accepted formats, AI extraction, line-item prefill, and draft-create behaviour are all preserved.
+
+### 2. Loaded-document display + preview modal (item 4)
+
+- After upload (or "Use sample document"), a `LoadedDoc` state tracks: filename, docType, previewSrc, isSample, mimeType.
+- A doc-row appears below the dropzone: doc icon + filename + type/sample label + eye (preview) button.
+- Eye button opens `DocPreviewModal` — a floating modal with blurred backdrop (`backdropFilter: blur(6px)` + dim scrim).
+- Modal preview rendering:
+  - PDF: `<iframe>` of the object URL or fixture path.
+  - CSV: `csvToTableHtml()` — inline split into a simple HTML table (no new package), first 200 rows.
+  - XLSX: best-effort note ("XLSX preview not supported inline; the AI will extract figures from it").
+- For sample docs, uses the fixture path directly (`/fixtures/...`); for uploaded files, creates an object URL which is revoked on component unmount via `previewObjectUrlRef` cleanup effect.
+- Accessibility: Escape closes, backdrop-click closes, visible close `×` in the titlebar, `tabIndex={-1}` on `<dialog>`, modal focused on open and prior-focus restored on close.
+
+### 3. "Back to Filing Records" breadcrumb (item 4)
+
+- Added `← Back to Filing Records` link (`fontFamily: var(--font-mono)`, `color: var(--ink-soft)`) above the "New Filing" page heading, routing to `/filing`.
+- Mirror style from `FilingRecord.tsx` (`← Filing Records`).
+
+### 4. Remove "entered directly · no AI" text (item 3-text)
+
+- In `frontend/src/components/FilingPipeline.tsx` `Stage1Detail`: removed the `<span className="titlebar-meta">entered directly · no AI</span>` branch when `manual === true`. The conditional now only renders `SovereignBadge` when `!manual`. No orphaned imports or variables.
+
+### Files touched
+
+- `frontend/src/pages/FilingNew.tsx` — all items 1/2/3
+- `frontend/src/components/FilingPipeline.tsx` — item 4
+
+### Verify
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: green (85 modules, 0 errors, 400 kB JS)
+- `bunx biome check frontend/src`: 0 errors in our changed files (1 pre-existing format error in `client.ts` not touched by this PR)

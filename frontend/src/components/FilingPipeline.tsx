@@ -378,11 +378,7 @@ export function Stage1Detail({
     <div className="window" style={{ marginTop: 12 }}>
       <div className="titlebar">
         <span className="titlebar-title">{manual ? 'Line Items' : 'Classified Line Items'}</span>
-        {manual ? (
-          <span className="titlebar-meta">entered directly · no AI</span>
-        ) : (
-          <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />
-        )}
+        {!manual && <SovereignBadge sovereign={classifyResult.sovereign} model={classifyResult.active_model} />}
       </div>
       <ul className="req-list">
         {lineItems.map((item) => (
