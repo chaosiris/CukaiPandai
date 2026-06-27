@@ -167,7 +167,7 @@ function deriveStages(phase: Phase, classifyResult: ClassifyResponse | null): St
     base[1].status = 'complete'
     base[1].writeBack =
       chargeableIncome != null && taxPayable != null
-        ? `Chargeable income RM ${chargeableIncome.toLocaleString()}, tax payable RM ${taxPayable.toLocaleString()}`
+        ? `Chargeable income RM ${chargeableIncome.toLocaleString('en-MY')}, tax payable RM ${taxPayable.toLocaleString('en-MY')}`
         : 'Form C computation complete'
     const flags = phase.result.risk_flags
     const high = flags.filter((f) => f.severity === 'high').length

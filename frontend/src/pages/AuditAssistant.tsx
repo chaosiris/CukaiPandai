@@ -56,7 +56,7 @@ function formatDate(iso: string): string {
 }
 
 function formatRM(value: number): string {
-  return `RM ${value.toLocaleString()}`
+  return `RM ${value.toLocaleString('en-MY')}`
 }
 
 /** Return true if a numeric figure is genuine (finite + within plausible range). */

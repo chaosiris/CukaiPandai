@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # LHDN Tax Identification Number (Nombor Pengenalan Cukai) prefixes. A TIN is a prefix code
 # followed by digits (post-2023 a trailing 0 was appended, so the digit count varies).
@@ -111,7 +111,9 @@ class ObligationCalendar(BaseModel):
 class LineItem(BaseModel):
     code: str
     description: str
-    amount: float
+    # Magnitudes only — the engine encodes sign via `category` (e.g. closing stock is income).
+    # A negative amount would silently reduce taxable income, so reject it at the boundary (COMP-4).
+    amount: float = Field(ge=0)
     category: str
 
 

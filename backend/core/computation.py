@@ -67,7 +67,9 @@ def _deductions(items: list[LineItem], cfg: dict) -> tuple[float, dict[str, floa
             allowed = amt * 0.5
             disallowed["entertainment_50"] += amt - allowed
             total += allowed
-        elif treatment == "epf_capped" and remuneration > 0:
+        elif treatment == "epf_capped":
+            # s.34(4): cap at 19% of remuneration. With no recorded remuneration the cap is 0, so the
+            # whole employer-EPF figure is disallowed (it can't be substantiated against payroll).
             allowed = min(amt, remuneration * epf_cap_pct)
             disallowed["epf_excess"] += amt - allowed
             total += allowed
@@ -95,6 +97,8 @@ def _capital_allowances(items: list[LineItem], profile: EntityTaxProfile, cfg: d
         elif klass in ("balancing_allowance", "unabsorbed_bf"):
             allowance += amt
         elif klass == "small_value":
+            # 100% small-value allowance assumes one asset per line at/under per_asset_cap_rm
+            # (RM2,000); per-asset enforcement would need one-asset-per-line granularity.
             sva_total += amt
         elif klass in ca_cfg:
             rule = ca_cfg[klass]
@@ -130,7 +134,9 @@ def _further_and_below_line(items: list[LineItem], cfg: dict) -> tuple[float, di
         elif key == "esg":
             further += min(amt, r.get("esg_further_deduction_cap_rm", amt))
         elif key in ("rnd", "double_deduction_labour", "export_promotion"):
-            further += amt  # the additional ('less') deduction the user has already quantified
+            # The user supplies the already-quantified ADDITIONAL ('less') deduction; the engine does
+            # not gross it up (reliefs.rd_double_deduction_pct in config is reference-only).
+            further += amt
         elif key == "approved_donations":
             below["donations"] += amt
         elif key == "zakat":
@@ -175,17 +181,27 @@ def compute_form_c(profile: EntityTaxProfile, items: list[LineItem], ya: int) ->
     deductions, disallowed = _deductions(items, cfg)
     further, below = _further_and_below_line(items, cfg)
 
+    # s.44A group relief requires BOTH companies to have paid-up capital > RM2.5m (i.e. NOT SMEs), so
+    # an SME claimant is ineligible -> drop any group relief it supplied. (The 70%-of-surrendered-loss
+    # cap is the surrendering company's responsibility and is out of this engine's scope.)
+    if below["group_relief"] and is_sme(profile, cfg):
+        below["group_relief"] = 0.0
+
     # Stage 2 -> adjusted income (a negative result is a current-year adjusted loss).
     adjusted = business_income - deductions - further
 
-    # Stage 3 -> statutory income (>= 0): + balancing charge, - capital allowances.
+    # Stage 3 -> statutory income (>= 0). The balancing charge (s.42) is added at the Sch 3 stage
+    # regardless of the adjusted-income sign (so a recapture is never lost on an adjusted loss);
+    # capital allowances are absorbed only against positive income (the excess carries forward, so
+    # CA never creates or deepens a loss).
     ca_allowance, balancing_charge = _capital_allowances(items, profile, cfg)
-    if adjusted >= 0:
-        statutory = max(0.0, adjusted + balancing_charge - ca_allowance)
+    pre_ca = adjusted + balancing_charge
+    if pre_ca > 0:
+        statutory = max(0.0, pre_ca - ca_allowance)
         current_year_loss = 0.0
     else:
         statutory = 0.0
-        current_year_loss = -adjusted
+        current_year_loss = -pre_ca
 
     # Stage 4 -> aggregate income (single business source; other-source income is folded into
     # business income as a deliberate SME-estimate simplification).

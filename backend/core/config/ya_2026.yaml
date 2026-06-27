@@ -13,6 +13,7 @@ income_tax:
     - { upto: 600000, rate: 0.17 } # next RM450,000 (150,001 - 600,000)
     - { upto: null, rate: 0.24 } # remainder
   non_sme_rate: 0.24
+  cp204_estimate_days_before: 30 # s.107C: ongoing co. files the CP204 estimate 30 days before the basis period
   # CP204 (s.107C): submit estimate >=30 days before basis period; new company within
   # 3 months of commencement; SME EXEMPT from estimate/instalments for first 2 YAs;
   # monthly instalment by the 15th; revise via CP204A in the 6th and/or 9th month.
@@ -88,7 +89,7 @@ capital_allowances:
 # against AGGREGATE INCOME. For a company, zakat is an aggregate-income deduction (s.44(11A)), NOT a rebate.
 reliefs:
   epf_remuneration_cap_pct: 0.19 # s.34(4) employer EPF deduction cap (PwC)
-  secretarial_taxfiling_cap_rm: 15000 # combined secretarial + tax-filing cap/YA (P.U.(A)162/2020 amended; in force YA2026) (EY)
+  secretarial_taxfiling_cap_rm: 15000 # combined secretarial + tax-filing cap/YA (P.U.(A) 162/2020, as amended by P.U.(A) 471/2021; in force YA2026) (EY)
   esg_further_deduction_cap_rm: 50000 # ESG further deduction/YA, YA2024-YA2027 (P.U.(A)193/2025) (Grant Thornton)
   rd_double_deduction_pct: 2.00 # s.34A/34B qualifying R&D double deduction (overseas R&D capped 30% of total) (LHDN PR10/2021)
   donation_aggregate_income_cap_pct: 0.10 # s.44(6) approved cash donations, max 10% of aggregate income (LHDN)

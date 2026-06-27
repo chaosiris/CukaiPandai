@@ -396,3 +396,12 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 - [x] +5 tests (HTML builder + 401/404/409 + PDF render, which skips where native libs absent); **246 backend tests**; FE `tsc`/`build`/`biome` green; end-to-end render verified (valid 3-page PDF with all sections + add-back lines).
 
 **Acceptance:** a finalized filing previews + downloads as a watermarked DRAFT Form C tax-computation pack; figures reconcile to the deterministic core; the "never submitted / self-assessment" framing is explicit; suites green; the deploy installs the PDF engine's native libs.
+
+### QA-1 `[BE]`/`[FE]`/`[DO]`/`[TD]` — Defect-register verification + fixes _(DONE; full detail in `progress.md`)_
+
+> External 34-item defect register verified item-by-item against the code (6-lens workflow): **2 refuted** (DEAD-7, FE-9). Fixed the clear/safe/high-value items; deferred the large/contract-changing ones with rationale.
+
+- [x] **Fixed:** AUTH-1/2 (no forgeable JWT key) · API-1 (sovereign LLM default) · API-2/3/4 (422/502 on bad upload/MSIC) · COMP-1/2/3/4/5/6 (balancing charge on loss, SME group-relief guard, EPF cap, non-negative amounts, citation reconcile, dead-config annotations) · CITE-3 (strict YES parse) · DEAD-3/6 (MyInvois band→mandatory_from, CP204 offset to config) · FE-1/2/3/4/6 (en-MY money, error states, journey route, TIN routing). **257 backend tests** (+11); FE green.
+- [ ] **Deferred (documented):** DEAD-1/2/5/8 (multi-obligation SST/CP39/CP204 + per-entity forms — contract-changing workstream) · DEAD-4 (obligation citations — needs corpus clauses) · CITE-1/2/4/5 (prose grounding / probe segregation / RAG allowed-set / escalation — entangled with the BE-18 money-shot; needs product decision) · FE-5 (by-design best-effort save) · COMP-6 per-asset cap (needs one-asset-per-line contract).
+
+**Acceptance:** every register item triaged with evidence; confirmed safe fixes shipped + tested; deferrals are documented with rationale, not half-implemented.

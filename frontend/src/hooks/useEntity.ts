@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
 import { type EntityTaxProfile, getEntity } from '../api/client'
+import { validateTin } from '../lib/tin'
 
 export function useEntity(tin?: string) {
   const { persona, personas } = useActivePersona()
@@ -21,17 +22,23 @@ export function useEntity(tin?: string) {
     setLoading(true)
     setError(null)
 
-    // EN-2: if the TIN is not a real Malaysian TIN (e.g. 'CUSTOM'), resolve from the personas
-    // list in context — covers both a hydrated backend profile and the empty My Company placeholder.
-    const isMalaysianTin = /^[A-Z][0-9]{10}$/.test(resolvedTin)
-    if (!isMalaysianTin) {
-      const match = personas.find((p) => p.tin === resolvedTin)
-      setEntity((match?.ssm ?? null) as EntityTaxProfile | null)
+    // Prefer the in-context personas list — it always holds the active persona (a seeded persona OR a
+    // hydrated custom company, or the empty My Company placeholder). This is the source of truth for
+    // the active entity and avoids misrouting a valid TIN to a null lookup (FE-6).
+    const match = personas.find((p) => p.tin === resolvedTin)
+    if (match) {
+      setEntity((match.ssm ?? null) as EntityTaxProfile | null)
       setLoading(false)
       return
     }
 
-    // Built-in TINs go through the normal getEntity path (mock or live).
+    // Not in context: fetch by TIN only when it is a valid Malaysian TIN (canonical lib/tin.ts
+    // grammar — 1-2 letter prefix + 8-12 digits); a non-TIN sentinel resolves to null.
+    if (validateTin(resolvedTin) !== null) {
+      setEntity(null)
+      setLoading(false)
+      return
+    }
     getEntity(resolvedTin)
       .then((e) => {
         setEntity(e)

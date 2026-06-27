@@ -204,7 +204,7 @@ TAX_ACCOUNTS: list[TaxAccount] = [
                note="Arm's-length consultancy/management fees deductible; related-party fees must meet TP tests; non-resident payments may attract WHT."),
     TaxAccount(code="prof_secretarial_taxfiling", label="Secretarial & tax filing fees", group="Professional fees", category=SPECIAL_DEDUCTION,
                relief_key="secretarial_taxfiling",
-               note="Deductible but capped combined per YA (P.U.(A) 162/2022); excess over the cap is added back."),
+               note="Deductible but capped combined per YA (P.U.(A) 162/2020, as amended by P.U.(A) 471/2021); excess over the cap is added back."),
 
     # --- Depreciation & amortisation (always added back) ---
     TaxAccount(code="dep_depreciation", label="Depreciation of property, plant & equipment", group="Depreciation & amortisation", category=NON_DEDUCTIBLE,

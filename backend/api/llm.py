@@ -140,15 +140,17 @@ def _escalation_fallback(primary_key: str, primary_base_url: str) -> LLMClient |
 
 
 def make_llm() -> LLMClient:
-    """Build the active client from env. ILMU-first (LLM_PROVIDER=openai); wrap in a
-    RoutingLLMClient only when an escalation fallback is configured (sovereign by default —
-    see _escalation_fallback). With none configured it returns the bare ILMU client (pure
-    sovereign — the 28 Jun prelim default, Q6)."""
-    provider = os.getenv("LLM_PROVIDER", "anthropic")
-    model = os.getenv("LLM_MODEL", "claude-opus-4-8")
+    """Build the active client from env. ILMU-first SOVEREIGN by default (LLM_PROVIDER=openai,
+    LLM_MODEL=nemo-super) — so the safe in-country route is the no-config fallback. A direct,
+    non-sovereign Anthropic primary (data leaves Malaysia) is a deliberate opt-in via
+    LLM_PROVIDER=anthropic. Wraps in a RoutingLLMClient only when an escalation fallback is
+    configured (sovereign by default — see _escalation_fallback)."""
+    provider = os.getenv("LLM_PROVIDER", "openai")
     key = os.getenv("LLM_API_KEY", "")
     if provider != "openai":
-        return _AnthropicClient(model, key)
+        # Direct Anthropic primary — non-sovereign; explicit opt-in only (LLM_PROVIDER=anthropic).
+        return _AnthropicClient(os.getenv("LLM_MODEL", "claude-opus-4-8"), key)
+    model = os.getenv("LLM_MODEL", "nemo-super")
     base_url = os.getenv("LLM_BASE_URL", "")
     primary = _OpenAICompatClient(model, key, base_url)
     fallback = _escalation_fallback(key, base_url)

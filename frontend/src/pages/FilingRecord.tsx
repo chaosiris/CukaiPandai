@@ -61,7 +61,7 @@ function buildFinalizedStages(rec: FilingRecord): Stage[] {
       status: 'complete' as StageStatus,
       writeBack:
         chargeableIncome != null && taxPayable != null
-          ? `Chargeable income RM ${chargeableIncome.toLocaleString()}, tax payable RM ${taxPayable.toLocaleString()}`
+          ? `Chargeable income RM ${chargeableIncome.toLocaleString('en-MY')}, tax payable RM ${taxPayable.toLocaleString('en-MY')}`
           : 'Form C computation complete'
     },
     {
@@ -89,6 +89,7 @@ export default function FilingRecordPage() {
   const [record, setRecord] = useState<FilingRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [reportUrl, setReportUrl] = useState<string | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState<string | null>(null)
@@ -97,13 +98,16 @@ export default function FilingRecordPage() {
     if (!id) return
     setLoading(true)
     setNotFound(false)
+    setLoadError(null)
     getFiling(id)
       .then((rec) => {
         setRecord(rec)
         setLoading(false)
       })
       .catch((e: Error) => {
+        // 404 -> genuinely not found; any other error (outage/network) is distinct, not "deleted".
         if (e.message.includes('404')) setNotFound(true)
+        else setLoadError(e.message)
         setLoading(false)
       })
   }, [id])
@@ -129,6 +133,27 @@ export default function FilingRecordPage() {
           <div style={{ padding: '24px 18px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
             Loading filing record...
           </div>
+        </div>
+      </>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <>
+        <div className="page-head">
+          <h1>Filing Record</h1>
+        </div>
+        <div className="window error-window" style={{ marginTop: 16 }}>
+          <div className="titlebar">
+            <span className="titlebar-title">Error</span>
+          </div>
+          <div className="error-body">{loadError}</div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Link to="/filing" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
+            &larr; Back to Filing Records
+          </Link>
         </div>
       </>
     )

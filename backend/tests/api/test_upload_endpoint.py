@@ -118,3 +118,29 @@ def test_upload_empty_file_returns_422():
         assert r.status_code == 422
     finally:
         app.dependency_overrides.clear()
+
+
+def test_upload_malformed_xlsx_returns_422():
+    """API-2 — a corrupt .xlsx is a user error (422), not a 500."""
+    app.dependency_overrides[get_llm] = _fake_llm
+    try:
+        r = TestClient(app, raise_server_exceptions=False).post(
+            f"/entities/{TIN}/documents/upload",
+            files={"file": ("broken.xlsx", b"not a real xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+        assert r.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_malformed_pdf_returns_422():
+    """API-3 — a corrupt .pdf is a user error (422), not a 500."""
+    app.dependency_overrides[get_llm] = _fake_llm
+    try:
+        r = TestClient(app, raise_server_exceptions=False).post(
+            f"/entities/{TIN}/documents/upload",
+            files={"file": ("broken.pdf", b"%PDF-1.4 broken garbage", "application/pdf")},
+        )
+        assert r.status_code == 422
+    finally:
+        app.dependency_overrides.clear()

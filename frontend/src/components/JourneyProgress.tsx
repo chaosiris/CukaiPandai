@@ -26,7 +26,7 @@ export const JOURNEY_STEPS: JourneyStep[] = [
     num: 2,
     label: 'Cited Form C Filing',
     output: 'A cited Form C with your tax payable. Every figure traced to a source.',
-    route: '/start/filing'
+    route: '/start/filing/new'
   },
   {
     num: 3,

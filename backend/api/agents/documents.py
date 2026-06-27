@@ -43,8 +43,8 @@ def classify_line_items(raw_text: str, llm: LLMClient) -> list[LineItem]:
             amount = float(li.get("amount"))
         except (TypeError, ValueError):
             continue  # drop rows without a usable numeric amount (non-financial noise)
-        if not math.isfinite(amount) or amount == 0:
-            continue  # reject NaN/Infinity and zero-value rows
+        if not math.isfinite(amount) or amount <= 0:
+            continue  # reject NaN/Infinity and non-positive rows (amounts are positive magnitudes)
         items.append(
             LineItem(
                 code=acct.code,

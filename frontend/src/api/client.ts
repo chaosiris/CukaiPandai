@@ -199,7 +199,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
   // basis_period 2025-01-01–2025-12-31; commencement 2018-03-01 (not in basis period)
   // Form C due: 2025-12-31 + 7m → last day of Jul 2026 = 2026-07-31
   // CP204  due: 2025-01-01 - 30d = 2024-12-02
-  // MyInvois: 5,000,000 >= 1,000,000 → due = basis_period_start = 2025-01-01 (mandate, not shifted)
+  // MyInvois: 5,000,000 in the [5m,25m) band → mandatory_from = 2025-07-01 (mandate, not shifted)
   // SST-02: sst_registered → due = basis_period_end = 2025-12-31 (Wed, no shift)
   // CP39: employees → basis_period_start 2025-01-01 = New Year (SGR) → shifts to 2025-01-02
   [ACME_TIN]: {
@@ -224,7 +224,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'einvoice',
         form: 'MyInvois',
-        due_date: '2025-01-01',
+        due_date: '2025-07-01',
         rule_id: 'oblig.einvoice.phase',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -287,7 +287,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
   // basis_period 2024-04-01–2025-03-31; commencement 2019-09-01 (not in basis period)
   // Form C due: 2025-03-31 + 7m → last day of Oct 2025 = 2025-10-31
   // CP204  due: 2024-04-01 - 30d = 2024-03-02 (Sat) → shifts to 2024-03-04
-  // MyInvois: 2,500,000 >= 1,000,000 → due = basis_period_start = 2024-04-01 (mandate, not shifted)
+  // MyInvois: 2,500,000 in the [1m,5m) band → mandatory_from = 2026-01-01 (mandate, not shifted)
   // SST-02: sst_registered → basis_period_end 2025-03-31 = Hari Raya (PNG) → shifts to 2025-04-02
   // CP39: 45 employees → due = basis_period_start = 2024-04-01
   C3219876540: {
@@ -312,7 +312,7 @@ const MOCK_OBLIGATIONS_BY_TIN: Record<string, ObligationCalendar> = {
       {
         obligation_type: 'einvoice',
         form: 'MyInvois',
-        due_date: '2024-04-01',
+        due_date: '2026-01-01',
         rule_id: 'oblig.einvoice.phase',
         config_version: 'YA2026.1',
         status: 'overdue'
@@ -743,7 +743,19 @@ function mockDeriveObligations(ssm: SsmProfile): ObligationCalendar {
     }
   }
   add('CP204', 'income_tax', 'oblig.income_tax.cp204', cp204)
-  if (ssm.gross_income >= 1_000_000) add('MyInvois', 'einvoice', 'oblig.einvoice.phase', start, false) // mandate, not shifted
+  // MyInvois mandate-start = the matching turnover phase's statutory date (mirrors backend DEAD-3);
+  // not holiday-shifted. Below RM1m turnover is exempt (omitted).
+  const mandate =
+    ssm.gross_income >= 100_000_000
+      ? '2024-08-01'
+      : ssm.gross_income >= 25_000_000
+        ? '2025-01-01'
+        : ssm.gross_income >= 5_000_000
+          ? '2025-07-01'
+          : ssm.gross_income >= 1_000_000
+            ? '2026-01-01'
+            : null
+  if (mandate) add('MyInvois', 'einvoice', 'oblig.einvoice.phase', new Date(`${mandate}T00:00:00Z`), false)
   if (ssm.sst_registered) add('SST-02', 'sst', 'oblig.sst.return', end)
   if (ssm.employee_count > 0) add('CP39', 'employer_mtd', 'oblig.employer.mtd', start)
   return { entity_tin: ssm.tin, obligations: obs }

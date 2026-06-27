@@ -35,15 +35,18 @@ export default function FilingStudio() {
   const [filterForm, setFilterForm] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [pageError, setPageError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setPageError(null)
     listFilings()
       .then((recs) => {
         setRecords(recs)
         setLoading(false)
       })
-      .catch(() => {
+      .catch((e: Error) => {
+        setPageError(e.message)
         setLoading(false)
       })
   }, [])
@@ -88,10 +91,13 @@ export default function FilingStudio() {
   async function handleDelete() {
     if (selected.size === 0) return
     setDeleting(true)
+    setPageError(null)
     try {
       await deleteFilings(Array.from(selected))
       setRecords((prev) => prev.filter((r) => !selected.has(r.id)))
       setSelected(new Set())
+    } catch (e) {
+      setPageError(`Could not delete the selected filing(s): ${(e as Error).message}`)
     } finally {
       setDeleting(false)
     }
@@ -108,6 +114,15 @@ export default function FilingStudio() {
           deterministic core.
         </p>
       </div>
+
+      {pageError && (
+        <div className="window error-window" style={{ marginTop: 16 }}>
+          <div className="titlebar">
+            <span className="titlebar-title">Error</span>
+          </div>
+          <div className="error-body">{pageError}</div>
+        </div>
+      )}
 
       {/* Filter + sort row */}
       {!loading && records.length > 0 && (
@@ -272,8 +287,8 @@ export default function FilingStudio() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && records.length === 0 && (
+      {/* Empty state (only when the load genuinely returned no records, not on an error) */}
+      {!loading && !pageError && records.length === 0 && (
         <div
           className="window"
           style={{
@@ -442,7 +457,7 @@ export default function FilingStudio() {
                               color: 'var(--ink)'
                             }}
                           >
-                            RM {tp.toLocaleString()}
+                            RM {tp.toLocaleString('en-MY')}
                           </div>
                         </>
                       ) : (

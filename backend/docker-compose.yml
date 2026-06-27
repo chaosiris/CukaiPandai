@@ -4,9 +4,10 @@ services:
     ports:
       - '8000:8000'
     environment:
-      # Default = Anthropic (Claude). Sovereign mode: set LLM_PROVIDER=openai and point
-      # LLM_BASE_URL/LLM_API_KEY/LLM_MODEL at ILMU Claw. Agents fall back to fixtures/tests without a key.
-      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      # Default = sovereign ILMU (openai-compatible). Point LLM_BASE_URL/LLM_API_KEY at ILMU Claw.
+      # Direct Anthropic (non-sovereign, data leaves Malaysia) is a deliberate opt-in: set
+      # LLM_PROVIDER=anthropic. Agents fall back to fixtures/tests without a key.
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
-      - LLM_MODEL=${LLM_MODEL:-claude-opus-4-8}
+      - LLM_MODEL=${LLM_MODEL:-nemo-super}

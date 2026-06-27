@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
@@ -18,10 +19,31 @@ import time
 _PBKDF2_ROUNDS = 240_000
 _TOKEN_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 
+_log = logging.getLogger("cukaipandai.auth")
+_DEV_INSECURE_SECRET = "dev-insecure-secret-change-me"  # the old hardcoded default — never used as a key now
+_ephemeral_secret: str | None = None
+
 
 def _jwt_secret() -> str:
-    # Dev default is intentionally insecure; production MUST set AUTH_JWT_SECRET (see .env.example).
-    return os.getenv("AUTH_JWT_SECRET", "dev-insecure-secret-change-me")
+    """The HMAC key for signing/verifying JWTs.
+
+    NEVER signs with a publicly-known or empty key (that would make every token forgeable -> account
+    takeover; AUTH-1/AUTH-2). A configured AUTH_JWT_SECRET is used only if it is strong (>=32 chars and
+    not the legacy dev value). Otherwise a RANDOM per-process secret is generated so tokens stay
+    unforgeable; they will not survive a restart, so production / multi-instance deploys MUST set a
+    strong AUTH_JWT_SECRET.
+    """
+    configured = os.getenv("AUTH_JWT_SECRET", "").strip()
+    if configured and configured != _DEV_INSECURE_SECRET and len(configured) >= 32:
+        return configured
+    global _ephemeral_secret
+    if _ephemeral_secret is None:
+        _ephemeral_secret = secrets.token_hex(32)
+        _log.warning(
+            "AUTH_JWT_SECRET is unset/empty/weak (<32 chars) or the legacy dev value; using a random "
+            "per-process key. Set a strong AUTH_JWT_SECRET (>=32 chars) for production / multi-instance."
+        )
+    return _ephemeral_secret
 
 
 # --- Password hashing (PBKDF2-HMAC-SHA256) ---

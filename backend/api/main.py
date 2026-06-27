@@ -377,9 +377,15 @@ def _extract_text(filename: str, content: bytes) -> str:
         rows = ["\t".join(row) for row in reader]
         return "\n".join(rows)
     elif name_lower.endswith(".xlsx"):
-        import openpyxl
+        import zipfile
 
-        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        import openpyxl
+        from openpyxl.utils.exceptions import InvalidFileException
+
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except (zipfile.BadZipFile, InvalidFileException) as e:
+            raise HTTPException(status_code=422, detail=f"Could not read the .xlsx file: {e}") from e
         lines: list[str] = []
         for ws in wb.worksheets:
             for row in ws.iter_rows(values_only=True):
@@ -388,9 +394,13 @@ def _extract_text(filename: str, content: bytes) -> str:
         return "\n".join(lines)
     elif name_lower.endswith(".pdf"):
         from pypdf import PdfReader
+        from pypdf.errors import PyPdfError
 
-        reader = PdfReader(io.BytesIO(content))
-        pages = [page.extract_text() or "" for page in reader.pages]
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            pages = [page.extract_text() or "" for page in reader.pages]
+        except PyPdfError as e:
+            raise HTTPException(status_code=422, detail=f"Could not read the .pdf file: {e}") from e
         return "\n".join(pages)
     else:
         raise HTTPException(status_code=415, detail=f"Unsupported file type: {filename!r}. Accepted: csv, xlsx, pdf")
@@ -512,7 +522,12 @@ def filing_resume(tin: str, req: FilingResumeReq) -> dict:
 @app.get("/reference/msic/{code}")
 def msic(code: str, client: MsicClient = Depends(get_msic)) -> dict:
     """Look up an MSIC activity code against the data.gov.my reference."""
-    entry = client.lookup(code)
+    import httpx
+
+    try:
+        entry = client.lookup(code)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"MSIC reference upstream error: {e}") from e
     if entry is None:
         raise HTTPException(status_code=404, detail=f"MSIC code {code} not found")
     return entry

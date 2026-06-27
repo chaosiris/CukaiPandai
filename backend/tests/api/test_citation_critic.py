@@ -21,3 +21,27 @@ def test_real_clause_but_llm_no_blocks():
 def test_missing_clause_blocks_without_calling_llm():
     cit = verify_claim(Citation(claim="x", clause_ids=["ITA-1967-s999(fake)"]), C, FakeLLMClient([]))
     assert cit.verified is False
+
+
+def test_leaked_no_after_yes_blocks():
+    # CITE-3: a prefix-match accepted these; the strict parse must reject them.
+    cit = verify_claim(
+        Citation(claim="x", clause_ids=["ITA-1967-s33(1)"]),
+        C,
+        FakeLLMClient(["YES, however this does NOT support the claim"]),
+    )
+    assert cit.verified is False
+
+
+def test_yesterday_prefix_blocks():
+    cit = verify_claim(
+        Citation(claim="x", clause_ids=["ITA-1967-s33(1)"]), C, FakeLLMClient(["YESTERDAY the rule changed, but NO"])
+    )
+    assert cit.verified is False
+
+
+def test_verbose_affirmative_passes():
+    cit = verify_claim(
+        Citation(claim="x", clause_ids=["ITA-1967-s33(1)"]), C, FakeLLMClient(["YES, this clause clearly supports it."])
+    )
+    assert cit.verified is True

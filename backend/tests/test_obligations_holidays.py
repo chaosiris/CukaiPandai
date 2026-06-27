@@ -44,10 +44,12 @@ def test_new_year_deadline_shifts_off_the_holiday():
     assert cal["CP39"].weekday() < 5
 
 
-def test_myinvois_mandate_is_not_shifted():
+def test_myinvois_mandate_uses_phase_date_not_shifted():
+    # MyInvois mandate-start = the turnover phase's statutory date (gross 8m -> [5m,25m) band ->
+    # 2025-07-01), used verbatim — an implementation date, not a holiday-rolled deadline (DEAD-3).
     cal = _by_form(derive_obligations(_profile(basis_period_start=date(2025, 1, 1), state="SGR"), 2026))
-    assert cal["MyInvois"] == date(2025, 1, 1)  # implementation date stays put
-    assert cal["CP39"] != cal["MyInvois"]  # the deadline shifted, the mandate did not
+    assert cal["MyInvois"] == date(2025, 7, 1)
+    assert cal["CP39"] != cal["MyInvois"]  # the CP39 deadline shifted; the mandate is a fixed statutory date
 
 
 def test_state_specific_holiday_shifts_only_with_state():

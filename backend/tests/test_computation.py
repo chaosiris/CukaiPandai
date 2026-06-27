@@ -1,5 +1,8 @@
 from datetime import date
 
+import pytest
+from pydantic import ValidationError
+
 from core.computation import compute_form_c
 from core.models import EntityTaxProfile, LineItem
 from core.tax_accounts import by_code
@@ -189,3 +192,39 @@ def test_full_classification_scenario():
     assert fc.fields["entertainment_50pct_addback"].value == 7_500
     assert "epf_excess_addback" not in fc.fields  # 117,000 < 19% x 900,000
     assert fc.fields["chargeable_income"].value == 1_901_500
+
+
+def test_balancing_charge_applies_on_adjusted_loss():
+    # COMP-1: a balancing charge must be added even when the business is in an adjusted loss.
+    items = [_item("rev_sales", 100_000), _item("cos_purchases", 150_000), _item("ca_balancing_charge", 80_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    # adjusted -50,000 + balancing charge 80,000 -> statutory 30,000 (charge not dropped)
+    assert fc.fields["statutory_income"].value == 30_000
+    assert fc.fields["chargeable_income"].value == 30_000
+
+
+def test_group_relief_ignored_for_sme():
+    # COMP-2: s.44A group relief requires non-SME; an SME claimant's group relief is dropped.
+    items = [_item("rev_sales", 300_000), _item("cos_purchases", 100_000), _item("rel_group_relief", 50_000)]
+    fc = compute_form_c(_p(), items, 2026)  # _p() is an SME (paid-up 1m, gross 500k)
+    assert fc.fields["chargeable_income"].value == 200_000  # group relief ignored
+
+
+def test_group_relief_allowed_for_non_sme():
+    items = [_item("rev_sales", 3_000_000), _item("rel_group_relief", 50_000)]
+    fc = compute_form_c(_p(paid_up_capital=5_000_000, gross_income=80_000_000), items, 2026)
+    assert fc.fields["chargeable_income"].value == 2_950_000  # non-SME -> relief deducted
+
+
+def test_epf_disallowed_when_no_remuneration():
+    # COMP-3: with no remuneration line the 19% cap base is 0, so employer EPF is fully added back.
+    items = [_item("rev_sales", 100_000), _item("staff_epf", 50_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    assert fc.fields["epf_excess_addback"].value == 50_000
+    assert fc.fields["chargeable_income"].value == 100_000
+
+
+def test_negative_line_item_amount_rejected():
+    # COMP-4: amounts are positive magnitudes; a negative is rejected at the boundary.
+    with pytest.raises(ValidationError):
+        LineItem(code="rev_sales", description="Sales", amount=-100_000, category="income")

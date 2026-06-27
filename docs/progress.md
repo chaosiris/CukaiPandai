@@ -1852,3 +1852,29 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - `backend`: `python -m pytest -q` → **246 passed** (+5 report tests; PDF-render test skips where WeasyPrint native libs absent).
 - End-to-end: a real Acme filing renders to a valid **3-page PDF** with every section + the entertainment-restricted / EPF-cap add-back lines + disclaimer.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors.
+
+---
+
+## [27/06/26] — Defect-register verification + fixes (34-item QA sweep) `[BE/FE/DO/TD]`
+
+**Why:** an external 34-item defect register (`defects.md`) was provided. A 6-lens verification workflow checked EACH item against the actual code before any fix: **2 refuted** (DEAD-7 off-by-one — a rule-selection heuristic, no day-level error; FE-9 — ObligationRadar DOES have empty-state branches), the rest confirmed/partial. Fixed the clear, safe, high-value items; deferred the large/contract-changing ones with rationale.
+
+### Fixed
+- **AUTH-1/2 (P0)** `api/auth.py`: `_jwt_secret` never signs with the public dev default or an empty key — a configured secret is used only if >=32 chars and not the legacy value, else a **random per-process key** (unforgeable; non-breaking — guest-first demo + tests keep working without env wiring; prod should still set `AUTH_JWT_SECRET`). `.env.example` line commented out.
+- **API-1** `api/llm.py` + `docker-compose.yml`: default LLM route flipped to **sovereign ILMU** (`LLM_PROVIDER=openai`, `nemo-super`); direct Anthropic is now an explicit opt-in (was the silent default).
+- **API-2/3/4** `api/main.py`: malformed `.xlsx` (`BadZipFile`/`InvalidFileException`) and `.pdf` (`PyPdfError` — the register's `PdfError` name was wrong) now return **422**; MSIC upstream `httpx.HTTPError` returns **502** (were uncaught 500s). +3 tests.
+- **COMP-1** balancing charge now applies on an adjusted loss (CA still can't create a loss). **COMP-2** group relief zeroed for SME claimants (ineligible). **COMP-3** employer-EPF fully added back when no remuneration line (cap base 0). **COMP-4** `LineItem.amount` is `Field(ge=0)`; classifier drops non-positive rows. **COMP-5** secretarial citation reconciled to P.U.(A) 162/2020 (amended by 471/2021). **COMP-6** dead `rd_double_deduction_pct` + small-value per-asset assumption annotated. +5 computation tests.
+- **CITE-3** `citation_critic.py`: affirmative parse tightened to first-token `YES` + no negation (rejects "YESTERDAY…NO", "YES…NOT support"). +3 tests.
+- **DEAD-3** MyInvois mandate uses the turnover **band → `mandatory_from`** (not basis-period start); **DEAD-6** CP204 30-day offset externalised to `income_tax.cp204_estimate_days_before`. FE mock dates synced; obligations holiday test updated.
+- **FE-1** all money figures use `'en-MY'` grouping. **FE-4** journey route `/start/filing` → `/start/filing/new`. **FE-6** `useEntity` resolves from in-context personas first, then `validateTin`-gated fetch (no more misrouted valid TINs). **FE-2** FilingStudio surfaces list-load + delete errors (empty-state gated on no-error). **FE-3** FilingRecord shows an Error card for non-404 failures (not "Filing Not Found").
+
+### Deferred (documented; not half-implemented)
+- **DEAD-1/2/5/8** (SST bi-monthly + CP39 monthly + CP204 instalments/SME-exemption + per-entity-type forms): large, change the ObligationCalendar contract (1→N obligations) and need verified per-form deadlines — a coordinated deadline-correctness workstream.
+- **DEAD-4** (obligation→clause citations): needs filing-procedure clauses added to the corpus with verified sources.
+- **CITE-1/2/4/5** (prose grounding, probe segregation, RAG allowed-set, escalation policy): the citation-integrity theme is entangled with the BE-18 "rejects a fake citation" money-shot contract + needs a product decision on redact-vs-block; CITE-2 left intact so the money-shot is not broken.
+- **FE-5** (custom-save silent failure): by-design best-effort; product decision on whether a save failure blocks navigation.
+- **COMP-6** per-asset small-value cap enforcement: needs a one-asset-per-line input contract.
+
+### Verify results
+- `backend`: `python -m pytest -q` → **257 passed** (+11).
+- `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` clean.

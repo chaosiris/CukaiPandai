@@ -18,10 +18,12 @@ def form_c_deadline(fye: date) -> date:
     return date(seventh.year, seventh.month, calendar.monthrange(seventh.year, seventh.month)[1])
 
 
-def cp204_deadline(basis_start: date, commencement: date | None) -> date:
+def cp204_deadline(basis_start: date, commencement: date | None, estimate_days_before: int = 30) -> date:
+    # s.107C: a new company files within 3 months of commencement; an ongoing company submits the
+    # estimate `estimate_days_before` days (statutorily 30) before the basis period starts.
     if commencement and basis_start <= commencement <= _add_months(basis_start, 12):
         return _add_months(commencement, 3)
-    return basis_start - timedelta(days=30)
+    return basis_start - timedelta(days=estimate_days_before)
 
 
 def shift_for_holidays(d: date, holidays: set[date]) -> date:

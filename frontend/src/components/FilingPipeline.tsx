@@ -175,7 +175,7 @@ export function FigureTraceRow({
           <span className="requirement-label-text">{label.replace(/_/g, ' ')}</span>
         </span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700 }}>
-          RM {trace.value.toLocaleString()}
+          RM {trace.value.toLocaleString('en-MY')}
         </span>
       </div>
       <details style={{ paddingLeft: 2 }}>
@@ -272,7 +272,7 @@ export function ComputationPanel({
               letterSpacing: '-0.02em'
             }}
           >
-            RM {heroEntry[1].value.toLocaleString()}
+            RM {heroEntry[1].value.toLocaleString('en-MY')}
           </div>
         </div>
       )}
@@ -387,7 +387,7 @@ export function Stage1Detail({
                 <span className="kind-tag">{item.category}</span>
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700 }}>
-                RM {item.amount.toLocaleString()}
+                RM {item.amount.toLocaleString('en-MY')}
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
                 {item.code}
@@ -500,7 +500,7 @@ export function TechnicalDetailsDisclosure({
                     {trace.inputs.length > 0 ? trace.inputs.join(', ') : 'none'}
                   </div>
                   <div>
-                    <strong style={{ color: 'var(--ink)' }}>value:</strong> RM {trace.value.toLocaleString()}
+                    <strong style={{ color: 'var(--ink)' }}>value:</strong> RM {trace.value.toLocaleString('en-MY')}
                   </div>
                 </div>
               ))}
