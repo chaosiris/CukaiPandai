@@ -1922,22 +1922,35 @@ a {
     height: calc(100vh - 24px);
   }
 
-  /* On narrow screens the panes stack and flow as blocks; the whole workbench scrolls as one
-     column (the desktop grid-rows would collapse the thread and overlap the composer). */
+  /* On narrow screens the panes stack, but each card keeps its own bounded scroll region.
+     The modal/workbench never scroll as one long page, so chips + composer stay pinned. */
   .audit-workbench {
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
-  .audit-pane,
+  .audit-pane {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    flex: 0 0 min(38vh, 300px);
+    max-height: min(38vh, 300px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .audit-conversation {
-    display: block;
-    overflow: visible;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .audit-pane-scroll {
-    overflow-y: visible;
+    min-height: 0;
+    overflow-y: auto;
   }
 }
 

@@ -39,9 +39,10 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     // Viewport-relative max-width: ensures the bubble never exceeds the available space.
     // Written into React state (not just a DOM mutation) so it survives re-renders and is
     // correct from the very first paint after repositioning.
-    const effectiveMaxWidth = Math.min(280, vw - 2 * MARGIN)
+    const effectiveMaxWidth = Math.max(160, Math.min(280, vw - 2 * MARGIN))
 
     // Apply to the DOM element before measuring so getBoundingClientRect reflects wrapping.
+    bubbleRef.current.style.boxSizing = 'border-box'
     bubbleRef.current.style.maxWidth = `${effectiveMaxWidth}px`
     const bubbleRect = bubbleRef.current.getBoundingClientRect()
 
@@ -57,9 +58,8 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     if (top + bubbleRect.height > vh - MARGIN) {
       top = vh - bubbleRect.height - MARGIN
     }
-    // Clamp horizontally
-    if (left < MARGIN) left = MARGIN
-    if (left + bubbleRect.width > vw - MARGIN) left = vw - bubbleRect.width - MARGIN
+    // Clamp horizontally, guarding the second clamp from pushing the bubble back off-screen.
+    left = Math.max(MARGIN, Math.min(left, Math.max(MARGIN, vw - bubbleRect.width - MARGIN)))
 
     setPos({ top, left, maxWidth: effectiveMaxWidth })
   }, [])
@@ -119,6 +119,7 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
             top: pos.top,
             left: pos.left,
             maxWidth: pos.maxWidth,
+            boxSizing: 'border-box',
             zIndex: 200,
             padding: '8px 11px',
             background: 'var(--window)',

@@ -215,9 +215,10 @@ function Chip({
 }
 
 /** Inline citation chip shown under each Pandai answer. */
-function CitationChip({ citation }: { citation: Citation }) {
+function CitationChip({ citation, showRejectedStamp = false }: { citation: Citation; showRejectedStamp?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const hasDetail = citation.section ?? citation.page_ref ?? citation.url ?? citation.passage
+  const showVerification = citation.verified || showRejectedStamp
   return (
     <div
       style={{
@@ -225,16 +226,28 @@ function CitationChip({ citation }: { citation: Citation }) {
         flexDirection: 'column',
         gap: 4,
         padding: '4px 10px',
-        border: citation.verified ? '1px solid var(--denim)' : '1px solid var(--rust)',
+        border: citation.verified
+          ? '1px solid var(--denim)'
+          : showRejectedStamp
+            ? '1px solid var(--rust)'
+            : 'var(--border)',
         borderRadius: 'var(--radius)',
-        background: citation.verified ? 'rgba(65,82,110,0.05)' : 'rgba(181,80,60,0.05)',
+        background: citation.verified
+          ? 'rgba(65,82,110,0.05)'
+          : showRejectedStamp
+            ? 'rgba(181,80,60,0.05)'
+            : 'var(--window)',
         fontFamily: 'var(--font-mono)',
         fontSize: 11,
         maxWidth: '100%'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
-        <VerifiedBadge verified={citation.verified} />
+        {showVerification ? (
+          <VerifiedBadge verified={citation.verified} />
+        ) : (
+          <span style={{ color: 'var(--ink-soft)', fontSize: 10, textTransform: 'uppercase' }}>Source</span>
+        )}
         <span style={{ color: 'var(--ink)', lineHeight: 1.4, minWidth: 0, overflowWrap: 'anywhere' }}>
           {citation.claim}
         </span>
@@ -349,8 +362,9 @@ function AssistantTurn({ msg }: { msg: ChatMessage }) {
 
   const verifiedCitations = data.citations.filter((c) => c.verified)
   const rejectedCitations = data.citations.filter((c) => !c.verified)
-  // Show rejected chips only in the Trust Demo (where rejection is the point); otherwise only verified.
-  const citationChips = msg.isFabrication ? data.citations : verifiedCitations
+  // Ordinary answers should still show unverified citations as small source chips. The rejected
+  // stamp remains exclusive to the Trust Demo path, where rejection is the point.
+  const citationChips = data.citations
   const answerText = data.answer ?? data.exposure_note
 
   return (
@@ -411,13 +425,16 @@ function AssistantTurn({ msg }: { msg: ChatMessage }) {
           {answerText}
         </div>
 
-        {/* Inline citation chips — only verified citations on ordinary answers. Rejected
-            citations are surfaced (and explained) by the Trust Demo's dedicated panel above,
-            so we don't stamp a confusing "REJECTED" chip on normal scope/refusal answers. */}
+        {/* Inline citation chips. Ordinary unverified citations render neutrally; the red
+            REJECTED stamp is only used by the Trust Demo dedicated rejection path. */}
         {citationChips.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {citationChips.map((c) => (
-              <CitationChip key={`${c.claim}-${c.clause_ids.join(',')}`} citation={c} />
+              <CitationChip
+                key={`${c.claim}-${c.clause_ids.join(',')}`}
+                citation={c}
+                showRejectedStamp={msg.isFabrication}
+              />
             ))}
           </div>
         )}
@@ -648,6 +665,7 @@ export default function AuditAssistant() {
 
   function handleChip(question: string) {
     if (!selectedFiling || chatLoading) return
+    setChipsExpanded(false)
     const evidence = filingEvidence(selectedFiling)
     void sendMessage(question, evidence, false)
   }
@@ -857,7 +875,7 @@ export default function AuditAssistant() {
                       key={rec.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '32px minmax(0, 1fr) auto',
+                        gridTemplateColumns: '32px minmax(0, 1fr)',
                         alignItems: 'center',
                         gap: 12,
                         padding: '12px 18px',
@@ -913,24 +931,6 @@ export default function AuditAssistant() {
                           <span>{formatDate(rec.created_at)}</span>
                           {showTp && <span>Tax payable: {formatRM(tp)}</span>}
                         </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void selectFiling(rec)}
-                        style={{
-                          padding: '8px 16px',
-                          border: 'none',
-                          background: 'var(--denim)',
-                          color: 'var(--paper)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          borderRadius: 'var(--radius)',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        Defend This Filing
                       </button>
                     </div>
                   )
