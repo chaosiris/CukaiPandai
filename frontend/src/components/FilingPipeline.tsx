@@ -167,7 +167,10 @@ export function RiskFlagList({ flags }: { flags: RiskFlag[] }) {
 export function FigureTraceRow({
   label,
   trace
-}: { label: string; trace: { value: number; inputs: string[]; rule_id: string; config_version: string } }) {
+}: {
+  label: string
+  trace: { value: number; inputs: string[]; rule_id: string; config_version: string }
+}) {
   return (
     <li className="requirement-row">
       <div className="requirement-topline">

@@ -216,13 +216,13 @@ The rubric weights **Innovation & Differentiation at 30 marks (23%)** and explic
 
 ### 5.2 Audit-defense flow (the differentiator)
 
-| Step | What happens                                                                                                                                           | AI or deterministic?                                          |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| 1    | LHDN issues an audit query/letter → user pastes/uploads it                                                                                             | input                                                         |
-| 2    | **Audit-Defense agent** `build_defense`: interpret contested items → return `{contested_item, claim, clause_ids}`                                      | **AI** (`nemo-super`, ILMU-first)                             |
+| Step | What happens                                                                                                                                           | AI or deterministic?                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 1    | LHDN issues an audit query/letter → user pastes/uploads it                                                                                             | input                                                                                      |
+| 2    | **Audit-Defense agent** `build_defense`: interpret contested items → return `{contested_item, claim, clause_ids}`                                      | **AI** (`nemo-super`, ILMU-first)                                                          |
 | 3    | **Citation verifier** `verify_claim`: deterministic existence gate (`ground_citation`) **then** LLM critic confirms the clause text supports the claim | gate = **deterministic**; critic = **AI** (`nemo-super`; sovereign escalation post-prelim) |
-| 4    | Compute exposure note (s.112/113); assemble `DefensePack` (query + items + verified citations + exposure note)                                         | **Deterministic** assembly                                    |
-| 5    | Human (tax agent/finance) reviews, edits, approves → export defense pack (PDF + evidence index) for LHDN                                               | Human-in-the-loop                                             |
+| 4    | Compute exposure note (s.112/113); assemble `DefensePack` (query + items + verified citations + exposure note)                                         | **Deterministic** assembly                                                                 |
+| 5    | Human (tax agent/finance) reviews, edits, approves → export defense pack (PDF + evidence index) for LHDN                                               | Human-in-the-loop                                                                          |
 
 ### 5.3 Obligation / filing state model
 
@@ -455,13 +455,13 @@ Because ILMU's OpenAI base URL accepts the same call shape, `_OpenAICompatClient
 
 The agents emit _classifications, clause-ID lists, and prose drafts_ — never numbers, never trusted citations. So the consequence of `nemo-super` being a smaller model than Claude is bounded:
 
-| Failure mode of a weaker model     | What actually happens                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Mis-classifies a line item         | Engine still prices it by the config rule for whatever category it landed in; human review catches a mislabel       |
-| Invents a clause ID                | `ground_citation` rejects it (`verified=False`) before it reaches a human                                           |
+| Failure mode of a weaker model     | What actually happens                                                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Mis-classifies a line item         | Engine still prices it by the config rule for whatever category it landed in; human review catches a mislabel               |
+| Invents a clause ID                | `ground_citation` rejects it (`verified=False`) before it reaches a human                                                   |
 | Cites a real-but-irrelevant clause | LLM critic (`nemo-super` for prelim; sovereign ILMU escalation post-prelim via BE-5) catches "clause doesn't support claim" |
-| Emits malformed JSON               | One retry + the JSON-mode flag; deterministic-core outputs are unaffected                                           |
-| Produces a wrong tax figure        | **Cannot happen** — the LLM has no write path to `FigureTrace.value`                                                |
+| Emits malformed JSON               | One retry + the JSON-mode flag; deterministic-core outputs are unaffected                                                   |
+| Produces a wrong tax figure        | **Cannot happen** — the LLM has no write path to `FigureTrace.value`                                                        |
 
 ---
 
@@ -517,14 +517,14 @@ This replaces the "engagement/gamification" layer of a consumer app: for an ente
 
 Act-on-by-default design assumptions; none is architectural, all are cheap to resolve. (Status of each → [`progress.md`](progress.md); resolution actions → [`plan.md`](plan.md).)
 
-| #   | Assumption                                                                                                                                                           |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | ILMU early-access tokens are **unmetered**; "Claw Starter ~RM27/seat/month" is a seat/access fee (§3.1). Revisit if metering is announced.                           |
+| #   | Assumption                                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A1  | ILMU early-access tokens are **unmetered**; "Claw Starter ~RM27/seat/month" is a seat/access fee (§3.1). Revisit if metering is announced.                                                                                                                                                             |
 | A2  | The Claw-tier `nemo-super` is good enough for classification/cite/draft; a **sovereign escalation** (stronger ILMU model on the gateway) backstops the citation-critic post-prelim (§3.4) — a direct-Claude backstop is a flagged non-sovereign opt-in. Confirm via the spike in [`plan.md`](plan.md). |
-| A3  | Government APIs stay mocked/seeded for the prelim (MyInvois fixture, SSM/MySST seeded). Live integrations are `[ROADMAP]`.                                           |
-| A4  | A single Vite + React console (ProofRank devkit) calling the 3 existing endpoints is sufficient for the live-demo requirement.                                       |
-| A5  | The 5-clause law corpus is sufficient to _demonstrate_ the citation mechanism; the full corpus + pgvector is `[ROADMAP]`.                                            |
-| A6  | Team of 3: backend/agents + frontend/demo + domain/business; the repo currently names two (Chaos, Tuna) — the third is product + tax-`⚠verify` + narration.          |
+| A3  | Government APIs stay mocked/seeded for the prelim (MyInvois fixture, SSM/MySST seeded). Live integrations are `[ROADMAP]`.                                                                                                                                                                             |
+| A4  | A single Vite + React console (ProofRank devkit) calling the 3 existing endpoints is sufficient for the live-demo requirement.                                                                                                                                                                         |
+| A5  | The 5-clause law corpus is sufficient to _demonstrate_ the citation mechanism; the full corpus + pgvector is `[ROADMAP]`.                                                                                                                                                                              |
+| A6  | Team of 3: backend/agents + frontend/demo + domain/business; the repo currently names two (Chaos, Tuna) — the third is product + tax-`⚠verify` + narration.                                                                                                                                            |
 
 ---
 

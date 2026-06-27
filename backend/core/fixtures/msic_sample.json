@@ -1,8 +1,62 @@
 [
-  {"item": "-", "class": "-", "group": "-", "digits": 1, "desc_bm": "Perdagangan borong dan runcit; pembaikan kenderaan motor dan motosikal", "desc_en": "Wholesale and retail trade; repair of motor vehicles and motorcycles", "section": "G", "division": "-"},
-  {"item": "-", "class": "-", "group": "-", "digits": 2, "desc_bm": "Perdagangan borong, kecuali kenderaan motor dan motosikal", "desc_en": "Wholesale trade, except of motor vehicles and motorcycles", "section": "G", "division": "46"},
-  {"item": "-", "class": "-", "group": "469", "digits": 3, "desc_bm": "Perdagangan jual borong bukan pengkhususan", "desc_en": "Non-specialized wholesale trade", "section": "G", "division": "46"},
-  {"item": "-", "class": "4690", "group": "469", "digits": 4, "desc_bm": "Perdagangan borong tanpa pengkhususan", "desc_en": "Non-specialized wholesale trade - wholesale of variety of goods without any particular specialization", "section": "G", "division": "46"},
-  {"item": "46901", "class": "4690", "group": "469", "digits": 5, "desc_bm": "Jualan borong ikan akuarium, burung dan haiwan peliharaan", "desc_en": "Wholesale of aquarium fishes, pet birds and animals", "section": "G", "division": "46"},
-  {"item": "62010", "class": "6201", "group": "620", "digits": 5, "desc_bm": "Aktiviti pengaturcaraan komputer", "desc_en": "Computer programming activities", "section": "J", "division": "62"}
+  {
+    "item": "-",
+    "class": "-",
+    "group": "-",
+    "digits": 1,
+    "desc_bm": "Perdagangan borong dan runcit; pembaikan kenderaan motor dan motosikal",
+    "desc_en": "Wholesale and retail trade; repair of motor vehicles and motorcycles",
+    "section": "G",
+    "division": "-"
+  },
+  {
+    "item": "-",
+    "class": "-",
+    "group": "-",
+    "digits": 2,
+    "desc_bm": "Perdagangan borong, kecuali kenderaan motor dan motosikal",
+    "desc_en": "Wholesale trade, except of motor vehicles and motorcycles",
+    "section": "G",
+    "division": "46"
+  },
+  {
+    "item": "-",
+    "class": "-",
+    "group": "469",
+    "digits": 3,
+    "desc_bm": "Perdagangan jual borong bukan pengkhususan",
+    "desc_en": "Non-specialized wholesale trade",
+    "section": "G",
+    "division": "46"
+  },
+  {
+    "item": "-",
+    "class": "4690",
+    "group": "469",
+    "digits": 4,
+    "desc_bm": "Perdagangan borong tanpa pengkhususan",
+    "desc_en": "Non-specialized wholesale trade - wholesale of variety of goods without any particular specialization",
+    "section": "G",
+    "division": "46"
+  },
+  {
+    "item": "46901",
+    "class": "4690",
+    "group": "469",
+    "digits": 5,
+    "desc_bm": "Jualan borong ikan akuarium, burung dan haiwan peliharaan",
+    "desc_en": "Wholesale of aquarium fishes, pet birds and animals",
+    "section": "G",
+    "division": "46"
+  },
+  {
+    "item": "62010",
+    "class": "6201",
+    "group": "620",
+    "digits": 5,
+    "desc_bm": "Aktiviti pengaturcaraan komputer",
+    "desc_en": "Computer programming activities",
+    "section": "J",
+    "division": "62"
+  }
 ]

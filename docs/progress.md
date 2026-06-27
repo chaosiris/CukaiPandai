@@ -1758,28 +1758,36 @@ In `frontend/src/pages/Landing.css`: removed `.lp-finale`, `.lp-finale-inner`, `
 **Why:** the `/filing/new` free-text `AccountName Amount` textarea was too lax — users typed non-financial gibberish (emojis, "tung tung tung sahur") and still got a classification. Replaced it with fixed, selectable accounts; PO chose to ALSO build the real Schedule-3 capital-allowance + s.44 reliefs engine (not just `income − deductible`).
 
 ### Research (SFI-0) — cited YA2026 rates/caps
+
 Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, s.44 relief caps, and the 7-stage computation order vs LHDN + PwC/EY/KPMG/Deloitte/Grant Thornton/Crowe. Locked: P&M 20/14, MV 20/20 (RM50k base cap), F&F 20/10, ICT 40/20, IBA 10/3, SVA 100% (SME aggregate-cap-exempt), **renovation general deduction EXPIRED 31/12/2022 → no auto-allowance**; donation 10% + zakat 2.5% both vs **aggregate** income; **company zakat is a deduction not a rebate**; **company total income = chargeable income**; **group relief needs paid-up >RM2.5m (inverse of SME)**.
 
 ### Taxonomy (SFI-1)
+
 - `backend/core/tax_accounts.py` — **88 fixed accounts across 14 groups** (research summary's "62" was an undercount); typed `TaxAccount`, `category` ∈ {income, exempt_income, deductible, non_deductible, capital_allowance, special_deduction} + `ca_class`/`relief_key`; helpers `by_code`/`by_group`/`allowed_codes`.
 - `frontend/src/lib/taxAccounts.ts` — mirror (code/label/group/category/note + `CATEGORY_LABEL`). MUST stay in sync (audit verified 88/88 codes, 0 category/group mismatches).
 
 ### Config (SFI-2)
+
 - `core/config/ya_2026.yaml` — added cited `capital_allowances` (IA/AA + caps per `ca_class`) and `reliefs` (EPF 19%, secretarial RM15k, ESG RM50k, donation 10%, zakat 2.5%, group relief 70%, loss/CA carry-forward 10y). Version unchanged (`YA2026.1`; additive only).
 
 ### Engine (SFI-3)
+
 - Rewrote `core/computation.py` `compute_form_c` to the full ascertainment chain (business income → adjusted → statutory[+balancing charge −CA] → aggregate[−CY loss] → total[−b/f loss −zakat −donations −group relief] → chargeable → tax). Exempt credit items (dividend, gain on disposal, unrealised forex gain) excluded. 8 stage fields exposed for the FigureTrace UI; `chargeable_income`+`tax_payable` keys retained. +9 stage tests. **Golden RM31,000 + non-SME RM240,000 preserved.**
 
 ### Structured manual entry (SFI-4)
+
 - `FilingNew.tsx`: free-text textarea → **two-level structured rows** (group → account → amount). `buildLineItems` builds `LineItem[]` deterministically from the taxonomy (**no LLM on the manual path**). Personas carry `demoItems` (replaced `demoRawText` everywhere). **Honest UI:** manual shows "entered directly · no AI", hides the AI route-info, provenance tip states no AI involved; sovereign/AI shown only for uploads. Resume rehydrates rows from line_items; "Edit Line Items" preserves rows + the one draft id. `FilingPipeline.Stage1Detail` gained a `manual` prop; `UPSTREAM_KEYS` extended for ordered stage display.
 
 ### Constrained upload (SFI-5)
+
 - `documents.py`: injects the 88-account catalogue into the prompt; **server-side drops codes outside the taxonomy + non-finite/zero amounts, and sets category authoritatively from the taxonomy** (never the model). Drop-zone names the curated docs (Income Statement/P&L, Trial Balance); AI extract pre-fills the rows for review. Mock classify aligned to taxonomy codes + valid categories.
 
 ### Audits (SFI-6)
+
 - Backend tax-engine audit → **GO**. FE + upload audit → **GO** (taxonomy sync verified programmatically; honesty contract holds; determinism + state-flow correct; no regressions). Hardened `documents.py` to reject NaN/Infinity per the audit note.
 
 ### Verify results
+
 - `backend`: `python -m pytest -q` (repo `.venv`) → **236 passed**.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` (root-pinned 1.9.4) 0 errors on all changed files.
 
@@ -1790,15 +1798,18 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 **Why:** follow-up to SFI. (1) The New Filing input showed Manual entry first; the team wants it **document-first** with the manual form behind a toggleable tab, mirroring `../myai-future-hackathon`. (2) No realistic sample documents existed to exercise the upload pipeline.
 
 ### Research (online-grounded)
+
 - A research agent mapped `../myai-future-hackathon`'s intake UX: **Upload is the default tab**; a custom (non-library) toggle keeps both panels mounted; sample docs live in `public/fixtures/` and load via a "use sample" affordance.
 - A second agent gathered **real Malaysian document formats** (cited): MPERS Statement of Profit or Loss (KPMG / Radiant Rainbow illustrative statements — header block, `Registration No : <12-digit> (<ROC>)`, `(Incorporated in Malaysia)`, parenthesised deductions, `RM` once at column head); AutoCount/SQL trial-balance export (`AccNo | Description | Debit | Credit`, `nnn-nnn` chart-of-accounts codes, "As At DD/MM/YYYY"); LHDN HK-1 working-sheet captions.
 
 ### FE — document-first tabs (`FilingNew.tsx`)
+
 - Replaced the manual-first + divider layout with a **tab toggle** ("Upload Document" default · "Manual Entry"); both panels stay mounted (toggled via `display`), so state survives a switch. Titlebar → "Stage 01 - Provide Your Figures".
 - **Honesty preserved:** manual entry stays deterministic ("entered directly · no AI", no sovereign badge); the AI/sovereign path shows only for uploads.
 - Added a **"Use sample document"** button (upload tab) that fetches the active persona's sample income statement from `/fixtures/`, wraps it as a `File`, and runs the upload pipeline. Shown only for the 3 demo personas (`SAMPLE_DOCS` keyed by TIN); hidden for custom entities.
 
 ### Sample documents (generated, verified)
+
 - A multi-agent workflow generated **sector-specific, arithmetic- and taxonomy-verified** financials for Acme (wholesale), Sinar (SaaS), Selera (F&B) — each P&L revenue matches the persona's gross income, gross profit + PBT reconcile exactly, and the trial balances balance. Saved to `backend/scripts/sample_financials.json`.
 - `backend/scripts/gen_sample_docs.py` (uses `fpdf2`, a dev-only fixture dep — NOT a runtime/deploy dependency) renders, per persona, into `frontend/public/fixtures/`:
   - `{key}-income-statement.pdf` — detailed MPERS Statement of Profit or Loss (real header format, parenthesised deductions).
@@ -1806,6 +1817,7 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 - Confirmed the PDFs contain **extractable text** (pypdf) with every line item present, so the live extraction pipeline (pypdf → constrained classifier → taxonomy) works end-to-end.
 
 ### Verify results
+
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` 0 errors.
 - Sample docs: 6 files generated; Acme/Sinar/Selera revenue + PBT exact; trial balances balance; PDF text extraction verified.
 
@@ -1816,18 +1828,22 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 **Why:** a review surfaced classic Form C misclassifications a naive classifier makes (depreciation as deductible; staff entertainment disallowed; client entertainment fully disallowed instead of 50%). Does our deterministic core catch these? Mostly yes — category is pinned to the taxonomy account, so depreciation is structurally `non_deductible` — but the entertainment 50% split + the EPF cap were not automatic.
 
 ### Boot-message UX (FE)
+
 - `client.ts`: added `safeFetch` (wraps `globalThis.fetch`; no recursion) so a failed request (server cold/suspended) surfaces "**The server is still starting up … please wait for it to boot, then refresh**" instead of the raw `NetworkError`. All live-path calls route through it — every backend-backed page benefits.
 
 ### Deterministic deduction treatments (BE)
+
 - `tax_accounts.py`: added a `treatment` field. Client entertainment repurposed (`sell_entertainment_allowed` → `sell_entertainment_clients`, `treatment="entertainment_50"`): the user enters the FULL amount and the engine deducts 50% + adds back 50% (s.39(1)(l)). Removed the manual `nd_entertainment_50` half. Added `staff_entertainment` (100% deductible — the s.39(1)(l) employee carve-out). `staff_epf` tagged `treatment="epf_capped"`.
 - `computation.py`: `_deductions` is now treatment-aware — applies the 50% entertainment restriction and the employer-EPF 19%-of-remuneration cap (s.34(4); base = salaries + directors' fees + direct labour; no cap when base is 0), and surfaces the disallowed amounts as visible figures (`entertainment_50pct_addback`, `epf_excess_addback`) for defensibility. Depreciation / general provisions / unapproved donations stay excluded by their pinned `non_deductible` category.
 - `audit_risk.py`: transparency flags when the entertainment restriction or EPF cap is applied.
 - Taxonomy stays **88 accounts, FE↔BE identical (diff = 0)**.
 
 ### Tests
+
 - +5 computation tests: entertainment 50% auto-split; staff entertainment 100%; EPF capped (excess added back) + under-cap; the full 20-line user scenario → chargeable RM1,901,500. Golden RM31,000 + non-SME RM240,000 unchanged.
 
 ### Verify results
+
 - `backend`: `python -m pytest -q` → **241 passed**.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors. Taxonomy diff backend↔FE = 0.
 
@@ -1838,17 +1854,21 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 **Why:** give the SME a printable Form C **draft pack** (tax-computation working paper) to review and take to LHDN / a tax agent. A preparation aid — **never auto-submitted** (Malaysia self-assessment; the taxpayer/authorised agent files via MyTax). Pattern mirrors `../myai-future-hackathon` (WeasyPrint + blob-URL iframe preview + download); format grounded in online research (LHDN HK-1 + tax-agent working-paper convention).
 
 ### Merges first
+
 Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `main` (now `60a000c`) and pushed.
 
 ### Backend
+
 - `api/report.py`: `build_report_html(filing, entity)` — pure HTML builder (cover + diagonal "DRAFT - NOT FOR SUBMISSION" watermark on every page via `position:fixed`; entity particulars; tax-computation working sheet; capital-allowance schedule; line-item schedule; Form C field summary; self-assessment disclaimer). All figures sourced from the engine's `computation.fields` (no re-derivation; inter-stage deltas reconcile). All interpolated values HTML-escaped. `render_pdf` lazily imports WeasyPrint so the API still boots if a native lib is missing.
 - `main.py`: `GET /me/filings/{id}/report` (owner-scoped) → inline `application/pdf`, `Cache-Control: no-store`; 404 (absent/foreign), 409 (no computation yet), 503 (PDF engine libs unavailable — caught ImportError/OSError so genuine bugs still 500).
 - Deps/deploy: `weasyprint>=62` in `pyproject`; Dockerfile installs Pango/Cairo/PangoFT2/HarfBuzz/GDK-PixBuf/libffi + DejaVu/Liberation fonts. `uv.lock` NOT regenerated (sandbox offline) — harmless: the image uses `uv pip install -e .` (resolves from pyproject), not `uv sync`.
 
 ### Frontend
+
 - `client.ts` `getFilingReport(id): Promise<Blob>` (authed fetch; mock degrades with a clear message). `FilingRecord.tsx` "Filing Draft Pack" card: Generate → blob → `URL.createObjectURL` → inline `<iframe>` preview + Download PDF (`<a download>`); blob URL revoked on unmount.
 
 ### Verify results
+
 - `backend`: `python -m pytest -q` → **246 passed** (+5 report tests; PDF-render test skips where WeasyPrint native libs absent).
 - End-to-end: a real Acme filing renders to a valid **3-page PDF** with every section + the entertainment-restricted / EPF-cap add-back lines + disclaimer.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors.
@@ -1860,6 +1880,7 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 **Why:** an external 34-item defect register (`defects.md`) was provided. A 6-lens verification workflow checked EACH item against the actual code before any fix: **2 refuted** (DEAD-7 off-by-one — a rule-selection heuristic, no day-level error; FE-9 — ObligationRadar DOES have empty-state branches), the rest confirmed/partial. Fixed the clear, safe, high-value items; deferred the large/contract-changing ones with rationale.
 
 ### Fixed
+
 - **AUTH-1/2 (P0)** `api/auth.py`: `_jwt_secret` never signs with the public dev default or an empty key — a configured secret is used only if >=32 chars and not the legacy value, else a **random per-process key** (unforgeable; non-breaking — guest-first demo + tests keep working without env wiring; prod should still set `AUTH_JWT_SECRET`). `.env.example` line commented out.
 - **API-1** `api/llm.py` + `docker-compose.yml`: default LLM route flipped to **sovereign ILMU** (`LLM_PROVIDER=openai`, `nemo-super`); direct Anthropic is now an explicit opt-in (was the silent default).
 - **API-2/3/4** `api/main.py`: malformed `.xlsx` (`BadZipFile`/`InvalidFileException`) and `.pdf` (`PyPdfError` — the register's `PdfError` name was wrong) now return **422**; MSIC upstream `httpx.HTTPError` returns **502** (were uncaught 500s). +3 tests.
@@ -1869,6 +1890,7 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - **FE-1** all money figures use `'en-MY'` grouping. **FE-4** journey route `/start/filing` → `/start/filing/new`. **FE-6** `useEntity` resolves from in-context personas first, then `validateTin`-gated fetch (no more misrouted valid TINs). **FE-2** FilingStudio surfaces list-load + delete errors (empty-state gated on no-error). **FE-3** FilingRecord shows an Error card for non-404 failures (not "Filing Not Found").
 
 ### Deferred (documented; not half-implemented)
+
 - **DEAD-1/2/5/8** (SST bi-monthly + CP39 monthly + CP204 instalments/SME-exemption + per-entity-type forms): large, change the ObligationCalendar contract (1→N obligations) and need verified per-form deadlines — a coordinated deadline-correctness workstream.
 - **DEAD-4** (obligation→clause citations): needs filing-procedure clauses added to the corpus with verified sources.
 - **CITE-1/2/4/5** (prose grounding, probe segregation, RAG allowed-set, escalation policy): the citation-integrity theme is entangled with the BE-18 "rejects a fake citation" money-shot contract + needs a product decision on redact-vs-block; CITE-2 left intact so the money-shot is not broken.
@@ -1876,6 +1898,7 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - **COMP-6** per-asset small-value cap enforcement: needs a one-asset-per-line input contract.
 
 ### Verify results
+
 - `backend`: `python -m pytest -q` → **257 passed** (+11).
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` clean.
 
@@ -1884,11 +1907,13 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 **Why:** screenshots showed the filing page's RM tax hero clipping off-screen on mobile and the Classified Line Items table running past the viewport on desktop (long rule codes / extreme RM figures). A deep, viewport-driven UI audit (Edge via playwright-core; programmatic overflow detection at 375px + 1440px, then a 4-lens read-only sweep of every page + the global CSS) confirmed both and surfaced the same root causes elsewhere.
 
 ### Root causes (one of three patterns each)
+
 1. Fixed px font-size on large numbers/headings with no `clamp()` → overflow on narrow screens.
 2. Grid tracks (`1fr` / `Npx` / `repeat(12,1fr)`) without `minmax(0,…)`, so a wide/unbreakable cell (grid items default `min-width:auto`) forces the track past the viewport.
 3. Long unbreakable mono strings (URLs, rule codes, big RM figures, model IDs) with no `overflow-wrap`.
 
 ### Fixed (9 files)
+
 - **FilingPipeline** — hero tax number `clamp(2.25rem,12vw,96px)` + wrap; `.requirement-topline` regrid to `minmax(0,1fr) minmax(0,200px) minmax(0,150px)` + shrinkable/wrapping cells; new `.trace-detail` rule wraps rule_id/config_version/input slugs.
 - **CitationPanel** — citation URL/clause/passage wrap; SovereignBadge truncates long model IDs.
 - **ObligationRadar** — 12-month calendar `repeat(12,minmax(0,1fr))` + `min-width:0` cells; filing-obligation rows `72px minmax(0,1fr) auto auto`.
@@ -1901,6 +1926,7 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 > Two refuted by the audit (no action): no other 96px-class heroes; `.dash-main-grid`/`.dash-orient`/`.dash-hero-sub` are already responsive-safe. Remaining audit items were `low` (defensive guards on devkit-dead-code classes — left untouched).
 
 ### Verify results
+
 - Edge screenshots + programmatic check: **zero horizontal overflow** at 375px and 1440px across the filing computation/line-items, citations, Obligation Calendar (12-month grid + filing rows), and Dashboard (mock-data populated).
 - `frontend`: `tsc -b` 0 errors · `vite build` green (84 modules) · `biome lint` 0 violations.
 - Diff audited by subagent → GO (one parity gap closed: AuditAssistant figure-row amount).

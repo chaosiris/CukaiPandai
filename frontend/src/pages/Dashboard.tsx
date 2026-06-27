@@ -194,7 +194,11 @@ function DeadlinesPanel({
   calendar,
   loading,
   error
-}: { calendar: ObligationCalendar | null; loading: boolean; error: string | null }) {
+}: {
+  calendar: ObligationCalendar | null
+  loading: boolean
+  error: string | null
+}) {
   const sorted = calendar ? [...calendar.obligations].sort((a, b) => daysUntil(a.due_date) - daysUntil(b.due_date)) : []
 
   return (
