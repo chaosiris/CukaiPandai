@@ -152,8 +152,8 @@ const SECONDARY_CONSOLES = [
     mascot: '/mascots/pandai-calendar.png'
   },
   {
-    to: '/audit-defense',
-    title: 'Audit Defense',
+    to: '/audit-assistant',
+    title: 'Audit Assistant',
     desc: 'Build a citation-grounded defense pack; fabricated clauses are rejected.',
     kicker: 'RAG · ground_citation gate',
     mascot: '/mascots/pandai-assistant.png'

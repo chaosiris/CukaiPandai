@@ -32,7 +32,7 @@ export const JOURNEY_STEPS: JourneyStep[] = [
     num: 3,
     label: 'Audit Defense Pack',
     output: 'A citation-grounded defense pack. Fabricated clauses are deterministically rejected.',
-    route: '/start/audit-defense'
+    route: '/start/audit-assistant'
   }
 ]
 

@@ -1768,6 +1768,21 @@ a {
   border-bottom: none !important;
 }
 
+/* ── Audit Workbench two-pane layout (FE-2.6 / PR-C) ───────────────── */
+/* Desktop: 1fr (figures) + 2fr (Q&A). Mobile (<=680px): single column. */
+.audit-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 680px) {
+  .audit-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
