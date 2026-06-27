@@ -1808,3 +1808,25 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 ### Verify results
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` 0 errors.
 - Sample docs: 6 files generated; Acme/Sinar/Selera revenue + PBT exact; trial balances balance; PDF text extraction verified.
+
+---
+
+## [27/06/26] — Engine robustness: deterministic deduction treatments + boot-message UX (SFI-8) `[BE/FE/TD]`
+
+**Why:** a review surfaced classic Form C misclassifications a naive classifier makes (depreciation as deductible; staff entertainment disallowed; client entertainment fully disallowed instead of 50%). Does our deterministic core catch these? Mostly yes — category is pinned to the taxonomy account, so depreciation is structurally `non_deductible` — but the entertainment 50% split + the EPF cap were not automatic.
+
+### Boot-message UX (FE)
+- `client.ts`: added `safeFetch` (wraps `globalThis.fetch`; no recursion) so a failed request (server cold/suspended) surfaces "**The server is still starting up … please wait for it to boot, then refresh**" instead of the raw `NetworkError`. All live-path calls route through it — every backend-backed page benefits.
+
+### Deterministic deduction treatments (BE)
+- `tax_accounts.py`: added a `treatment` field. Client entertainment repurposed (`sell_entertainment_allowed` → `sell_entertainment_clients`, `treatment="entertainment_50"`): the user enters the FULL amount and the engine deducts 50% + adds back 50% (s.39(1)(l)). Removed the manual `nd_entertainment_50` half. Added `staff_entertainment` (100% deductible — the s.39(1)(l) employee carve-out). `staff_epf` tagged `treatment="epf_capped"`.
+- `computation.py`: `_deductions` is now treatment-aware — applies the 50% entertainment restriction and the employer-EPF 19%-of-remuneration cap (s.34(4); base = salaries + directors' fees + direct labour; no cap when base is 0), and surfaces the disallowed amounts as visible figures (`entertainment_50pct_addback`, `epf_excess_addback`) for defensibility. Depreciation / general provisions / unapproved donations stay excluded by their pinned `non_deductible` category.
+- `audit_risk.py`: transparency flags when the entertainment restriction or EPF cap is applied.
+- Taxonomy stays **88 accounts, FE↔BE identical (diff = 0)**.
+
+### Tests
+- +5 computation tests: entertainment 50% auto-split; staff entertainment 100%; EPF capped (excess added back) + under-cap; the full 20-line user scenario → chargeable RM1,901,500. Golden RM31,000 + non-SME RM240,000 unchanged.
+
+### Verify results
+- `backend`: `python -m pytest -q` → **241 passed**.
+- `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` 0 errors. Taxonomy diff backend↔FE = 0.

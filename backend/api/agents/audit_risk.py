@@ -74,4 +74,21 @@ def assess_risk(
                     "Not an SME for the preferential rate (" + "; ".join(reasons)
                     + f") — chargeable income is taxed at the flat {it['non_sme_rate'] * 100:.0f}% rate.")))
 
+    # 6. Deterministic add-backs the engine applied (transparency — surfaces the rules a naive
+    #    classifier gets wrong, so the user sees the correction was made and why).
+    ent = computation.fields.get("entertainment_50pct_addback")
+    if ent is not None and ent.value > 0:
+        flags.append(RiskFlag(
+            code="entertainment_restricted", severity="low",
+            message=(
+                f"Client/business entertainment restricted to 50% (s.39(1)(l)) — "
+                f"RM{ent.value:,.0f} added back to chargeable income.")))
+    epf = computation.fields.get("epf_excess_addback")
+    if epf is not None and epf.value > 0:
+        flags.append(RiskFlag(
+            code="epf_excess_addback", severity="medium",
+            message=(
+                f"Employer EPF/approved-fund contribution exceeds the 19% cap (s.34(4)) — "
+                f"RM{epf.value:,.0f} added back as non-deductible.")))
+
     return flags

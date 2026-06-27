@@ -42,6 +42,40 @@ def _sum(items: list[LineItem], category: str) -> float:
     return sum(i.amount for i in items if i.category == category)
 
 
+# Remuneration base for the employer-EPF deduction cap (s.34(4)).
+_REMUNERATION_CODES = {"staff_salaries", "staff_directors_remuneration", "cos_direct_labour"}
+
+
+def _deductions(items: list[LineItem], cfg: dict) -> tuple[float, dict[str, float]]:
+    """Treatment-aware allowable deductions.
+
+    Applies, deterministically and regardless of input source, the rules a naive classifier gets
+    wrong: the 50% client-entertainment restriction (s.39(1)(l)) and the employer-EPF cap at 19% of
+    remuneration (s.34(4)). Returns (total deductible, {disallowed amounts added back}).
+    """
+    epf_cap_pct = cfg.get("reliefs", {}).get("epf_remuneration_cap_pct", 0.19)
+    remuneration = sum(i.amount for i in items if i.category == DEDUCTIBLE and i.code in _REMUNERATION_CODES)
+    total = 0.0
+    disallowed = {"entertainment_50": 0.0, "epf_excess": 0.0}
+    for it in items:
+        if it.category != DEDUCTIBLE:
+            continue
+        acct = by_code(it.code)
+        treatment = acct.treatment if acct else None
+        amt = it.amount
+        if treatment == "entertainment_50":
+            allowed = amt * 0.5
+            disallowed["entertainment_50"] += amt - allowed
+            total += allowed
+        elif treatment == "epf_capped" and remuneration > 0:
+            allowed = min(amt, remuneration * epf_cap_pct)
+            disallowed["epf_excess"] += amt - allowed
+            total += allowed
+        else:
+            total += amt
+    return total, disallowed
+
+
 def _capital_allowances(items: list[LineItem], profile: EntityTaxProfile, cfg: dict) -> tuple[float, float]:
     """Return (total capital-allowance deduction, total balancing charge) for the Sch 3 stage."""
     ca_cfg = cfg.get("capital_allowances", {})
@@ -138,7 +172,7 @@ def compute_form_c(profile: EntityTaxProfile, items: list[LineItem], ya: int) ->
     r = cfg.get("reliefs", {})
 
     business_income = _sum(items, INCOME)
-    deductions = _sum(items, DEDUCTIBLE)
+    deductions, disallowed = _deductions(items, cfg)
     further, below = _further_and_below_line(items, cfg)
 
     # Stage 2 -> adjusted income (a negative result is a current-year adjusted loss).
@@ -177,11 +211,19 @@ def compute_form_c(profile: EntityTaxProfile, items: list[LineItem], ya: int) ->
     fields = {
         "business_income": fig(business_income, ["income"], "cit.business_income"),
         "adjusted_income": fig(adjusted, ["business_income", "deductible", "special_deduction"], "cit.adjusted_income"),
+    }
+    # Surface the deterministic add-backs so the treatment is visible + defensible.
+    if disallowed["entertainment_50"] > 0:
+        fields["entertainment_50pct_addback"] = fig(
+            disallowed["entertainment_50"], ["sell_entertainment_clients"], "cit.entertainment_restriction_s39")
+    if disallowed["epf_excess"] > 0:
+        fields["epf_excess_addback"] = fig(disallowed["epf_excess"], ["staff_epf"], "cit.epf_cap_s34")
+    fields.update({
         "capital_allowances": fig(ca_allowance, ["capital_allowance"], "cit.capital_allowances"),
         "statutory_income": fig(statutory, ["adjusted_income", "capital_allowances"], "cit.statutory_income"),
         "aggregate_income": fig(aggregate, ["statutory_income"], "cit.aggregate_income"),
         "total_income": fig(total, ["aggregate_income", "special_deduction"], "cit.total_income"),
         "chargeable_income": fig(chargeable, ["total_income"], "cit.chargeable_income"),
         "tax_payable": tp,
-    }
+    })
     return FormComputation(form="C", fields=fields)

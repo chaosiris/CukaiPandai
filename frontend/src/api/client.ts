@@ -623,13 +623,27 @@ async function ensureSession(): Promise<void> {
   await _guestMint
 }
 
+// A failed fetch (server unreachable / cold-started / suspended on free hosting) rejects with a
+// TypeError before any HTTP response. Surface a calm "still booting" message instead of the raw
+// browser "NetworkError when attempting to fetch resource".
+const SERVER_BOOTING_MESSAGE =
+  'The server is still starting up. Free-tier hosting can take up to a minute to wake on the first request -- please wait for it to boot, then refresh.'
+
+async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await globalThis.fetch(input, init)
+  } catch {
+    throw new Error(SERVER_BOOTING_MESSAGE)
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: { ...authHeaders() } })
+  const res = await safeFetch(`${BASE_URL}${path}`, { headers: { ...authHeaders() } })
   return handleResponse<T>(res)
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await safeFetch(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body)
@@ -828,7 +842,7 @@ export async function uploadDocument(tin: string, file: File, profile?: EntityTa
   if (MOCK_MODE) return makeMockClassify(tin, profile ?? MOCK_ENTITIES[tin])
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`${BASE_URL}/entities/${tin}/documents/upload`, {
+  const res = await safeFetch(`${BASE_URL}/entities/${tin}/documents/upload`, {
     method: 'POST',
     body: form
   })
@@ -957,7 +971,7 @@ export async function putMyEntity(ssm: SsmProfile): Promise<EntityTaxProfile> {
     return _mockMyEntity
   }
   await ensureSession()
-  const res = await fetch(`${BASE_URL}/me/entity`, {
+  const res = await safeFetch(`${BASE_URL}/me/entity`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ ssm })
@@ -1070,7 +1084,7 @@ export async function upgradeFiling(
     return _mockFilings[idx]
   }
   await ensureSession()
-  const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
+  const res = await safeFetch(`${BASE_URL}/me/filings/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(patch)
@@ -1096,7 +1110,7 @@ export async function deleteFiling(id: string): Promise<{ deleted: string }> {
     return { deleted: id }
   }
   await ensureSession()
-  const res = await fetch(`${BASE_URL}/me/filings/${id}`, {
+  const res = await safeFetch(`${BASE_URL}/me/filings/${id}`, {
     method: 'DELETE',
     headers: { ...authHeaders() }
   })
@@ -1110,7 +1124,7 @@ export async function deleteFilings(ids: string[]): Promise<{ deleted: string[] 
     return { deleted: ids }
   }
   await ensureSession()
-  const res = await fetch(`${BASE_URL}/me/filings`, {
+  const res = await safeFetch(`${BASE_URL}/me/filings`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ ids })

@@ -2,6 +2,13 @@ from datetime import date
 
 from core.computation import compute_form_c
 from core.models import EntityTaxProfile, LineItem
+from core.tax_accounts import by_code
+
+
+def _item(code: str, amount: float) -> LineItem:
+    """Build a line item the way the real system does — category pinned from the taxonomy."""
+    acct = by_code(code)
+    return LineItem(code=code, description=acct.label, amount=amount, category=acct.category)
 
 
 def _p(**kw):
@@ -121,3 +128,64 @@ def test_zakat_capped_at_2_5pct_aggregate_income():
     fc = compute_form_c(_p(), items, 2026)
     # aggregate income 200,000; zakat capped at 2.5% = 5,000 -> chargeable 195,000
     assert fc.fields["chargeable_income"].value == 195_000
+
+
+def test_client_entertainment_auto_restricted_to_50pct():
+    items = [_item("rev_sales", 500_000), _item("sell_entertainment_clients", 15_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    assert fc.fields["entertainment_50pct_addback"].value == 7_500  # the disallowed half, added back
+    assert fc.fields["chargeable_income"].value == 492_500  # 500,000 - 7,500 deductible half
+
+
+def test_staff_entertainment_is_fully_deductible():
+    items = [_item("rev_sales", 500_000), _item("staff_entertainment", 8_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    assert "entertainment_50pct_addback" not in fc.fields  # staff carve-out is NOT restricted
+    assert fc.fields["chargeable_income"].value == 492_000  # 500,000 - 8,000 (full)
+
+
+def test_employer_epf_capped_at_19pct_of_remuneration():
+    items = [_item("rev_sales", 2_000_000), _item("staff_salaries", 900_000), _item("staff_epf", 200_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    # cap = 19% x 900,000 = 171,000; excess 29,000 added back
+    assert fc.fields["epf_excess_addback"].value == 29_000
+    assert fc.fields["chargeable_income"].value == 929_000  # 2,000,000 - 900,000 - 171,000
+
+
+def test_employer_epf_under_cap_fully_deductible():
+    items = [_item("rev_sales", 2_000_000), _item("staff_salaries", 900_000), _item("staff_epf", 117_000)]
+    fc = compute_form_c(_p(), items, 2026)
+    assert "epf_excess_addback" not in fc.fields
+    assert fc.fields["chargeable_income"].value == 983_000  # 2,000,000 - 900,000 - 117,000
+
+
+def test_full_classification_scenario():
+    # The 20-line user scenario: depreciation / unapproved donations / general provisions excluded
+    # (added back); client entertainment 50%-restricted; staff entertainment 100%; approved donation
+    # within the 10% cap; EPF under the 19% cap.
+    items = [
+        _item("rev_sales", 5_000_000),
+        _item("rev_other_operating", 50_000),
+        _item("cos_purchases", 1_800_000),
+        _item("staff_salaries", 900_000),
+        _item("staff_epf", 117_000),
+        _item("staff_socso_eis_hrdf", 12_000),
+        _item("prem_rent", 120_000),
+        _item("prem_utilities", 36_000),
+        _item("rep_maintenance", 18_000),
+        _item("dep_depreciation", 150_000),
+        _item("staff_entertainment", 8_000),
+        _item("sell_entertainment_clients", 15_000),
+        _item("rel_approved_donations", 20_000),
+        _item("nd_donations_pl", 5_000),
+        _item("admin_bank_charges", 3_000),
+        _item("prof_legal_revenue", 40_000),
+        _item("sell_travel", 25_000),
+        _item("fin_interest", 30_000),
+        _item("admin_bad_debts_specific", 12_000),
+        _item("nd_general_provisions", 8_000),
+    ]
+    fc = compute_form_c(_p(), items, 2026)
+    assert fc.fields["entertainment_50pct_addback"].value == 7_500
+    assert "epf_excess_addback" not in fc.fields  # 117,000 < 19% x 900,000
+    assert fc.fields["chargeable_income"].value == 1_901_500

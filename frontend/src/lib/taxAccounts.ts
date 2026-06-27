@@ -228,7 +228,7 @@ export const TAX_ACCOUNTS: TaxAccount[] = [
     label: 'EPF / approved-fund (employer)',
     group: 'Staff costs',
     category: 'deductible',
-    note: 'Deductible but capped at 19% of remuneration; enter any excess as the EPF add-back.'
+    note: 'Deductible but capped at 19% of remuneration (s.34(4)); the engine caps it automatically and adds back any excess.'
   },
   {
     code: 'staff_socso_eis_hrdf',
@@ -242,7 +242,14 @@ export const TAX_ACCOUNTS: TaxAccount[] = [
     label: 'Staff medical, insurance & welfare',
     group: 'Staff costs',
     category: 'deductible',
-    note: 'Employee medical/insurance/amenities and staff entertainment (annual dinner, family day) are 100% deductible.'
+    note: 'Employee medical/insurance/amenities; 100% deductible (proviso (i) to s.39(1)(l)).'
+  },
+  {
+    code: 'staff_entertainment',
+    label: 'Staff entertainment (annual dinner, family day)',
+    group: 'Staff costs',
+    category: 'deductible',
+    note: 'Entertainment wholly for employees is 100% deductible -- NOT subject to the 50% client-entertainment restriction.'
   },
   {
     code: 'staff_training',
@@ -393,11 +400,11 @@ export const TAX_ACCOUNTS: TaxAccount[] = [
     note: 'Business travel/lodging; the leave-passage element is non-deductible.'
   },
   {
-    code: 'sell_entertainment_allowed',
-    label: 'Client entertainment (deductible 50%)',
+    code: 'sell_entertainment_clients',
+    label: 'Client / business entertainment (50% restricted)',
     group: 'Selling & marketing',
     category: 'deductible',
-    note: 'Only 50% of general client entertainment is deductible; enter the restricted half as the entertainment add-back.'
+    note: 'Enter the FULL client/business entertainment; only 50% is deductible (s.39(1)(l)) -- the 50% restriction is applied automatically.'
   },
 
   // Finance costs
@@ -476,13 +483,6 @@ export const TAX_ACCOUNTS: TaxAccount[] = [
     group: 'Non-deductible add-backs',
     category: 'non_deductible',
     note: 'Employer EPF contributions exceeding 19% of remuneration are added back.'
-  },
-  {
-    code: 'nd_entertainment_50',
-    label: 'Client entertainment (disallowed 50%)',
-    group: 'Non-deductible add-backs',
-    category: 'non_deductible',
-    note: 'The restricted 50% of general entertainment is added back; pairs with the 50%-allowed selling line.'
   },
   {
     code: 'nd_leave_passage',

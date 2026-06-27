@@ -64,6 +64,10 @@ class TaxAccount(BaseModel):
     ca_class: str | None = None
     # special_deduction rows: links to ya_2026.yaml reliefs[relief_key].
     relief_key: str | None = None
+    # Special engine rule applied to a deductible row, deterministically:
+    #   "entertainment_50" -> only 50% is deductible (s.39(1)(l)); the engine adds back the other 50%.
+    #   "epf_capped"       -> deduction capped at the statutory % of remuneration (s.34(4)); excess added back.
+    treatment: str | None = None
 
 
 TAX_ACCOUNTS: list[TaxAccount] = [
@@ -123,11 +127,14 @@ TAX_ACCOUNTS: list[TaxAccount] = [
     TaxAccount(code="staff_directors_remuneration", label="Directors' fees & remuneration", group="Staff costs", category=DEDUCTIBLE,
                note="Deductible if for services rendered; excessive amounts in controlled companies may be disallowed."),
     TaxAccount(code="staff_epf", label="EPF / approved-fund (employer)", group="Staff costs", category=DEDUCTIBLE,
-               note="Deductible but capped at the statutory % of remuneration (s.34(4)); enter any excess as the EPF add-back."),
+               treatment="epf_capped",
+               note="Deductible but capped at 19% of remuneration (s.34(4)); the engine caps it automatically and adds back any excess."),
     TaxAccount(code="staff_socso_eis_hrdf", label="SOCSO, EIS & HRD Corp levy (employer)", group="Staff costs", category=DEDUCTIBLE,
                note="Employer statutory contributions and HRDF levy; deductible s.33(1)."),
     TaxAccount(code="staff_welfare_medical", label="Staff medical, insurance & welfare", group="Staff costs", category=DEDUCTIBLE,
-               note="Employee medical/insurance/amenities and staff entertainment (annual dinner, family day) 100% deductible (proviso (i) to s.39(1)(l))."),
+               note="Employee medical/insurance/amenities; 100% deductible (proviso (i) to s.39(1)(l))."),
+    TaxAccount(code="staff_entertainment", label="Staff entertainment (annual dinner, family day)", group="Staff costs", category=DEDUCTIBLE,
+               note="Entertainment wholly for employees is 100% deductible (proviso (i) to s.39(1)(l)) -- NOT subject to the 50% client-entertainment restriction."),
     TaxAccount(code="staff_training", label="Staff training & development", group="Staff costs", category=DEDUCTIBLE,
                note="Ordinary training single deduction s.33(1); approved/qualifying training instead claims a double deduction (see reliefs)."),
 
@@ -176,8 +183,9 @@ TAX_ACCOUNTS: list[TaxAccount] = [
                note="Outward freight/delivery to customers and marketplace fees; deductible s.33(1)."),
     TaxAccount(code="sell_travel", label="Business travel & accommodation", group="Selling & marketing", category=DEDUCTIBLE,
                note="Business travel/lodging deductible; the leave-passage element is non-deductible (s.39(1)(m))."),
-    TaxAccount(code="sell_entertainment_allowed", label="Client entertainment (deductible 50%)", group="Selling & marketing", category=DEDUCTIBLE,
-               note="Only 50% of general client/business entertainment is deductible (s.39(1)(l), PR 4/2015); enter the restricted half as the entertainment add-back."),
+    TaxAccount(code="sell_entertainment_clients", label="Client / business entertainment (50% restricted)", group="Selling & marketing", category=DEDUCTIBLE,
+               treatment="entertainment_50",
+               note="Enter the FULL client/business entertainment; only 50% is deductible (s.39(1)(l), PR 4/2015) -- the engine applies the 50% restriction and adds back the other half automatically."),
 
     # --- Finance costs ---
     TaxAccount(code="fin_interest", label="Interest on borrowings (loan / overdraft)", group="Finance costs", category=DEDUCTIBLE,
@@ -207,8 +215,6 @@ TAX_ACCOUNTS: list[TaxAccount] = [
     # --- Non-deductible add-backs ---
     TaxAccount(code="nd_epf_excess", label="Excess EPF over the statutory cap", group="Non-deductible add-backs", category=NON_DEDUCTIBLE,
                note="Employer EPF/approved-fund contributions exceeding the cap of remuneration are added back (s.34(4))."),
-    TaxAccount(code="nd_entertainment_50", label="Client entertainment (disallowed 50%)", group="Non-deductible add-backs", category=NON_DEDUCTIBLE,
-               note="The restricted 50% of general entertainment (s.39(1)(l)) is added back; pairs with the 50%-allowed selling line."),
     TaxAccount(code="nd_leave_passage", label="Employee leave passage", group="Non-deductible add-backs", category=NON_DEDUCTIBLE,
                note="Leave passage (employee holiday travel/accommodation) is specifically disallowed (s.39(1)(m)); added back."),
     TaxAccount(code="nd_general_provisions", label="General provisions & impairments (doubtful debts, stock, warranty)", group="Non-deductible add-backs", category=NON_DEDUCTIBLE,

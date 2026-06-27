@@ -374,3 +374,14 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 - [x] **Wiring:** "Use sample document" button (upload tab) fetches the active persona's sample and runs the upload pipeline; shown only for the 3 demo personas. PDFs verified text-extractable (pypdf) so live extraction works.
 
 **Acceptance:** New Filing is document-first with a manual toggle; realistic taxonomy-aligned sample docs ship in `public/fixtures/` and load via "Use sample document"; `tsc`/`build`/`biome` green.
+
+### SFI-8 `[BE]`/`[FE]`/`[TD]` — Engine robustness (deduction treatments) + boot-message UX _(DONE)_
+
+> Review surfaced classic Form C misclassifications (depreciation deductible; staff entertainment disallowed; client entertainment fully disallowed vs 50%). Our taxonomy already pins category by account (depreciation is structurally non-deductible), but the entertainment split + EPF cap weren't automatic.
+
+- [x] **Deduction treatments:** added a `treatment` field; `_deductions` now applies the **50% client-entertainment restriction** (s.39(1)(l)) and the **employer-EPF 19%-of-remuneration cap** (s.34(4)) deterministically, surfacing disallowed amounts as visible `*_addback` figures. Client entertainment → single auto-split account (`sell_entertainment_clients`); added `staff_entertainment` (100% carve-out); removed manual `nd_entertainment_50`. Taxonomy stays 88, FE↔BE diff = 0.
+- [x] **Transparency:** `assess_risk` flags when the entertainment restriction / EPF cap is applied.
+- [x] **Boot-message UX:** `client.ts` `safeFetch` surfaces "server is starting up — please wait for it to boot" instead of the raw `NetworkError`.
+- [x] +5 computation tests (incl. the 20-line scenario → chargeable RM1,901,500); golden RM31,000 preserved; **241 backend tests**; FE green.
+
+**Acceptance:** the deterministic core auto-applies the entertainment 50% rule + EPF cap (input-path-agnostic), surfaces + flags the add-backs, and the cold-backend UX is calm; suites green; taxonomy in sync.
