@@ -158,3 +158,5 @@ class DefensePack(BaseModel):
     items: list[dict]
     citations: list[Citation]
     exposure_note: str
+    answer: str = ""
+    followups: list[str] = []

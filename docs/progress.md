@@ -1542,3 +1542,39 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `bunx tsc --noEmit` -- clean (0 errors)
 - `bun run build` -- green (83 modules, 0 errors, 0 warnings)
 - `bunx biome check frontend/src` -- **0 errors, 0 warnings**
+
+---
+
+## [27/06/26] -- BE-2.2 + BE-2.3 (PR-C backend: Pandai persona + conversation memory) `[BE]`
+
+**BE-2.2 -- Pandai 5-layer persona system prompt + conversational answer**
+
+- `backend/api/agents/pandai_primer.md` (NEW): citation-safe explanatory primer shipped from scratchpad; `## Research sources` section stripped; no asserted figures, no clause IDs, no percentage rates, no RM amounts.
+- `backend/api/agents/pandai_persona.py` (NEW): `build_pandai_system(filing_digest, *, history, locale)` assembles the 5-layer system prompt in order -- (1) Language (English stub), (2) Persona ("Pandai", warm/precise Malaysian-SME companion), (3) Hard Rules (scope, no promises, no PII, no legal advice, cite filing numbers, no greeting, no memory figures), (4) Primer (lru_cache'd load of `pandai_primer.md`), (5) Live Digest (filing figures/line-items/computation injected per request).
+- `backend/api/agents/audit_defense.py`: replaced bare one-line `system` with `build_pandai_system(filing_digest, history=bounded_history)`; extended JSON schema/prompt to request `answer` (Pandai's conversational reply) and `followups` (exactly 3 suggestions, padded with `""` if model returns fewer); new params `filing_digest: dict | None` and `history: list[dict] | None`; bounded history at `_MAX_HISTORY_TURNS=8`; citation gate (`verify_claim` + `thread_provenance` + `inject_fabricated` probe) preserved exactly as-is.
+- `backend/core/models.py`: `DefensePack` gains `answer: str = ""` and `followups: list[str] = []` (optional with defaults; existing callers/tests unaffected).
+- `backend/api/schemas.py`: `AuditDefenseReq` gains `filing_id: str | None = None` for conversation-linked queries.
+
+**BE-2.3 -- Per-filing audit conversation memory**
+
+- `backend/migrations/neon_schema.sql`: additive `CREATE TABLE IF NOT EXISTS audit_conversations (user_id text, filing_id text, messages jsonb NOT NULL DEFAULT '[]', updated_at timestamptz DEFAULT now(), PRIMARY KEY (user_id, filing_id))`. No existing table altered. Chaos-safe.
+- `backend/api/persistence.py`: `ConversationRepository` (fallback-first): `get(owner, filing_id) -> list`, `append(owner, filing_id, turn)` (auto-timestamps), `delete(owner, filing_id)`. `FilingRepository.delete` gains optional `conversation_repo` param for cascade-delete.
+- `backend/api/main.py`: `_CONVERSATION_REPO = ConversationRepository()` module singleton; `GET /me/filings/{id}/conversation` (401 no token, 404 if not owned/absent, `[]` if empty); `POST /entities/{tin}/audit-defense` extended -- loads filing digest + bounded history when `filing_id` is supplied + caller is authenticated, persists user question + assistant reply (with citations) after each call; cascade-delete wired on both single and multi-delete filing endpoints.
+- Shared-guest caveat: documented in migration SQL comment -- guest sub keys all guest conversation rows (by design, same as other guest data).
+
+**Tests**
+
+- `backend/tests/api/test_pandai_persona.py` (NEW): 16 tests -- primer file exists; no asserted `%`/`RM`/comma-numbers in primer; no authoritative ITA clause IDs in primer; research-sources section stripped; 5 layers present in assembled system; layer order verified; no-greeting rule present; no-filing placeholder; filing digest injected; locale stub; primer cached; fabricated probe still rejected with persona; `answer` + `followups` present; pad-to-3 followups.
+- `backend/tests/api/test_audit_conversation.py` (NEW): 16 tests -- hermetic `_hermetic` autouse fixture (monkeypatches DATABASE_URL away, clears `_mem` dicts); repo unit tests (empty get, append/get, timestamp added, order, per-owner isolation, delete, noop delete); cascade delete via FilingRepository.delete; endpoint tests (401, 404, empty [], persist Q+A, no persistence without filing_id, multi-turn growth, cascade via API, foreign-filing 404).
+
+**Test count:** 195 (baseline) → 227 (+32). All 227 pass. `uv run pytest -q` green.
+
+### Deviations from plan
+
+- `ConversationRepository` implements `get`/`append`/`delete` (not `set` -- the plan listed `append(owner, filing_id, turn) / set(owner, filing_id, messages)` as alternatives; `set` was not needed by any endpoint, so omitted per simplicity-first).
+- `FilingRepository.delete` signature changed from `(owner, ids)` to `(owner, ids, conversation_repo=None)` -- backward-compatible (default None); existing callers unaffected.
+- The audit-defense endpoint is now auth-optional (resolves owner when a valid bearer token is present, falls back to None if absent or invalid). This keeps the endpoint working unauthenticated (existing tests pass) while enabling conversation persistence for authenticated users.
+
+### Build status (BE)
+
+- `cd backend && uv run pytest -q` -- **227 passed, 1 warning** (no failures)

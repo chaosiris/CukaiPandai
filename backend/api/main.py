@@ -27,7 +27,7 @@ from api.agents.documents import classify_line_items
 from api.connectors.msic import MsicClient
 from api.graph import build_filing_graph
 from api.llm import LLMClient, make_llm
-from api.persistence import EntityRepository, FilingRepository, UserEntityRepository, UserRepository, make_checkpointer
+from api.persistence import ConversationRepository, EntityRepository, FilingRepository, UserEntityRepository, UserRepository, make_checkpointer
 from api.schemas import (
     AuditDefenseReq,
     ClassifyReq,
@@ -91,6 +91,9 @@ _USER_ENTITY_REPO = UserEntityRepository()
 
 # EP-2 — per-user filing records (keyed by JWT sub; fallback-first).
 _FILING_REPO = FilingRepository()
+
+# BE-2.3 — per-(owner, filing_id) audit conversation history (fallback-first).
+_CONVERSATION_REPO = ConversationRepository()
 
 # Single in-process HITL filing graph. The compute node is deterministic (no LLM), so no model
 # client is constructed here. BE-15: a durable Neon Postgres checkpointer is used when
@@ -278,14 +281,14 @@ def delete_my_filing(rec_id: str, owner: str = Depends(_owner)) -> dict:
     rec = _FILING_REPO.get(owner, rec_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="Filing record not found")
-    _FILING_REPO.delete(owner, [rec_id])
+    _FILING_REPO.delete(owner, [rec_id], conversation_repo=_CONVERSATION_REPO)
     return {"deleted": rec_id}
 
 
 @app.delete("/me/filings")
 def multi_delete_my_filings(req: MultiDeleteReq, owner: str = Depends(_owner)) -> dict:
     """EP-2 — Delete multiple filing records by id. Foreign/unknown ids are silently skipped."""
-    _FILING_REPO.delete(owner, req.ids)
+    _FILING_REPO.delete(owner, req.ids, conversation_repo=_CONVERSATION_REPO)
     return {"deleted": req.ids}
 
 
@@ -382,12 +385,69 @@ def upload_document(tin: str, file: UploadFile = File(...), llm: LLMClient = Dep
     return {"line_items": [i.model_dump(mode="json") for i in items], **llm.route_info()}
 
 
+@app.get("/me/filings/{rec_id}/conversation")
+def get_filing_conversation(rec_id: str, owner: str = Depends(_owner)) -> list:
+    """BE-2.3 — Return the owner's audit conversation for the given filing; [] if none exists.
+    404 if the filing is not owned or absent; 401 without a valid token."""
+    rec = _FILING_REPO.get(owner, rec_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Filing record not found")
+    return _CONVERSATION_REPO.get(owner, rec_id)
+
+
 @app.post("/entities/{tin}/audit-defense")
-def audit_defense(tin: str, req: AuditDefenseReq, llm: LLMClient = Depends(get_llm)) -> dict:
+def audit_defense(
+    tin: str,
+    req: AuditDefenseReq,
+    llm: LLMClient = Depends(get_llm),
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """BE-2.2/BE-2.3 — Run Pandai audit defense. When a filing_id is supplied (and the caller
+    is authenticated), load the filing digest + conversation history, persist both question and
+    answer to the conversation thread, and feed the last N turns as context."""
+    # Resolve the authenticated owner (optional; falls back to None if unauthenticated).
+    owner: str | None = None
+    filing_digest: dict | None = None
+    filing_id: str | None = req.filing_id
+
+    if authorization and authorization.lower().startswith("bearer "):
+        try:
+            owner = _owner(authorization=authorization)
+        except HTTPException:
+            owner = None
+
+    if owner and filing_id:
+        filing_digest = _FILING_REPO.get(owner, filing_id)
+
+    history: list[dict] | None = None
+    if owner and filing_id:
+        history = _CONVERSATION_REPO.get(owner, filing_id)
+
     try:
-        pack = build_defense(req.query, [tuple(e) for e in req.evidence], llm, _CORPUS, inject_fabricated=req.inject_fabricated)
+        pack = build_defense(
+            req.query,
+            [tuple(e) for e in req.evidence],
+            llm,
+            _CORPUS,
+            inject_fabricated=req.inject_fabricated,
+            filing_digest=filing_digest,
+            history=history,
+        )
     except _PARSE_ERRORS as e:
         raise HTTPException(status_code=502, detail=f"Model returned unparseable output: {e}") from e
+
+    # BE-2.3 — persist the user question + Pandai's reply with citations to the conversation.
+    if owner and filing_id:
+        _CONVERSATION_REPO.append(owner, filing_id, {
+            "role": "user",
+            "content": req.query,
+        })
+        _CONVERSATION_REPO.append(owner, filing_id, {
+            "role": "assistant",
+            "content": pack.answer,
+            "citations": [c.model_dump(mode="json") for c in pack.citations],
+        })
+
     return {**pack.model_dump(mode="json"), **llm.route_info()}
 
 
