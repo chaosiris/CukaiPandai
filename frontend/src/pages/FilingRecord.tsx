@@ -79,11 +79,26 @@ function useActiveSection(ids: string[]): string {
   useEffect(() => {
     if (ids.length === 0) return
 
+    // Track which sections are currently intersecting so we can fall back to the
+    // first section when nothing is in the observer band (e.g. scrollY = 0).
+    const intersecting = new Set<string>()
+
     const observer = new IntersectionObserver(
       (entries) => {
-        // Pick the topmost entry that is intersecting
-        const visible = entries.filter((e) => e.isIntersecting)
-        if (visible.length === 0) return
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            intersecting.add(entry.target.id)
+          } else {
+            intersecting.delete(entry.target.id)
+          }
+        }
+        if (intersecting.size === 0) {
+          // Nothing in the band -- fall back to the first section (covers page top)
+          setActiveId(ids[0])
+          return
+        }
+        // Pick the topmost visible section
+        const visible = entries.filter((e) => intersecting.has(e.target.id))
         visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         setActiveId(visible[0].target.id)
       },

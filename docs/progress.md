@@ -2049,3 +2049,36 @@ Four refinements to `/filing/[id]` (`FilingRecord.tsx`) and the Audit Assistant 
 - `bunx tsc --noEmit`: clean
 - `bun run build`: green (85 modules, 0 errors, ~405 kB JS)
 - `bunx biome check` on all 4 touched files: 0 errors, 0 warnings
+
+## [28/06/26] — PR-G4: fix req-list divider left-gap, analytics tooltip 768px clip, scroll-spy top highlight `[FE]`
+
+**Branch:** `fix/ui-batch-smoke` (uncommitted; Gate 2 pending).
+
+### 1. Fix 1 -- req-list left-gap divider (tokens.css)
+
+- **Root cause:** `.req-list` inherits the browser-default `ul` padding (`padding-inline-start: 40px`), which insets the `<ul>` ~40px from the card left edge. The `border-top` on `.requirement-row` elements fills the `<ul>` width, not the `.window` width, so dividers in "Classified Line Items", "Line Items", and "SUPPORTING FIGURES" bands were ~40px short of the card left border.
+- **Fix:** added `list-style: none; margin: 0; padding: 0;` to the `.req-list` rule in `frontend/src/styles/tokens.css`. The `display: grid` + `overflow: hidden` properties were already there and handle the right edge and border-radius clipping; removing the default padding makes the left edge flush too.
+- **Files:** `frontend/src/styles/tokens.css` (`.req-list` rule, ~line 855).
+
+### 2. Fix 2 -- analytics tooltip 768px clip (Tooltip.tsx)
+
+- **Root cause (two parts):**
+  1. The bubble initially renders at `pos={top:0, left:0}` with `maxWidth` only in the React state initial value (280) but NOT in the style prop -- so the first paint showed the bubble at its natural (potentially unclamped) width.
+  2. A single `requestAnimationFrame` is not guaranteed to run after the browser has completed layout for the newly-mounted bubble; `getBoundingClientRect()` could return `{width:0, height:0}` if the browser hasn't laid out the node yet, leaving `left` unclamped.
+- **Fix:**
+  - Added `maxWidth` to the `pos` state (`{ top, left, maxWidth }`) so it is part of the React style prop and is always correctly applied from the first positioned render onward. The `effectiveMaxWidth = min(280, vw - 2*MARGIN)` computation already existed; it now flows into state and the style prop.
+  - Changed the single `rAF` to a double nested `rAF` (`outer -> inner`): the outer frame lets React flush the bubble into the DOM and the browser complete an initial layout pass; the inner frame runs `reposition()` after that settled layout, so `getBoundingClientRect()` returns real dimensions.
+  - Both cleanup paths (`cancelAnimationFrame(outer)` + `cancelAnimationFrame(inner)`) are covered.
+- **Files:** `frontend/src/components/Tooltip.tsx` (state type, `reposition`, open `useEffect`, bubble `style` prop).
+
+### 3. Fix 3 -- scroll-spy stale highlight at page top (FilingRecord.tsx)
+
+- **Root cause:** The `useActiveSection` hook's `IntersectionObserver` callback returned early (`return`) when `visible.length === 0` (no section in the `-84px 0px -60% 0px` band). At `scrollY = 0` the page header pushes SECTION_TAX below the top margin, so the first section never enters the band, and the observer fires with 0 intersecting entries -- leaving `activeId` unchanged from the previous mid-scroll state (stale highlight).
+- **Fix:** Introduced a `Set<string> intersecting` to track which sections are currently in the band (updated on each observer callback). When the set is empty, fall back to `ids[0]` (the first section = "Tax Computation"). When non-empty, sort by `boundingClientRect.top` as before and highlight the topmost.
+- **Files:** `frontend/src/pages/FilingRecord.tsx` (`useActiveSection` hook).
+
+### Verify
+
+- `bunx tsc --noEmit`: clean (0 errors)
+- `bun run build`: green (85 modules, 2.07s, 0 errors)
+- `bunx biome check frontend/src`: 1 error (pre-existing `client.ts` format nit, not ours); 0 errors on touched files
