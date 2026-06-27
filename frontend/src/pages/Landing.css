@@ -492,39 +492,6 @@
   color: rgba(236, 231, 216, 0.75);
 }
 
-/* ---- Finale (fixed dark; slogan + CTA) ---- */
-.lp-finale {
-  background: #1c1b19;
-  border-top: 1px solid rgba(236, 231, 216, 0.12);
-}
-
-.lp-finale-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 24px;
-}
-
-.lp-finale-cta {
-  display: inline-block;
-  text-decoration: none;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #1c1b19;
-  background: var(--mustard);
-  border: 1px solid var(--mustard);
-  border-radius: var(--radius);
-  padding: 13px 26px;
-}
-
-.lp-finale-cta:hover {
-  color: var(--mustard);
-  background: transparent;
-}
-
 /* ---- FAQ (featured, document style) ---- */
 .lp-faq {
   background: var(--window);
@@ -689,8 +656,7 @@
   background: #161d29;
 }
 
-[data-theme="dark"] .lp-trust,
-[data-theme="dark"] .lp-finale {
+[data-theme="dark"] .lp-trust {
   background: #0c1018;
 }
 

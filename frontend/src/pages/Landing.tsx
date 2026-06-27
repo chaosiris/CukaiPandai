@@ -297,15 +297,6 @@ export function Landing() {
             </div>
           </div>
         </section>
-
-        {/* Finale CTA */}
-        <section className="lp-section lp-finale">
-          <div className="lp-inner lp-finale-inner">
-            <Link className="lp-finale-cta" to="/sign-in">
-              Open the Demo
-            </Link>
-          </div>
-        </section>
       </div>
 
       <button
