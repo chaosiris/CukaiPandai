@@ -1,34 +1,5 @@
 import type { Theme } from '../hooks/useTheme'
 
-// Inline SVG logo mark — a stylised ledger/document stamp motif.
-// Drawn in currentColor: inherits --ink in topbar, --paper in footer.
-// No image asset required; no public/ dir dependency.
-export function LogoMark() {
-  return (
-    <span className="logo-mark" aria-hidden="true">
-      {/* biome-ignore lint/a11y/noSvgWithoutTitle: parent span is aria-hidden */}
-      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
-        {/* Outer document rectangle */}
-        <rect x="5" y="2" width="20" height="26" rx="1" stroke="currentColor" strokeWidth="1.5" />
-        {/* Folded corner */}
-        <polyline points="18,2 18,8 24,8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        {/* Three ruled lines (ledger rows) */}
-        <line x1="8" y1="13" x2="22" y2="13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        <line x1="8" y1="17" x2="22" y2="17" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-        {/* Verification tick at bottom-right */}
-        <polyline
-          points="17,21 19,23 23,19"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  )
-}
-
 export function ThemeIcon({ theme }: { theme: Theme }) {
   if (theme === 'dark') {
     return (

@@ -1631,3 +1631,52 @@ Em-dash sweep: all three em-dashes in user-facing copy in `About.tsx` were remov
 - `cd frontend && bunx tsc --noEmit` -- **0 errors**
 - `bun run build` -- **green** (83 modules, 2.15s)
 - `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
+
+---
+
+## [27/06/26] — Branding pass (PR-D) `[FE]`
+
+**Branch:** `feat/branding` (uncommitted, pending Gate 2).
+
+### Assets added
+
+- `frontend/public/fonts/talina.otf` -- Talina brand font (copied from `docs/screenshots/talina-font.otf`).
+- `frontend/public/pandai-thinking.png` -- FAQ mascot, optimized 480x480 RGBA PNG (~142 KB, down from ~1.5 MB) via `PIL.Image.thumbnail(LANCZOS)`.
+- `frontend/public/og-banner.png` -- social embed banner (copied as-is from `docs/screenshots/cukaipandai-embed.png`).
+
+### Task 1 -- Brand font on wordmark only
+
+- `frontend/src/styles/tokens.css`: added `@font-face` for "Talina" (`/fonts/talina.otf`, `font-display: swap`), added `--font-brand` token (`"Talina", "Fraunces", Georgia, serif`).
+- Applied `var(--font-brand)` to `.topbar-wordmark`, `.drawer-wordmark`, `.footer-wordmark` in `tokens.css`.
+- Applied `var(--font-brand)` to `.auth-brand` in `Auth.css`.
+- No other Fraunces heading was touched.
+
+### Task 2 -- Auth-page logo fix
+
+- `frontend/src/pages/AuthScreen.tsx`: removed `LogoMark` import (orphan); replaced `<LogoMark />` with `<img src="/logo.png" alt="CukaiPandai" className="brand-logo" />`.
+- `frontend/src/pages/Auth.css`: replaced `.auth-brand .logo-mark` sizing rule with `.auth-brand .brand-logo` (same 26px dimensions).
+
+### Task 3 -- Landing FAQ mascot + cleanup
+
+- `frontend/src/pages/Landing.tsx`: restructured FAQ section into 2-column layout (`.lp-faq-mascot-col` + `.lp-faq-content-col`); added `pandai-thinking.png` mascot in left column; removed "See All Questions" `<Link>`; removed `<p className="lp-script">` tagline from finale; kept "Open the Demo" CTA.
+- `frontend/src/pages/Landing.css`: `.lp-faq-inner` changed to 2-col grid (280px mascot col + 1fr content); added `.lp-faq-mascot-col`, `.lp-faq-mascot`, `.lp-faq-content-col` rules; mobile `@media (max-width: 900px)` collapses to 1-col with smaller 120px mascot.
+
+### Task 4 -- Landing mobile HOW IT WORKS stepped presentation
+
+Desktop: scroll-driven `activeStep` JS (cardRefs on card slots) + sticky left step nav + tall right card slots (80vh each). Mobile was a flat stack with all steps at full opacity.
+
+Fix: added a `.lp-how-mobile` layout (hidden on desktop, shown at <=900px) that renders each step with its console mock interleaved in a single column `<ol>`; `cardRefs` are now attached to each `<li>` in the mobile layout so scroll-driven `activeStep` updates work on mobile too. `cardRefs` type widened from `HTMLDivElement` to `Element` to accommodate `<li>` refs.
+
+- `frontend/src/pages/Landing.tsx`: added `.lp-how-desktop` / `.lp-how-mobile` sibling containers; mobile uses `lp-step-mobile` `<li>` items with `.lp-step-header` + `.lp-step-mock` inline.
+- `frontend/src/pages/Landing.css`: `.lp-how-desktop { display: grid }` / `.lp-how-mobile { display: none }` by default; at <=900px swapped; added `.lp-steps-mobile`, `.lp-step-mobile`, `.lp-step-header`, `.lp-step-mock` rules.
+
+### Task 5 -- Social embed meta
+
+- `frontend/index.html`: added Open Graph tags (`og:type`, `og:url`, `og:title`, `og:description`, `og:image`, `og:image:width 1200`, `og:image:height 630`) and Twitter Card tags (`twitter:card summary_large_image`, `twitter:title`, `twitter:description`, `twitter:image`), all pointing to `/og-banner.png`.
+
+### Verify results
+
+- `cd frontend && bunx tsc --noEmit` -- **0 errors**
+- `bun run build` -- **green** (83 modules, 2.26s)
+- `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
+- Font file confirmed present at `frontend/public/fonts/talina.otf` (9 KB).
