@@ -1,26 +1,26 @@
 # CukaiPandai — Demo Pitch Script (7 minutes: 3 pitch + 4 demo)
 
-> **Style reference:** modeled on the "Layar" demo pitch — persona cold-open → striking stat → the MyGov chatbot failure as the setup → "introducing…" → named pipeline steps → the citation guardrail as the hero → sovereignty → live demo with the persona → emotional persona bookend.
+> **Style reference:** modeled on the "Layar" demo pitch — persona cold-open → striking stat → the MyGov chatbot failure as the setup → "introducing…" → named pipeline steps → the citation guardrail as the hero → data-stays-in-Malaysia → live demo with the persona → emotional persona bookend.
 > **Budget:** ~3:00 pitch · ~4:00 live demo. _Italics_ = clicks / on-screen action. Plain text = spoken.
 > **Demo policy:** walk only the **verified-OK** paths. See **§5 Demo Safety**.
-> **Two placeholders to fill before recording:** (1) the **impact metric** in §1.7 and §3 — needs a real number from the team; (2) the **persona** — swap `Encik Pandai` for a real seeded persona if you have one.
-> **Honesty flags:** do **not** claim in-memory-only privacy unless confirmed (bracketed below); the sovereignty beat is real.
+> **One placeholder left to fill before recording:** the **persona** — swap `Encik Pandai` for a real seeded persona if you have one. _(The §1.7 impact metric is now filled with a sourced LHDN figure — the up-to-45% late-filing penalty, s.112(3) ITA 1967 / GPHDN 5/2019.)_
+> **Honesty flags:** do **not** claim in-memory-only privacy unless confirmed (bracketed below); the data-stays-in-Malaysia beat is real.
 
 ---
 
 # PART 1 — THE PITCH (3 min)
 
-## 1.1 Cold open — the persona (20 sec)
+## 1.1 Cold open — the persona (25 sec)
 
-> "This is Encik Pandai. He's 45, and he runs a small air-conditioning service company in Shah Alam — six employees, three of them with families that depend on that payroll.
+> "Imagine you've spent years on the sigma grindset building something real — a small air-conditioning company in Shah Alam. Six employees; three of them have families who count on that payroll every month. You're good at the work, but you're certainly not good at accounting.
 >
-> Like most SME owners, Pandai isn't looking to dodge anything. He's just trying to file his company tax correctly — and not get blindsided by a penalty or an audit he can't answer."
+> This is Encik Pandai. He's 45 — and like most SME owners, he isn't trying to dodge anything. He just wants to file his company tax correctly, and not get blindsided by a penalty, or an audit he can't answer."
 
 ## 1.2 The problem + the stat (25 sec)
 
-> "But Malaysian corporate tax is built for accountants, not for Pandai. Form C, CP204, capital allowances, Schedule 3, Section 44 deductions, e-invoicing phases — every figure has to be computed correctly _and_ justified under the right provision.
+> "But Malaysian corporate tax is built for accountants, not for Encik Pandai. Form C, CP204, capital allowances, Schedule 3, Section 44 deductions, e-invoicing phases — every figure has to be computed correctly _and_ justified under the right provision.
 >
-> So SMEs do one of two things: they overpay out of fear, or they misfile and hope LHDN never looks. Both cost them money they can't spare."
+> So most SMEs do one of two things. They **overpay** — leaving capital allowances and deductions they're entitled to on the table, just to feel safe. Or they **misfile** — a wrong figure here, a required schedule or field left blank there, a deduction claimed without backing — and hope LHDN never looks too closely. One quietly costs them money; the other invites a penalty or an audit. Both hurt a business that can't spare it."
 
 ## 1.3 The killer setup — why generic AI can't fix this (25 sec)
 
@@ -32,35 +32,45 @@
 
 > "Introducing **CukaiPandai** — your AI agent for Malaysian corporate tax.
 >
-> One upload of your financials. And on the other side: your filing deadlines mapped to one calendar, a fully computed Form C, and a draft filing packet — where **every single ringgit traces back to Malaysian law**, ready for you to review and submit."
+> CukaiPandai just needs one upload of your company's financials. From that one file, it produces three things: every deadline on one calendar, a fully computed **Form C** — that's your company's annual tax return — and a draft filing packet, where **every single ringgit traces back to Malaysian law**, ready for you to review and submit."
 
 ## 1.5 Under the hood — the architecture (30 sec)
 
-> "Under the hood, CukaiPandai is two layers — and the split is the whole point.
+> "Under the hood, two layers — and the handoff between them is the whole point.
 >
-> A **deterministic core** owns all the tax math, every deadline, and every citation. It does not call an LLM, so it _cannot_ hallucinate a number.
+> First, **six AI agents** read your documents and classify each line — that's the thinking.
 >
-> On top, an **agentic layer** — six specialized agents and a filing graph — orchestrates the workflow: it reads documents, classifies line items, and drives the filing. But it is structurally forbidden from inventing a figure or a law. The AI does the _thinking_; the deterministic core does the _math and the law._"
+> Then it hands off to a **rules engine** for the actual tax math and the citations. No AI touches it, so it _can't_ make a number up. The AI does the _thinking_; the rules engine does the _math and the law._"
+
+> _On screen (caption / mini-diagram), don't say aloud: built on **Python · Pydantic · LangGraph · FastAPI · React**. Let the stack show for credibility while you speak plainly._
 
 ## 1.6 The guardrail — the hero beat (25 sec)
 
 > "Here's the line that matters. **No tax figure appears in the interface without a retrievable citation.** Every number on the form links to a real clause in the YA2026 law corpus. And if the corpus can't ground a figure, that figure is flagged **unverified** and never contributes to the return.
 >
-> That single guardrail is what separates CukaiPandai from the MyGov chatbot failure — and it's not a prompt, it's an architectural gate the model cannot talk its way past."
+> That single guardrail is what separates CukaiPandai from the MyGov chatbot failure — and it's not a prompt, it's an architectural gate the model cannot bypass."
+
+## 1.6b Not bookkeeping, not a chatbot — a new category (20 sec)
+
+> "You might be thinking this is just accounting software. It isn't. Tools like **Bukku**, AutoCount and SQL are great at _bookkeeping_ — they record what happened and push your e-invoices to LHDN. But they all stop at the tax line: Bukku's own help docs literally tell you to _assume_ your tax bill and just journal it. None of them computes your Form C — capital allowances, the schedules, the SME bands — and none can cite a figure to law or defend it in an audit.
+>
+> A generic chatbot, for instance ChatGPT and Claude, _will_ compute it for you, but more often than not, they will hallucinate the law doing it, exactly like MyGov. CukaiPandai fills in the uncertainty gap: it **computes** the Form C like a tax agent, **cites** every figure like the law demands, and **never invents one** like the chatbots."
+
+> _**Compressed (one line, if over time):** "And to be clear — this isn't bookkeeping like Bukku, which stops at the tax line, and it isn't a chatbot that makes the law up. It's the only tool that computes your Form C **and** cites every figure to the law."_
 
 ## 1.7 Why now, who it's for, and the upside (25 sec)
 
 > "And the timing is now. Malaysia's **e-invoicing mandate** hit SMEs with RM1 to 5 million turnover on **1 January 2026** — pulling them into exactly this compliance burden, ready or not.
 >
-> That's part of **1.2 million SMEs** — 97% of every business in the country. For each one, CukaiPandai means **[IMPACT METRIC — e.g. "filings done in minutes instead of days," or "RM ___ in over-deductions caught," or "the RM ___ late-filing penalty avoided"]**.
+> This affects **1.2 million SMEs** — 97% of every business in the country. If they file their taxes late or wrongly, they might get penalized for up to 45% of their tax bill. CukaiPandai completely prevents this from happening by verifying your tax forms - in minutes, not days.
 >
 > We monetize through accounting firms and direct SaaS — and because every figure is sourced, we're the version an LHDN partnership could actually stand behind."
 
-## 1.8 Sovereignty (20 sec)
+## 1.8 Your data stays in Malaysia (20 sec)
 
-> "Last thing before I show you. This is Malaysian tax data — it shouldn't leave the country. So the agentic layer is model-agnostic and routed **ILMU-first, sovereign by default**. The same pipeline can hot-swap the model to run on-prem.
+> "One last thing. Your company's tax data is about as confidential as it gets — it shouldn't be shipped off to some AI server overseas. So CukaiPandai runs on **ILMU**, the lokal Malaysian AI built by **YTL AI Labs**: your data stays in Malaysia, and so does the model that processes it.
 >
-> So when the data must never leave the country, the model doesn't either. Let me show you the system."
+> Now — let me show you the system."
 
 > _[OPTIONAL — only if confirmed true in code: "And your financials are never warehoused into a shadow profile — processed for the filing, nothing else."]_
 
@@ -87,7 +97,7 @@ _Point to a holiday-shifted date._
 
 _Go to the document-first filing input. Upload the prepared sample financials._
 
-> "Now the filing. Pandai uploads his financials — his P&L, his asset schedule. Watch the pipeline run in the open."
+> "Now the filing. Pandai uploads his financials — a single document, his trial balance. Watch the pipeline run in the open."
 
 _Let the steps surface — extraction, then classification._
 
@@ -99,9 +109,9 @@ _Let the steps surface — extraction, then classification._
 
 _Open the computation trace / figure breakdown._
 
-> "Here's chargeable income, computed end to end — capital allowances, Schedule 3, Section 44 deductions in the correct statutory order, and the SME tax bands: 15%, 17%, then 24%.
+> "Here's chargeable income, computed end to end. Watch this — his depreciation is added back, because accounting depreciation isn't deductible; and in its place the engine grants a **capital allowance** on his new machine: 34% of RM300,000, so **RM102,000**, straight from the Schedule 3 rates. Then the SME tax bands — 15, 17, then 24%.
 >
-> And this is the part that matters — **every figure has a trace.** This deduction isn't just a number on a screen; it links to the exact provision it comes from."
+> And this is the part that matters — **every figure has a trace.** This capital allowance isn't just a number on a screen; it links to the exact provision it comes from."
 
 _Click one figure through to its citation._
 
@@ -153,7 +163,9 @@ _Trigger the download._
 >
 > Less guessing, less penalty risk, more time running the business he built — and more time for the people whose payroll depends on it.
 >
-> A generic AI can summarize the tax act. CukaiPandai helps you _file_ it, and _defend_ it — sovereign, and grounded in law. Thank you."
+> A generic AI can summarize the tax act. CukaiPandai helps you _file_ it, and _defend_ it — grounded in Malaysian law, and verified by Malaysian AI.
+>
+> **One upload. Every ringgit cited. Ready to defend.** Thank you."
 
 ---
 
@@ -178,6 +190,14 @@ Known open defects (see [`docs/defects.md`](defects.md)). **Do not click these o
 
 > "Both compute nothing deterministically and will fabricate a citation under pressure — that's literally why the MyGov bot was pulled. Our tax math lives in a pure deterministic core with zero LLM involvement, and our citation gate rejects fabrications outright. The AI orchestrates; it never invents."
 
+**"How is this different from Bukku, AutoCount, or other accounting software?"**
+
+> "Those are bookkeeping — they record transactions, run SST, and push e-invoices to MyInvois. They deliberately stop at the corporate-tax line: Bukku's own help docs tell you to _assume_ your tax liability and just journal it. None of them computes a Form C — capital allowances, Schedule 3, Section 44, the SME bands — and none cites a figure to law or defends it in an audit. CukaiPandai starts exactly where they stop: it takes those accounting figures and produces a cited, audit-defensible Form C. We're complementary to bookkeeping, not a replacement for it — and a natural integration or acquisition target for one of them."
+
+**"So who are your actual competitors?"**
+
+> "Three camps, and none of them do what we do. **One — accounting + e-invoicing software:** Bukku, AutoCount, SQL, Financio, ABSS, QuickBooks, Xero, Deskera, plus MyInvois middleware like Storecove and ClearTax. They move money and invoices but never compute or cite a Form C. **Two — AI helpers:** generic ChatGPT, TaxGPT, the personal-tax app MyTaxMate, LHDN's own support bot — they either only cover personal tax or hallucinate the law. **Three — human tax agents:** real Form C work, but slow, offline, RM300–1,500 a return. No one fuses all four of our pillars: deterministic cited tax math, a fabrication-rejecting citation gate, in-country routing on a Malaysian model, and a human-in-the-loop draft return. That's the white space — software speed with tax-agent rigor and zero hallucinated numbers."
+
 **"Where's the audit-defense pillar?"**
 
 > "It starts at the figure: every number we file already carries its citation, so the defense ships with the return — that's Beat 4. The conversational audit assistant rides that same deterministic gate, and it's our immediate next sprint."
@@ -186,9 +206,9 @@ Known open defects (see [`docs/defects.md`](defects.md)). **Do not click these o
 
 > "The core is test-covered — 245 backend tests across SME band boundaries, capital-allowance rates, Schedule 3 / Section 44 ordering, and Form C deadline shifting including holiday and state-specific rolls. We're hardening edge cases like loss-year balancing charges next."
 
-**"Why 'sovereign'?"**
+**"Why does keeping the data in Malaysia matter?"**
 
-> "Malaysian tax data stays on Malaysian infrastructure — ILMU-first, failover in-country, foreign models off by default. For government and enterprise buyers, data residency is the deciding factor."
+> "Tax data is some of the most confidential data a company has, and ours stays on Malaysian infrastructure. We run on **ILMU** — the Malaysian LLM built by **YTL AI Labs** — kept in-country, with foreign models off by default. For government and enterprise buyers, data residency is the deciding factor, and building on a homegrown national model is part of the story."
 
 **"What's the business model / who pays?"**
 
@@ -258,10 +278,18 @@ Known open defects (see [`docs/defects.md`](defects.md)). **Do not click these o
   - Clean phase table: [Crowe Malaysia — latest e-invoice timeline](https://www.crowe.com/my/news/latest-e-invoice-implementation-timeline) or [ClearTax MY](https://www.cleartax.com/my/en/different-phases-implementation-timelines-einvoicing-malaysia)
 - **Verified phases:** P1 Aug 2024 (>RM100m) · P2 Jan 2025 (RM25–100m) · P3 Jul 2025 (RM5–25m) · **P4 Jan 2026 (RM1–5m)** · P5 Jul 2026 (remainder; <RM1m now exempt).
 - **Tip:** animate a marker landing on the Jan 2026 SME row as you say "ready or not" — makes the "why now" land visually.
+- **Impact-metric source (caption when you say "up to 45%"):** the s.112(3) ITA 1967 late-filing penalty is administered on a **15% / 30% / 45%** sliding scale by months overdue under LHDN Operational Guidelines GPHDN 5/2019 (later 3/2020) — [GSK Associates summary](https://www.gskassociates.net/post/new-penalty-rates-lhdn) · [KTP](https://www.ktp.com.my/blog/what-is-the-penalty-of-late-filing-for-my-sdn-bhd/09nov22). The stacked penalties: **10%** CP204 under-estimation when actual tax exceeds the estimate by >30% (s.107C(10)) and **10%** late-payment (s.103) — [ClearTax LHDN penalties](https://www.cleartax.com/my/en/lhdn-penalties). _Say "up to 45%," not a fixed RM figure — it's a % of the company's own tax bill, so it's always defensible._
 
 ### §1.5 / §1.6 Architecture + guardrail
 
 - **Show:** a simple two-layer diagram (agentic layer → deterministic core → law corpus) and a mock of a figure with its citation link.
 - **Source:** make this yourself from your own architecture (see `docs/trd.md`). This is your IP — don't pull external footage here.
+
+### §1.6b Category / competitors — "not bookkeeping, not a chatbot"
+
+- **Show:** a 3-column "who does what" slide — _Bookkeeping_ (Bukku / AutoCount / SQL logos), _Chatbot_ (ChatGPT / MyGov), _CukaiPandai_ (✓ computes ✓ cites ✓ defends). Optionally flash the Bukku help-doc line that says to _assume_ a tax liability and journal it — it's the single most damning visual.
+- **Source (cite on screen):** [Bukku features](https://bukku.my/features) · [Bukku "How to Record the Company Tax" help doc](https://intercom.help/bukku/en/articles/8056759-how-to-record-the-company-tax) (the "let's say the company has a tax liability of RM10,000" line) · [AutoCount](https://www.autocountsoft.com/).
+- **Tip:** keep it to ~3 seconds per column. The point is positioning, not a feature war — you're defining a new category, not dunking on Bukku.
+- **Honesty:** Bukku/AutoCount/SQL are genuinely good bookkeeping tools — frame as "they stop where we start," not "they're bad."
 
 > **One-line on-screen disclaimer to include once in Part 1:** "Encik Pandai is an illustrative persona; figures shown are from sample data." Honest, and it pre-empts any 'is this a real customer?' doubt.
