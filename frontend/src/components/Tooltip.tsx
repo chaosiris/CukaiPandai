@@ -21,7 +21,11 @@ interface TooltipProps {
 export function Tooltip({ trigger, content, className }: TooltipProps) {
   const id = useId()
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+  const [pos, setPos] = useState<{ top: number; left: number; maxWidth: number }>({
+    top: 0,
+    left: 0,
+    maxWidth: 280
+  })
   const wrapRef = useRef<HTMLSpanElement>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
 
@@ -32,10 +36,13 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     const vh = window.innerHeight
     const MARGIN = 8
 
-    // Apply viewport-relative max-width before measuring so bubbleRect.width reflects wrapping
+    // Viewport-relative max-width: ensures the bubble never exceeds the available space.
+    // Written into React state (not just a DOM mutation) so it survives re-renders and is
+    // correct from the very first paint after repositioning.
     const effectiveMaxWidth = Math.min(280, vw - 2 * MARGIN)
-    bubbleRef.current.style.maxWidth = `${effectiveMaxWidth}px`
 
+    // Apply to the DOM element before measuring so getBoundingClientRect reflects wrapping.
+    bubbleRef.current.style.maxWidth = `${effectiveMaxWidth}px`
     const bubbleRect = bubbleRef.current.getBoundingClientRect()
 
     // Default: centre above the trigger
@@ -54,18 +61,24 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
     if (left < MARGIN) left = MARGIN
     if (left + bubbleRect.width > vw - MARGIN) left = vw - bubbleRect.width - MARGIN
 
-    setPos({ top, left })
+    setPos({ top, left, maxWidth: effectiveMaxWidth })
   }, [])
 
   useEffect(() => {
     if (!open) return
-    // Position on next paint once bubble is in the DOM
-    const frame = requestAnimationFrame(reposition)
+    // Two nested rAFs: the first lets React flush the bubble into the DOM and the
+    // browser perform an initial layout pass; the second runs after that first layout
+    // so getBoundingClientRect() returns the real wrapped dimensions (not 0x0).
+    let inner: number
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(reposition)
+    })
     // Re-clamp on scroll or resize while open
     window.addEventListener('scroll', reposition, { passive: true })
     window.addEventListener('resize', reposition, { passive: true })
     return () => {
-      cancelAnimationFrame(frame)
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
       window.removeEventListener('scroll', reposition)
       window.removeEventListener('resize', reposition)
     }
@@ -105,6 +118,7 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
             position: 'fixed',
             top: pos.top,
             left: pos.left,
+            maxWidth: pos.maxWidth,
             zIndex: 200,
             padding: '8px 11px',
             background: 'var(--window)',

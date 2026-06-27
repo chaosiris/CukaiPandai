@@ -854,6 +854,10 @@ a {
 
 .req-list {
   display: grid;
+  /* Reset browser-default ul padding so border-top on rows spans full card width. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
   /* overflow: hidden ensures border-top on rows reaches both card edges without
      sub-pixel gaps caused by border-radius clipping on the parent .window */
   overflow: hidden;
