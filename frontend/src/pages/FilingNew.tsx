@@ -39,6 +39,14 @@ import { isEntityIncomplete } from '../personas'
 // Sentinel "model" for deterministically-entered line items (no LLM was involved).
 const MANUAL_MODEL = 'structured-entry'
 
+// Per-persona sample financial statements shipped in /public/fixtures (generated, taxonomy-aligned).
+// Lets a demo user try the upload pipeline with a realistic document for their own company.
+const SAMPLE_DOCS: Record<string, { file: string; label: string }> = {
+  C2581234509: { file: 'acme-income-statement.pdf', label: 'Acme Trading — Statement of Profit or Loss' },
+  C7654321098: { file: 'sinar-income-statement.pdf', label: 'Sinar Digital — Statement of Profit or Loss' },
+  C3219876540: { file: 'selera-income-statement.pdf', label: 'Selera Kita — Statement of Profit or Loss' }
+}
+
 function buildSsm(entity: {
   tin: string
   entity_type: string
@@ -214,6 +222,7 @@ export default function FilingNew() {
   const [latestResult, setLatestResult] = useState<FormCResponse | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [mode, setMode] = useState<'upload' | 'manual'>('upload')
   const [draftId, setDraftId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notify } = useNotifications()
@@ -391,6 +400,21 @@ export default function FilingNew() {
     if (file) void handleUpload(file)
   }
 
+  async function handleUseSample() {
+    if (!entity) return
+    const sample = SAMPLE_DOCS[entity.tin]
+    if (!sample) return
+    setUploadError(null)
+    try {
+      const res = await fetch(`/fixtures/${sample.file}`)
+      if (!res.ok) throw new Error(`could not load sample (${res.status})`)
+      const blob = await res.blob()
+      await handleUpload(new File([blob], sample.file, { type: 'application/pdf' }))
+    } catch (e) {
+      setUploadError(`Could not load the sample document: ${(e as Error).message}`)
+    }
+  }
+
   async function handleCompute() {
     if (!entity || !classifyResult) return
     setPhase({ tag: 'computing' })
@@ -461,240 +485,300 @@ export default function FilingNew() {
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
         <div className="window" style={{ marginTop: 16 }}>
           <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="titlebar-title">Stage 01 - Line Items</span>
-            <InfoTip content="Pick each account from the fixed list and enter its amount -- only valid tax accounts can be added, so there is no free-text guessing. Your entries feed the deterministic rule-based core directly. Uploading a financial document instead uses AI to extract and classify the figures into these same accounts." />
-            <span className="titlebar-meta">structured entry</span>
+            <span className="titlebar-title">Stage 01 - Provide Your Figures</span>
+            <InfoTip content="Upload a financial document (Income Statement / P&L or Trial Balance) and AI extracts + maps the figures to the fixed tax accounts, or switch to Manual Entry to pick the accounts yourself. Manual entry is deterministic -- no AI -- and only valid tax accounts can be added, so there is no free-text guessing." />
+            <span className="titlebar-meta">upload or enter</span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
+            {/* Document-first tab toggle */}
             <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: 'var(--ink)',
-                fontWeight: 600
-              }}
+              role="tablist"
+              aria-label="Input mode"
+              style={{ display: 'flex', gap: 4, borderBottom: 'var(--border)' }}
             >
-              Add each account from your trial balance or P&amp;L
+              {(
+                [
+                  ['upload', 'Upload Document'],
+                  ['manual', 'Manual Entry']
+                ] as const
+              ).map(([m, lbl]) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    appearance: 'none',
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '8px 14px',
+                    marginBottom: -1,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: mode === m ? 700 : 500,
+                    color: mode === m ? 'var(--ink)' : 'var(--ink-soft)',
+                    borderBottom: mode === m ? '2px solid var(--denim)' : '2px solid transparent'
+                  }}
+                >
+                  {lbl}
+                </button>
+              ))}
             </div>
 
-            {/* Column headings */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
-                gap: 8,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--ink-soft)'
-              }}
-            >
-              <span>Category group</span>
-              <span>Account</span>
-              <span>Amount (RM)</span>
-              <span />
-            </div>
-
-            {/* Rows */}
-            <div style={{ display: 'grid', gap: 10 }}>
-              {rows.map((r) => {
-                const acct = r.code ? accountByCode(r.code) : undefined
-                return (
-                  <div key={r.key} style={{ display: 'grid', gap: 4 }}>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
-                        gap: 8,
-                        alignItems: 'center'
-                      }}
-                    >
-                      <select
-                        value={r.group}
-                        onChange={(e) => updateRow(r.key, { group: e.target.value, code: '' })}
-                        style={selectStyle}
-                      >
-                        <option value="">Group…</option>
-                        {TAX_GROUPS.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={r.code}
-                        onChange={(e) => updateRow(r.key, { code: e.target.value })}
-                        disabled={!r.group}
-                        style={{ ...selectStyle, opacity: r.group ? 1 : 0.5 }}
-                      >
-                        <option value="">{r.group ? 'Account…' : 'Pick a group first'}</option>
-                        {accountsInGroup(r.group).map((a) => (
-                          <option key={a.code} value={a.code}>
-                            {a.label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        value={r.amount}
-                        onChange={(e) => updateRow(r.key, { amount: e.target.value })}
-                        placeholder="0"
-                        style={{ ...selectStyle, textAlign: 'right' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}
-                        aria-label="Remove line item"
-                        title="Remove line item"
-                        style={{
-                          border: 'var(--border)',
-                          background: 'var(--window)',
-                          color: 'var(--ink-soft)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 14,
-                          lineHeight: 1,
-                          height: 30,
-                          cursor: 'pointer',
-                          borderRadius: 'var(--radius)'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    {acct && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, minHeight: 16 }}>
-                        <span className="kind-tag">{CATEGORY_LABEL[acct.category]}</span>
-                        <InfoTip content={acct.note} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setRows((rs) => [...rs, blankRow()])}
+            {/* Manual entry panel */}
+            <div style={{ display: mode === 'manual' ? 'grid' : 'none', gap: 14 }}>
+              <div
                 style={{
-                  padding: '7px 14px',
-                  border: 'var(--border)',
-                  background: 'var(--window)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
                   color: 'var(--ink)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  borderRadius: 'var(--radius)'
+                  fontWeight: 600
                 }}
               >
-                + Add line item
-              </button>
-              <button
-                type="button"
-                onClick={handleManualSubmit}
-                disabled={validItems.length === 0}
-                style={{
-                  padding: '8px 20px',
-                  border: 'var(--border)',
-                  background: 'var(--denim)',
-                  color: 'var(--paper)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: validItems.length === 0 ? 'not-allowed' : 'pointer',
-                  borderRadius: 'var(--radius)',
-                  opacity: validItems.length === 0 ? 0.5 : 1
-                }}
-              >
-                Continue
-              </button>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                {validItems.length} valid line item{validItems.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+                Add each account from your trial balance or P&amp;L
+              </div>
 
-            {/* Divider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, height: 1, background: 'var(--grid)' }} />
-              <span
+              {/* Column headings */}
+              <div
                 style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                  gap: 8,
                   fontFamily: 'var(--font-mono)',
                   fontSize: 10,
-                  color: 'var(--ink-soft)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em'
+                  letterSpacing: '0.06em',
+                  color: 'var(--ink-soft)'
                 }}
               >
-                or upload a financial document
-              </span>
-              <div style={{ flex: 1, height: 1, background: 'var(--grid)' }} />
+                <span>Category group</span>
+                <span>Account</span>
+                <span>Amount (RM)</span>
+                <span />
+              </div>
+
+              {/* Rows */}
+              <div style={{ display: 'grid', gap: 10 }}>
+                {rows.map((r) => {
+                  const acct = r.code ? accountByCode(r.code) : undefined
+                  return (
+                    <div key={r.key} style={{ display: 'grid', gap: 4 }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                          gap: 8,
+                          alignItems: 'center'
+                        }}
+                      >
+                        <select
+                          value={r.group}
+                          onChange={(e) => updateRow(r.key, { group: e.target.value, code: '' })}
+                          style={selectStyle}
+                        >
+                          <option value="">Group…</option>
+                          {TAX_GROUPS.map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={r.code}
+                          onChange={(e) => updateRow(r.key, { code: e.target.value })}
+                          disabled={!r.group}
+                          style={{ ...selectStyle, opacity: r.group ? 1 : 0.5 }}
+                        >
+                          <option value="">{r.group ? 'Account…' : 'Pick a group first'}</option>
+                          {accountsInGroup(r.group).map((a) => (
+                            <option key={a.code} value={a.code}>
+                              {a.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          value={r.amount}
+                          onChange={(e) => updateRow(r.key, { amount: e.target.value })}
+                          placeholder="0"
+                          style={{ ...selectStyle, textAlign: 'right' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}
+                          aria-label="Remove line item"
+                          title="Remove line item"
+                          style={{
+                            border: 'var(--border)',
+                            background: 'var(--window)',
+                            color: 'var(--ink-soft)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 14,
+                            lineHeight: 1,
+                            height: 30,
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius)'
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {acct && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, minHeight: 16 }}>
+                          <span className="kind-tag">{CATEGORY_LABEL[acct.category]}</span>
+                          <InfoTip content={acct.note} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setRows((rs) => [...rs, blankRow()])}
+                  style={{
+                    padding: '7px 14px',
+                    border: 'var(--border)',
+                    background: 'var(--window)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    borderRadius: 'var(--radius)'
+                  }}
+                >
+                  + Add line item
+                </button>
+                <button
+                  type="button"
+                  onClick={handleManualSubmit}
+                  disabled={validItems.length === 0}
+                  style={{
+                    padding: '8px 20px',
+                    border: 'var(--border)',
+                    background: 'var(--denim)',
+                    color: 'var(--paper)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: validItems.length === 0 ? 'not-allowed' : 'pointer',
+                    borderRadius: 'var(--radius)',
+                    opacity: validItems.length === 0 ? 0.5 : 1
+                  }}
+                >
+                  Continue
+                </button>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                  {validItems.length} valid line item{validItems.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
-            {/* Secondary: file drop (AI extract + classify into the taxonomy) */}
-            <button
-              type="button"
-              onDragOver={(e) => {
-                e.preventDefault()
-                setDragOver(true)
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: dragOver ? '2px dashed var(--denim)' : '2px dashed var(--grid)',
-                borderRadius: 'var(--radius)',
-                background: dragOver ? 'rgba(65,82,110,0.06)' : 'var(--screen)',
-                padding: '16px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'border-color 150ms, background 150ms',
-                width: '100%'
-              }}
-            >
+            {/* Upload panel (document-first / default) */}
+            <div style={{ display: mode === 'upload' ? 'grid' : 'none', gap: 14 }}>
               <div
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12,
-                  color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
+                  color: 'var(--ink)',
+                  fontWeight: 600
                 }}
               >
-                Drop your Income Statement / P&amp;L or Trial Balance (CSV, XLSX, or PDF)
+                Upload your Income Statement / P&amp;L or Trial Balance
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 4 }}>
-                AI extracts the figures and maps them to the accounts above -- non-financial rows are dropped. Or click
-                to browse.
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.pdf"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void handleUpload(file)
-                  e.target.value = ''
-                }}
-              />
-            </button>
+              {entity && SAMPLE_DOCS[entity.tin] && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => void handleUseSample()}
+                    style={{
+                      padding: '7px 14px',
+                      border: 'var(--border)',
+                      background: 'var(--window)',
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)'
+                    }}
+                  >
+                    Use sample document
+                  </button>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                    {SAMPLE_DOCS[entity.tin].label}
+                  </span>
+                </div>
+              )}
 
-            {uploadError && (
-              <div
+              {/* File drop (AI extract + classify into the taxonomy) */}
+              <button
+                type="button"
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragOver(true)
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
                 style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  color: 'var(--rust)',
-                  padding: '8px 12px',
-                  border: '1px solid var(--rust)',
+                  border: dragOver ? '2px dashed var(--denim)' : '2px dashed var(--grid)',
                   borderRadius: 'var(--radius)',
-                  background: 'rgba(181,80,60,0.04)'
+                  background: dragOver ? 'rgba(65,82,110,0.06)' : 'var(--screen)',
+                  padding: '16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'border-color 150ms, background 150ms',
+                  width: '100%'
                 }}
               >
-                {uploadError}
-              </div>
-            )}
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
+                  }}
+                >
+                  Drop your Income Statement / P&amp;L or Trial Balance (CSV, XLSX, or PDF)
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 4 }}>
+                  AI extracts the figures and maps them to the accounts above -- non-financial rows are dropped. Or
+                  click to browse.
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.pdf"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleUpload(file)
+                    e.target.value = ''
+                  }}
+                />
+              </button>
+
+              {uploadError && (
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    color: 'var(--rust)',
+                    padding: '8px 12px',
+                    border: '1px solid var(--rust)',
+                    borderRadius: 'var(--radius)',
+                    background: 'rgba(181,80,60,0.04)'
+                  }}
+                >
+                  {uploadError}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

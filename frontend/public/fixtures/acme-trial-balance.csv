@@ -1,0 +1,39 @@
+User ID: ADMIN
+TRIAL BALANCE
+Acme Trading Sdn Bhd (1287456-A)
+As At 31/12/2025
+
+AccNo,Description,Debit,Credit
+312-010,Cash at bank,350000.00,
+300-000,Trade receivables,640000.00,
+330-400,Inventory (closing stock),720000.00,
+200-010,"Property, plant & equipment (net)",900000.00,
+400-000,Trade payables,,520000.00
+400-000,Accruals & other payables,,85000.00
+450-000,Bank loan / borrowings,,470000.00
+100-000,Share capital (paid-up),,1000000.00
+150-000,Retained earnings b/f,,413720.00
+500-010,Sales / turnover,,4850000.00
+500-020,Other operating / incidental income,,150000.00
+550-010,Interest income,,12000.00
+700-010,Opening stock / inventory,620000.00,
+700-020,Purchases of goods,3840000.00,
+700-030,"Carriage inwards, freight & import duty",60000.00,
+700-040,Closing stock / inventory (credit to COGS),,720000.00
+900-010,"Salaries, wages, bonuses & commissions",480000.00,
+900-020,Directors' fees & remuneration,96000.00,
+900-030,EPF / approved-fund (employer),69120.00,
+900-040,"SOCSO, EIS & HRD Corp levy (employer)",14400.00,
+900-050,Business premises rent / lease,96000.00,
+900-060,"Utilities (electricity, water, gas)",36000.00,
+900-070,"Telephone, internet & communications",14400.00,
+900-080,Repairs & maintenance,4800.00,
+900-090,Carriage outwards / delivery & distribution,42000.00,
+900-100,Advertising & promotion,30000.00,
+900-110,General business insurance,16000.00,
+900-120,Bank charges & commissions,9500.00,
+900-130,"Audit, accounting & bookkeeping fees",18000.00,
+900-140,Secretarial & tax filing fees,6500.00,
+900-150,"Depreciation of property, plant & equipment",120000.00,
+900-160,Interest on borrowings (loan / overdraft),38000.00,
+,TOTAL,8220720.00,8220720.00

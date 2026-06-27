@@ -1,0 +1,35 @@
+User ID: ADMIN
+TRIAL BALANCE
+Sinar Digital Sdn Bhd (1467890-K)
+As At 31/12/2025
+
+AccNo,Description,Debit,Credit
+312-010,Cash at bank,165800.00,
+300-000,Trade receivables,62000.00,
+340-000,Prepayments & deposits,4000.00,
+200-010,Office equipment & computers (net of accumulated depreciation),38000.00,
+400-000,Trade payables,,9000.00
+410-000,Accruals,,7000.00
+100-000,Share capital (paid-up),,100000.00
+150-000,Retained earnings b/f,,30000.00
+500-010,Subscription / SaaS revenue,,300000.00
+500-020,Service / consulting fees,,80000.00
+550-010,Interest income on bank deposits,,1200.00
+700-010,Cloud hosting & third-party licences (cost of revenue),22000.00,
+900-010,"Salaries, wages & bonuses",120000.00,
+900-020,EPF (employer),14400.00,
+900-030,"SOCSO, EIS & HRD Corp levy (employer)",3000.00,
+900-040,"Staff medical, insurance & welfare",4500.00,
+900-050,Office rent,30000.00,
+900-060,Utilities (electricity & water),4800.00,
+900-070,"Telephone, internet & communications",3600.00,
+900-080,Software subscriptions / SaaS tools,18000.00,
+900-090,General business insurance,2400.00,
+900-100,Bank charges & merchant fees,1500.00,
+900-110,Advertising & promotion,9000.00,
+900-120,Business travel & accommodation,3500.00,
+900-130,Audit & accounting fees,4500.00,
+900-140,Secretarial & tax filing fees,2400.00,
+900-150,Depreciation of office equipment & computers,12000.00,
+900-160,Interest on borrowings,1800.00,
+,TOTAL,527200.00,527200.00

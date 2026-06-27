@@ -1,0 +1,1004 @@
+[
+  {
+    "key": "acme",
+    "data": {
+      "meta": {
+        "company_name": "Acme Trading Sdn Bhd",
+        "tin": "C2581234509",
+        "basis_period": "2025-01-01 to 2025-12-31",
+        "msic": "46900",
+        "sector": "Wholesale trading / distribution of general goods (non-specialized wholesale trade)"
+      },
+      "pnl": [
+        {
+          "section": "revenue",
+          "account_code": "rev_sales",
+          "label": "Sales / turnover",
+          "amount": 4850000
+        },
+        {
+          "section": "revenue",
+          "account_code": "rev_other_operating",
+          "label": "Other operating / incidental income (scrap & recoveries)",
+          "amount": 150000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_opening_stock",
+          "label": "Opening stock / inventory",
+          "amount": 620000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_purchases",
+          "label": "Purchases of goods",
+          "amount": 3840000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_freight_duty",
+          "label": "Carriage inwards, freight & import duty",
+          "amount": 60000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_closing_stock",
+          "label": "Closing stock / inventory",
+          "amount": -720000
+        },
+        {
+          "section": "other_income",
+          "account_code": "oth_interest_income",
+          "label": "Interest income",
+          "amount": 12000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_salaries",
+          "label": "Salaries, wages, bonuses & commissions",
+          "amount": 480000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_directors_remuneration",
+          "label": "Directors' fees & remuneration",
+          "amount": 96000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_epf",
+          "label": "EPF / approved-fund (employer)",
+          "amount": 69120
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_socso_eis_hrdf",
+          "label": "SOCSO, EIS & HRD Corp levy (employer)",
+          "amount": 14400
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_rent",
+          "label": "Business premises rent / lease",
+          "amount": 96000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_utilities",
+          "label": "Utilities (electricity, water, gas)",
+          "amount": 36000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_communications",
+          "label": "Telephone, internet & communications",
+          "amount": 14400
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "rep_maintenance",
+          "label": "Repairs & maintenance (premises, plant, vehicles)",
+          "amount": 4800
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "sell_carriage_outwards",
+          "label": "Carriage outwards / delivery & distribution",
+          "amount": 42000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "sell_advertising",
+          "label": "Advertising & promotion",
+          "amount": 30000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_insurance",
+          "label": "General business insurance",
+          "amount": 16000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_bank_charges",
+          "label": "Bank charges & commissions",
+          "amount": 9500
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_audit_accounting",
+          "label": "Audit, accounting & bookkeeping fees",
+          "amount": 18000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_secretarial_taxfiling",
+          "label": "Secretarial & tax filing fees",
+          "amount": 6500
+        },
+        {
+          "section": "depreciation",
+          "account_code": "dep_depreciation",
+          "label": "Depreciation of property, plant & equipment",
+          "amount": 120000
+        },
+        {
+          "section": "finance_costs",
+          "account_code": "fin_interest",
+          "label": "Interest on borrowings (loan / overdraft)",
+          "amount": 38000
+        }
+      ],
+      "pnl_subtotals": {
+        "revenue": 5000000,
+        "cost_of_sales": 3800000,
+        "gross_profit": 1200000,
+        "other_income": 12000,
+        "total_operating_expenses": 1090720,
+        "profit_before_tax": 121280
+      },
+      "trial_balance": [
+        {
+          "label": "Cash at bank",
+          "account_code": null,
+          "debit": 350000,
+          "credit": 0
+        },
+        {
+          "label": "Trade receivables",
+          "account_code": null,
+          "debit": 640000,
+          "credit": 0
+        },
+        {
+          "label": "Inventory (closing stock)",
+          "account_code": null,
+          "debit": 720000,
+          "credit": 0
+        },
+        {
+          "label": "Property, plant & equipment (net)",
+          "account_code": null,
+          "debit": 900000,
+          "credit": 0
+        },
+        {
+          "label": "Trade payables",
+          "account_code": null,
+          "debit": 0,
+          "credit": 520000
+        },
+        {
+          "label": "Accruals & other payables",
+          "account_code": null,
+          "debit": 0,
+          "credit": 85000
+        },
+        {
+          "label": "Bank loan / borrowings",
+          "account_code": null,
+          "debit": 0,
+          "credit": 470000
+        },
+        {
+          "label": "Share capital (paid-up)",
+          "account_code": null,
+          "debit": 0,
+          "credit": 1000000
+        },
+        {
+          "label": "Retained earnings b/f",
+          "account_code": null,
+          "debit": 0,
+          "credit": 413720
+        },
+        {
+          "label": "Sales / turnover",
+          "account_code": "rev_sales",
+          "debit": 0,
+          "credit": 4850000
+        },
+        {
+          "label": "Other operating / incidental income",
+          "account_code": "rev_other_operating",
+          "debit": 0,
+          "credit": 150000
+        },
+        {
+          "label": "Interest income",
+          "account_code": "oth_interest_income",
+          "debit": 0,
+          "credit": 12000
+        },
+        {
+          "label": "Opening stock / inventory",
+          "account_code": "cos_opening_stock",
+          "debit": 620000,
+          "credit": 0
+        },
+        {
+          "label": "Purchases of goods",
+          "account_code": "cos_purchases",
+          "debit": 3840000,
+          "credit": 0
+        },
+        {
+          "label": "Carriage inwards, freight & import duty",
+          "account_code": "cos_freight_duty",
+          "debit": 60000,
+          "credit": 0
+        },
+        {
+          "label": "Closing stock / inventory (credit to COGS)",
+          "account_code": "cos_closing_stock",
+          "debit": 0,
+          "credit": 720000
+        },
+        {
+          "label": "Salaries, wages, bonuses & commissions",
+          "account_code": "staff_salaries",
+          "debit": 480000,
+          "credit": 0
+        },
+        {
+          "label": "Directors' fees & remuneration",
+          "account_code": "staff_directors_remuneration",
+          "debit": 96000,
+          "credit": 0
+        },
+        {
+          "label": "EPF / approved-fund (employer)",
+          "account_code": "staff_epf",
+          "debit": 69120,
+          "credit": 0
+        },
+        {
+          "label": "SOCSO, EIS & HRD Corp levy (employer)",
+          "account_code": "staff_socso_eis_hrdf",
+          "debit": 14400,
+          "credit": 0
+        },
+        {
+          "label": "Business premises rent / lease",
+          "account_code": "prem_rent",
+          "debit": 96000,
+          "credit": 0
+        },
+        {
+          "label": "Utilities (electricity, water, gas)",
+          "account_code": "prem_utilities",
+          "debit": 36000,
+          "credit": 0
+        },
+        {
+          "label": "Telephone, internet & communications",
+          "account_code": "prem_communications",
+          "debit": 14400,
+          "credit": 0
+        },
+        {
+          "label": "Repairs & maintenance",
+          "account_code": "rep_maintenance",
+          "debit": 4800,
+          "credit": 0
+        },
+        {
+          "label": "Carriage outwards / delivery & distribution",
+          "account_code": "sell_carriage_outwards",
+          "debit": 42000,
+          "credit": 0
+        },
+        {
+          "label": "Advertising & promotion",
+          "account_code": "sell_advertising",
+          "debit": 30000,
+          "credit": 0
+        },
+        {
+          "label": "General business insurance",
+          "account_code": "admin_insurance",
+          "debit": 16000,
+          "credit": 0
+        },
+        {
+          "label": "Bank charges & commissions",
+          "account_code": "admin_bank_charges",
+          "debit": 9500,
+          "credit": 0
+        },
+        {
+          "label": "Audit, accounting & bookkeeping fees",
+          "account_code": "prof_audit_accounting",
+          "debit": 18000,
+          "credit": 0
+        },
+        {
+          "label": "Secretarial & tax filing fees",
+          "account_code": "prof_secretarial_taxfiling",
+          "debit": 6500,
+          "credit": 0
+        },
+        {
+          "label": "Depreciation of property, plant & equipment",
+          "account_code": "dep_depreciation",
+          "debit": 120000,
+          "credit": 0
+        },
+        {
+          "label": "Interest on borrowings (loan / overdraft)",
+          "account_code": "fin_interest",
+          "debit": 38000,
+          "credit": 0
+        }
+      ],
+      "tb_totals": {
+        "total_debit": 8220720,
+        "total_credit": 8220720
+      }
+    }
+  },
+  {
+    "key": "sinar",
+    "data": {
+      "meta": {
+        "company_name": "Sinar Digital Sdn Bhd",
+        "tin": "C7654321098",
+        "basis_period": "1 Jan 2025 - 31 Dec 2025",
+        "msic": "62010",
+        "sector": "Software development / IT services (SaaS)"
+      },
+      "pnl": [
+        {
+          "section": "revenue",
+          "account_code": "rev_subscription",
+          "label": "Subscription / SaaS revenue",
+          "amount": 300000
+        },
+        {
+          "section": "revenue",
+          "account_code": "rev_service_fees",
+          "label": "Service / consulting fees",
+          "amount": 80000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_cloud_licences",
+          "label": "Cloud hosting & third-party licences (cost of revenue)",
+          "amount": 22000
+        },
+        {
+          "section": "other_income",
+          "account_code": "oth_interest_income",
+          "label": "Interest income on bank deposits",
+          "amount": 1200
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_salaries",
+          "label": "Salaries, wages & bonuses",
+          "amount": 120000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_epf",
+          "label": "EPF (employer)",
+          "amount": 14400
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_socso_eis_hrdf",
+          "label": "SOCSO, EIS & HRD Corp levy (employer)",
+          "amount": 3000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_welfare_medical",
+          "label": "Staff medical, insurance & welfare",
+          "amount": 4500
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_rent",
+          "label": "Office rent",
+          "amount": 30000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_utilities",
+          "label": "Utilities (electricity & water)",
+          "amount": 4800
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_communications",
+          "label": "Telephone, internet & communications",
+          "amount": 3600
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_software_saas",
+          "label": "Software subscriptions / SaaS tools",
+          "amount": 18000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_insurance",
+          "label": "General business insurance",
+          "amount": 2400
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_bank_charges",
+          "label": "Bank charges & merchant fees",
+          "amount": 1500
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "sell_advertising",
+          "label": "Advertising & promotion",
+          "amount": 9000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "sell_travel",
+          "label": "Business travel & accommodation",
+          "amount": 3500
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_audit_accounting",
+          "label": "Audit & accounting fees",
+          "amount": 4500
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_secretarial_taxfiling",
+          "label": "Secretarial & tax filing fees",
+          "amount": 2400
+        },
+        {
+          "section": "depreciation",
+          "account_code": "dep_depreciation",
+          "label": "Depreciation of office equipment & computers",
+          "amount": 12000
+        },
+        {
+          "section": "finance_costs",
+          "account_code": "fin_interest",
+          "label": "Interest on borrowings",
+          "amount": 1800
+        }
+      ],
+      "pnl_subtotals": {
+        "revenue": 380000,
+        "cost_of_sales": 22000,
+        "gross_profit": 358000,
+        "other_income": 1200,
+        "total_operating_expenses": 235400,
+        "profit_before_tax": 123800
+      },
+      "trial_balance": [
+        {
+          "label": "Cash at bank",
+          "account_code": null,
+          "debit": 165800,
+          "credit": 0
+        },
+        {
+          "label": "Trade receivables",
+          "account_code": null,
+          "debit": 62000,
+          "credit": 0
+        },
+        {
+          "label": "Prepayments & deposits",
+          "account_code": null,
+          "debit": 4000,
+          "credit": 0
+        },
+        {
+          "label": "Office equipment & computers (net of accumulated depreciation)",
+          "account_code": null,
+          "debit": 38000,
+          "credit": 0
+        },
+        {
+          "label": "Trade payables",
+          "account_code": null,
+          "debit": 0,
+          "credit": 9000
+        },
+        {
+          "label": "Accruals",
+          "account_code": null,
+          "debit": 0,
+          "credit": 7000
+        },
+        {
+          "label": "Share capital (paid-up)",
+          "account_code": null,
+          "debit": 0,
+          "credit": 100000
+        },
+        {
+          "label": "Retained earnings b/f",
+          "account_code": null,
+          "debit": 0,
+          "credit": 30000
+        },
+        {
+          "label": "Subscription / SaaS revenue",
+          "account_code": "rev_subscription",
+          "debit": 0,
+          "credit": 300000
+        },
+        {
+          "label": "Service / consulting fees",
+          "account_code": "rev_service_fees",
+          "debit": 0,
+          "credit": 80000
+        },
+        {
+          "label": "Interest income on bank deposits",
+          "account_code": "oth_interest_income",
+          "debit": 0,
+          "credit": 1200
+        },
+        {
+          "label": "Cloud hosting & third-party licences (cost of revenue)",
+          "account_code": "cos_cloud_licences",
+          "debit": 22000,
+          "credit": 0
+        },
+        {
+          "label": "Salaries, wages & bonuses",
+          "account_code": "staff_salaries",
+          "debit": 120000,
+          "credit": 0
+        },
+        {
+          "label": "EPF (employer)",
+          "account_code": "staff_epf",
+          "debit": 14400,
+          "credit": 0
+        },
+        {
+          "label": "SOCSO, EIS & HRD Corp levy (employer)",
+          "account_code": "staff_socso_eis_hrdf",
+          "debit": 3000,
+          "credit": 0
+        },
+        {
+          "label": "Staff medical, insurance & welfare",
+          "account_code": "staff_welfare_medical",
+          "debit": 4500,
+          "credit": 0
+        },
+        {
+          "label": "Office rent",
+          "account_code": "prem_rent",
+          "debit": 30000,
+          "credit": 0
+        },
+        {
+          "label": "Utilities (electricity & water)",
+          "account_code": "prem_utilities",
+          "debit": 4800,
+          "credit": 0
+        },
+        {
+          "label": "Telephone, internet & communications",
+          "account_code": "prem_communications",
+          "debit": 3600,
+          "credit": 0
+        },
+        {
+          "label": "Software subscriptions / SaaS tools",
+          "account_code": "admin_software_saas",
+          "debit": 18000,
+          "credit": 0
+        },
+        {
+          "label": "General business insurance",
+          "account_code": "admin_insurance",
+          "debit": 2400,
+          "credit": 0
+        },
+        {
+          "label": "Bank charges & merchant fees",
+          "account_code": "admin_bank_charges",
+          "debit": 1500,
+          "credit": 0
+        },
+        {
+          "label": "Advertising & promotion",
+          "account_code": "sell_advertising",
+          "debit": 9000,
+          "credit": 0
+        },
+        {
+          "label": "Business travel & accommodation",
+          "account_code": "sell_travel",
+          "debit": 3500,
+          "credit": 0
+        },
+        {
+          "label": "Audit & accounting fees",
+          "account_code": "prof_audit_accounting",
+          "debit": 4500,
+          "credit": 0
+        },
+        {
+          "label": "Secretarial & tax filing fees",
+          "account_code": "prof_secretarial_taxfiling",
+          "debit": 2400,
+          "credit": 0
+        },
+        {
+          "label": "Depreciation of office equipment & computers",
+          "account_code": "dep_depreciation",
+          "debit": 12000,
+          "credit": 0
+        },
+        {
+          "label": "Interest on borrowings",
+          "account_code": "fin_interest",
+          "debit": 1800,
+          "credit": 0
+        }
+      ],
+      "tb_totals": {
+        "total_debit": 527200,
+        "total_credit": 527200
+      }
+    }
+  },
+  {
+    "key": "selera",
+    "data": {
+      "meta": {
+        "company_name": "Selera Kita Sdn Bhd",
+        "tin": "C3219876540",
+        "basis_period": "1 Apr 2024 - 31 Mar 2025",
+        "msic": "56101",
+        "sector": "Restaurants and restaurant-cafes (food & beverage)"
+      },
+      "pnl": [
+        {
+          "section": "revenue",
+          "account_code": "rev_sales",
+          "label": "Food sales (dine-in & takeaway)",
+          "amount": 2050000
+        },
+        {
+          "section": "revenue",
+          "account_code": "rev_other_operating",
+          "label": "Beverage & incidental F&B sales",
+          "amount": 450000
+        },
+        {
+          "section": "cost_of_sales",
+          "account_code": "cos_purchases",
+          "label": "Food & beverage purchases",
+          "amount": 800000
+        },
+        {
+          "section": "other_income",
+          "account_code": "oth_interest_income",
+          "label": "Interest income on fixed deposit",
+          "amount": 5000
+        },
+        {
+          "section": "other_income",
+          "account_code": "oth_bad_debts_recovered",
+          "label": "Catering deposits recovered",
+          "amount": 7000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_salaries",
+          "label": "Salaries, wages & service charge (45 staff)",
+          "amount": 900000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_epf",
+          "label": "EPF employer contributions",
+          "amount": 108000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "staff_socso_eis_hrdf",
+          "label": "SOCSO, EIS & HRD Corp levy",
+          "amount": 27000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_rent",
+          "label": "Restaurant premises rent",
+          "amount": 120000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_utilities",
+          "label": "Utilities (electricity, water, gas)",
+          "amount": 60000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prem_services",
+          "label": "Cleaning, pest control & security",
+          "amount": 36000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "rep_maintenance",
+          "label": "Kitchen equipment repairs & maintenance",
+          "amount": 24000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_office_supplies",
+          "label": "Disposables, stationery & supplies",
+          "amount": 18000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_insurance",
+          "label": "Fire & public liability insurance",
+          "amount": 14000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "admin_bank_charges",
+          "label": "Bank & card-processing charges",
+          "amount": 22000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "sell_advertising",
+          "label": "Advertising & delivery-platform promotion",
+          "amount": 30000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_audit_accounting",
+          "label": "Audit & accounting fees",
+          "amount": 12000
+        },
+        {
+          "section": "operating_expenses",
+          "account_code": "prof_secretarial_taxfiling",
+          "label": "Secretarial & tax filing fees",
+          "amount": 4000
+        },
+        {
+          "section": "depreciation",
+          "account_code": "dep_depreciation",
+          "label": "Depreciation of kitchen plant, fittings & equipment",
+          "amount": 80000
+        },
+        {
+          "section": "finance_costs",
+          "account_code": "fin_interest",
+          "label": "Interest on term loan & overdraft",
+          "amount": 18000
+        }
+      ],
+      "pnl_subtotals": {
+        "revenue": 2500000,
+        "cost_of_sales": 800000,
+        "gross_profit": 1700000,
+        "other_income": 12000,
+        "total_operating_expenses": 1473000,
+        "profit_before_tax": 239000
+      },
+      "trial_balance": [
+        {
+          "label": "Cash at bank & cash in hand",
+          "account_code": null,
+          "debit": 420000,
+          "credit": 0
+        },
+        {
+          "label": "Trade & other receivables",
+          "account_code": null,
+          "debit": 95000,
+          "credit": 0
+        },
+        {
+          "label": "Inventory (food & beverage stock)",
+          "account_code": null,
+          "debit": 70000,
+          "credit": 0
+        },
+        {
+          "label": "Property, plant & equipment (net of accumulated depreciation)",
+          "account_code": null,
+          "debit": 880000,
+          "credit": 0
+        },
+        {
+          "label": "Trade payables",
+          "account_code": null,
+          "debit": 0,
+          "credit": 110000
+        },
+        {
+          "label": "Accruals & other payables",
+          "account_code": null,
+          "debit": 0,
+          "credit": 48000
+        },
+        {
+          "label": "Bank term loan",
+          "account_code": null,
+          "debit": 0,
+          "credit": 260000
+        },
+        {
+          "label": "Share capital (paid-up)",
+          "account_code": null,
+          "debit": 0,
+          "credit": 500000
+        },
+        {
+          "label": "Retained earnings brought forward",
+          "account_code": null,
+          "debit": 0,
+          "credit": 69000
+        },
+        {
+          "label": "Profit for the year (current-year profit before tax)",
+          "account_code": null,
+          "debit": 0,
+          "credit": 239000
+        },
+        {
+          "label": "Food sales (dine-in & takeaway)",
+          "account_code": "rev_sales",
+          "debit": 0,
+          "credit": 2050000
+        },
+        {
+          "label": "Beverage & incidental F&B sales",
+          "account_code": "rev_other_operating",
+          "debit": 0,
+          "credit": 450000
+        },
+        {
+          "label": "Interest income on fixed deposit",
+          "account_code": "oth_interest_income",
+          "debit": 0,
+          "credit": 5000
+        },
+        {
+          "label": "Catering deposits recovered",
+          "account_code": "oth_bad_debts_recovered",
+          "debit": 0,
+          "credit": 7000
+        },
+        {
+          "label": "Food & beverage purchases",
+          "account_code": "cos_purchases",
+          "debit": 800000,
+          "credit": 0
+        },
+        {
+          "label": "Salaries, wages & service charge (45 staff)",
+          "account_code": "staff_salaries",
+          "debit": 900000,
+          "credit": 0
+        },
+        {
+          "label": "EPF employer contributions",
+          "account_code": "staff_epf",
+          "debit": 108000,
+          "credit": 0
+        },
+        {
+          "label": "SOCSO, EIS & HRD Corp levy",
+          "account_code": "staff_socso_eis_hrdf",
+          "debit": 27000,
+          "credit": 0
+        },
+        {
+          "label": "Restaurant premises rent",
+          "account_code": "prem_rent",
+          "debit": 120000,
+          "credit": 0
+        },
+        {
+          "label": "Utilities (electricity, water, gas)",
+          "account_code": "prem_utilities",
+          "debit": 60000,
+          "credit": 0
+        },
+        {
+          "label": "Cleaning, pest control & security",
+          "account_code": "prem_services",
+          "debit": 36000,
+          "credit": 0
+        },
+        {
+          "label": "Kitchen equipment repairs & maintenance",
+          "account_code": "rep_maintenance",
+          "debit": 24000,
+          "credit": 0
+        },
+        {
+          "label": "Disposables, stationery & supplies",
+          "account_code": "admin_office_supplies",
+          "debit": 18000,
+          "credit": 0
+        },
+        {
+          "label": "Fire & public liability insurance",
+          "account_code": "admin_insurance",
+          "debit": 14000,
+          "credit": 0
+        },
+        {
+          "label": "Bank & card-processing charges",
+          "account_code": "admin_bank_charges",
+          "debit": 22000,
+          "credit": 0
+        },
+        {
+          "label": "Advertising & delivery-platform promotion",
+          "account_code": "sell_advertising",
+          "debit": 30000,
+          "credit": 0
+        },
+        {
+          "label": "Audit & accounting fees",
+          "account_code": "prof_audit_accounting",
+          "debit": 12000,
+          "credit": 0
+        },
+        {
+          "label": "Secretarial & tax filing fees",
+          "account_code": "prof_secretarial_taxfiling",
+          "debit": 4000,
+          "credit": 0
+        },
+        {
+          "label": "Depreciation of kitchen plant, fittings & equipment",
+          "account_code": "dep_depreciation",
+          "debit": 80000,
+          "credit": 0
+        },
+        {
+          "label": "Interest on term loan & overdraft",
+          "account_code": "fin_interest",
+          "debit": 18000,
+          "credit": 0
+        }
+      ],
+      "tb_totals": {
+        "total_debit": 3738000,
+        "total_credit": 3738000
+      }
+    }
+  }
+]

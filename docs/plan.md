@@ -364,3 +364,13 @@ _Phase-0 RQ1–RQ6 RESOLVED; Phase-1 spike resolved Q1, partially Q2. Q6 RESOLVE
 - [ ] Subagent-audit after each SFI task (correctness + tax-treatment + no-regression); final `pytest` green + FE `tsc`/`build`/`biome` clean; update `docs/trd.md` (the new computation stages + the taxonomy + the constrained-upload contract) + `progress.md` → verify: every task audited GO; suite green; docs reflect the new engine + input.
 
 **Acceptance:** each task subagent-verified GO; suite + FE build green; trd/progress updated; no attribution in any commit.
+
+### SFI-7 `[FE]`/`[TD]` — Document-first tabbed input + realistic sample documents _(DONE)_
+
+> Follow-up driven by the PO: make the New Filing input **document-first with a toggleable tab** (mirroring `../myai-future-hackathon`), and ship **realistic, online-format-grounded** sample documents to exercise the upload pipeline.
+
+- [x] **Tabbed input** (`FilingNew.tsx`): Upload Document (default) · Manual Entry toggle; both panels stay mounted (state survives switch); honesty preserved (manual = no-AI, upload = sovereign/AI). Custom token-CSS toggle (no library).
+- [x] **Sample docs:** multi-agent workflow generated sector-specific, arithmetic+taxonomy-verified financials (`backend/scripts/sample_financials.json`); online research grounded the layout in real MPERS statements (KPMG/Radiant Rainbow) + AutoCount trial balances + LHDN HK-1. `backend/scripts/gen_sample_docs.py` (fpdf2, dev-only) renders per-persona `{key}-income-statement.pdf` (MPERS detailed P&L) + `{key}-trial-balance.csv` (AutoCount style) into `frontend/public/fixtures/`.
+- [x] **Wiring:** "Use sample document" button (upload tab) fetches the active persona's sample and runs the upload pipeline; shown only for the 3 demo personas. PDFs verified text-extractable (pypdf) so live extraction works.
+
+**Acceptance:** New Filing is document-first with a manual toggle; realistic taxonomy-aligned sample docs ship in `public/fixtures/` and load via "Use sample document"; `tsc`/`build`/`biome` green.

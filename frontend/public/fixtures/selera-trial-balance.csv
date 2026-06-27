@@ -1,0 +1,37 @@
+User ID: ADMIN
+TRIAL BALANCE
+Selera Kita Sdn Bhd (1334567-T)
+As At 31/03/2025
+
+AccNo,Description,Debit,Credit
+320-000,Cash at bank & cash in hand,420000.00,
+300-000,Trade & other receivables,95000.00,
+330-400,Inventory (food & beverage stock),70000.00,
+200-010,"Property, plant & equipment (net of accumulated depreciation)",880000.00,
+400-000,Trade payables,,110000.00
+400-000,Accruals & other payables,,48000.00
+450-000,Bank term loan,,260000.00
+100-000,Share capital (paid-up),,500000.00
+150-000,Retained earnings brought forward,,69000.00
+150-100,Profit for the year (current-year profit before tax),,239000.00
+500-010,Food sales (dine-in & takeaway),,2050000.00
+500-020,Beverage & incidental F&B sales,,450000.00
+550-010,Interest income on fixed deposit,,5000.00
+550-020,Catering deposits recovered,,7000.00
+700-010,Food & beverage purchases,800000.00,
+900-010,"Salaries, wages & service charge (45 staff)",900000.00,
+900-020,EPF employer contributions,108000.00,
+900-030,"SOCSO, EIS & HRD Corp levy",27000.00,
+900-040,Restaurant premises rent,120000.00,
+900-050,"Utilities (electricity, water, gas)",60000.00,
+900-060,"Cleaning, pest control & security",36000.00,
+900-070,Kitchen equipment repairs & maintenance,24000.00,
+900-080,"Disposables, stationery & supplies",18000.00,
+900-090,Fire & public liability insurance,14000.00,
+900-100,Bank & card-processing charges,22000.00,
+900-110,Advertising & delivery-platform promotion,30000.00,
+900-120,Audit & accounting fees,12000.00,
+900-130,Secretarial & tax filing fees,4000.00,
+900-140,"Depreciation of kitchen plant, fittings & equipment",80000.00,
+900-150,Interest on term loan & overdraft,18000.00,
+,TOTAL,3738000.00,3738000.00

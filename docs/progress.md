@@ -1782,3 +1782,29 @@ Background workflow `w5fzrr9qw` (4 agents) verified CA IA/AA rates + cost caps, 
 ### Verify results
 - `backend`: `python -m pytest -q` (repo `.venv`) → **236 passed**.
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` (root-pinned 1.9.4) 0 errors on all changed files.
+
+---
+
+## [27/06/26] — Document-first filing input + realistic sample documents (SFI-7) `[FE/TD]`
+
+**Why:** follow-up to SFI. (1) The New Filing input showed Manual entry first; the team wants it **document-first** with the manual form behind a toggleable tab, mirroring `../myai-future-hackathon`. (2) No realistic sample documents existed to exercise the upload pipeline.
+
+### Research (online-grounded)
+- A research agent mapped `../myai-future-hackathon`'s intake UX: **Upload is the default tab**; a custom (non-library) toggle keeps both panels mounted; sample docs live in `public/fixtures/` and load via a "use sample" affordance.
+- A second agent gathered **real Malaysian document formats** (cited): MPERS Statement of Profit or Loss (KPMG / Radiant Rainbow illustrative statements — header block, `Registration No : <12-digit> (<ROC>)`, `(Incorporated in Malaysia)`, parenthesised deductions, `RM` once at column head); AutoCount/SQL trial-balance export (`AccNo | Description | Debit | Credit`, `nnn-nnn` chart-of-accounts codes, "As At DD/MM/YYYY"); LHDN HK-1 working-sheet captions.
+
+### FE — document-first tabs (`FilingNew.tsx`)
+- Replaced the manual-first + divider layout with a **tab toggle** ("Upload Document" default · "Manual Entry"); both panels stay mounted (toggled via `display`), so state survives a switch. Titlebar → "Stage 01 - Provide Your Figures".
+- **Honesty preserved:** manual entry stays deterministic ("entered directly · no AI", no sovereign badge); the AI/sovereign path shows only for uploads.
+- Added a **"Use sample document"** button (upload tab) that fetches the active persona's sample income statement from `/fixtures/`, wraps it as a `File`, and runs the upload pipeline. Shown only for the 3 demo personas (`SAMPLE_DOCS` keyed by TIN); hidden for custom entities.
+
+### Sample documents (generated, verified)
+- A multi-agent workflow generated **sector-specific, arithmetic- and taxonomy-verified** financials for Acme (wholesale), Sinar (SaaS), Selera (F&B) — each P&L revenue matches the persona's gross income, gross profit + PBT reconcile exactly, and the trial balances balance. Saved to `backend/scripts/sample_financials.json`.
+- `backend/scripts/gen_sample_docs.py` (uses `fpdf2`, a dev-only fixture dep — NOT a runtime/deploy dependency) renders, per persona, into `frontend/public/fixtures/`:
+  - `{key}-income-statement.pdf` — detailed MPERS Statement of Profit or Loss (real header format, parenthesised deductions).
+  - `{key}-trial-balance.csv` — AutoCount-style trial balance (`AccNo | Description | Debit | Credit`, balanced totals).
+- Confirmed the PDFs contain **extractable text** (pypdf) with every line item present, so the live extraction pipeline (pypdf → constrained classifier → taxonomy) works end-to-end.
+
+### Verify results
+- `frontend`: `tsc --noEmit` 0 errors · `vite build` green (84 modules) · `biome check` 0 errors.
+- Sample docs: 6 files generated; Acme/Sinar/Selera revenue + PBT exact; trial balances balance; PDF text extraction verified.
