@@ -480,6 +480,8 @@ export default function AuditAssistant() {
   const [deleting, setDeleting] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [pageError, setPageError] = useState<string | null>(null)
+  // Filing-picker modal (opened by "+ Select Filing" on the dashboard and "Switch Filing" in the chat)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   // Chat state
   const [thread, setThread] = useState<ChatMessage[]>([])
@@ -488,7 +490,8 @@ export default function AuditAssistant() {
   const [convLoading, setConvLoading] = useState(false)
   // Suggested/follow-up chips are collapsed by default to save vertical space
   const [chipsExpanded, setChipsExpanded] = useState(false)
-  const threadEndRef = useRef<HTMLDivElement>(null)
+  // Scroll the thread container itself (not scrollIntoView, which would scroll the whole page)
+  const threadScrollRef = useRef<HTMLDivElement>(null)
 
   // Load filing records on mount
   useEffect(() => {
@@ -528,10 +531,12 @@ export default function AuditAssistant() {
       .catch(() => setFilingsLoading(false))
   }, [entityError])
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll the thread container to the bottom on new messages (scrolls only the contained
+  // thread, never the page — the chat lives in a fixed modal).
   useEffect(() => {
-    if (thread.length > 0) {
-      threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = threadScrollRef.current
+    if (el && thread.length > 0) {
+      el.scrollTop = el.scrollHeight
     }
   }, [thread.length])
 
@@ -672,572 +677,709 @@ export default function AuditAssistant() {
         </p>
       </div>
 
-      {/* Filing picker (shown when no filing is selected) */}
-      {!selectedFiling && (
-        <>
-          {filingsLoading && (
-            <div className="window" aria-label="Loading filed returns">
-              <div className="titlebar">
-                <span className="titlebar-title">Your Filed Returns</span>
-              </div>
-              <div className="row-div-list">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    key={n}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr auto auto',
-                      gap: 14,
-                      alignItems: 'center',
-                      padding: '14px 18px'
-                    }}
-                  >
-                    <div style={{ display: 'grid', gap: 5 }}>
-                      <Skeleton height={13} width="50%" />
-                      <Skeleton height={11} width="30%" />
-                    </div>
-                    <Skeleton height={18} width={80} />
-                    <Skeleton height={22} width={60} />
-                  </div>
-                ))}
-              </div>
+      {/* Dashboard (base layer; the chat + picker modals float above it) */}
+      <>
+        {filingsLoading && (
+          <div className="window" aria-label="Loading filed returns">
+            <div className="titlebar">
+              <span className="titlebar-title">Your Filed Returns</span>
             </div>
-          )}
-
-          {!filingsLoading && filings.length === 0 && (
-            <div className="window" style={{ padding: '48px 24px', textAlign: 'center', display: 'grid', gap: 16 }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7 }}>
-                No saved filings found. Complete a Form C filing first, then return here to defend any figure with a
-                citation-grounded justification.
-              </div>
-              <div>
-                <Link
-                  to="/filing/new"
+            <div className="row-div-list">
+              {[1, 2, 3].map((n) => (
+                <div
+                  key={n}
                   style={{
-                    display: 'inline-block',
-                    padding: '9px 22px',
-                    background: 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    borderRadius: 'var(--radius)'
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto auto',
+                    gap: 14,
+                    alignItems: 'center',
+                    padding: '14px 18px'
                   }}
                 >
-                  Create a Filing
-                </Link>
-              </div>
+                  <div style={{ display: 'grid', gap: 5 }}>
+                    <Skeleton height={13} width="50%" />
+                    <Skeleton height={11} width="30%" />
+                  </div>
+                  <Skeleton height={18} width={80} />
+                  <Skeleton height={22} width={60} />
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {pageError && (
-            <div className="window error-window" style={{ marginBottom: 12 }}>
-              <div className="titlebar">
-                <span className="titlebar-title">Error</span>
-              </div>
-              <div className="error-body">{pageError}</div>
+        {!filingsLoading && filings.length === 0 && (
+          <div className="window" style={{ padding: '48px 24px', textAlign: 'center', display: 'grid', gap: 16 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7 }}>
+              No saved filings found. Complete a Form C filing first, then return here to defend any figure with a
+              citation-grounded justification.
             </div>
-          )}
+            <div>
+              <Link
+                to="/filing/new"
+                style={{
+                  display: 'inline-block',
+                  padding: '9px 22px',
+                  background: 'var(--denim)',
+                  color: 'var(--paper)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  borderRadius: 'var(--radius)'
+                }}
+              >
+                Create a Filing
+              </Link>
+            </div>
+          </div>
+        )}
 
-          {!filingsLoading && filings.length > 0 && (
-            <>
-              {/* Sort control */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                <select
-                  value={sortKey}
-                  onChange={(e) => setSortKey(e.target.value as SortKey)}
-                  aria-label="Sort by"
+        {pageError && (
+          <div className="window error-window" style={{ marginBottom: 12 }}>
+            <div className="titlebar">
+              <span className="titlebar-title">Error</span>
+            </div>
+            <div className="error-body">{pageError}</div>
+          </div>
+        )}
+
+        {!filingsLoading && filings.length > 0 && (
+          <>
+            {/* Sort control */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Sort by"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  border: 'var(--border)',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--screen)',
+                  color: 'var(--ink)',
+                  padding: '4px 8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="tax-payable">Tax payable (high to low)</option>
+              </select>
+            </div>
+
+            {/* Toolbar: select-all + delete-selected (left), New Filing CTA (right) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 8,
+                flexWrap: 'wrap'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="checkbox"
+                  id="audit-select-all"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  style={{ cursor: 'pointer' }}
+                  aria-label="Select all filings"
+                />
+                <label
+                  htmlFor="audit-select-all"
                   style={{
                     fontFamily: 'var(--font-mono)',
                     fontSize: 11,
-                    border: 'var(--border)',
-                    borderRadius: 'var(--radius)',
-                    background: 'var(--screen)',
-                    color: 'var(--ink)',
-                    padding: '4px 8px',
+                    color: 'var(--ink-soft)',
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                  <option value="tax-payable">Tax payable (high to low)</option>
-                </select>
-              </div>
-
-              {/* Toolbar: select-all + delete-selected (left), New Filing CTA (right) */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  marginBottom: 8,
-                  flexWrap: 'wrap'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="checkbox"
-                    id="audit-select-all"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    style={{ cursor: 'pointer' }}
-                    aria-label="Select all filings"
-                  />
-                  <label
-                    htmlFor="audit-select-all"
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </label>
+                {selected.size > 0 && (
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => void handleDeleteFilings()}
                     style={{
+                      padding: '5px 14px',
+                      border: '1px solid var(--rust)',
+                      background: 'var(--window)',
+                      color: deleting ? 'var(--ink-soft)' : 'var(--rust)',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 11,
-                      color: 'var(--ink-soft)',
-                      cursor: 'pointer'
+                      cursor: deleting ? 'not-allowed' : 'pointer',
+                      borderRadius: 'var(--radius)'
                     }}
                   >
-                    {allSelected ? 'Deselect All' : 'Select All'}
-                  </label>
-                  {selected.size > 0 && (
-                    <button
-                      type="button"
-                      disabled={deleting}
-                      onClick={() => void handleDeleteFilings()}
-                      style={{
-                        padding: '5px 14px',
-                        border: '1px solid var(--rust)',
-                        background: 'var(--window)',
-                        color: deleting ? 'var(--ink-soft)' : 'var(--rust)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        cursor: deleting ? 'not-allowed' : 'pointer',
-                        borderRadius: 'var(--radius)'
-                      }}
-                    >
-                      {deleting ? 'Deleting...' : `Delete Selected (${selected.size})`}
-                    </button>
-                  )}
-                </div>
-                <Link
-                  to="/filing/new"
-                  style={{
-                    display: 'inline-block',
-                    padding: '8px 18px',
-                    background: 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  + New Filing
-                </Link>
+                    {deleting ? 'Deleting...' : `Delete Selected (${selected.size})`}
+                  </button>
+                )}
               </div>
-
-              <div className="window">
-                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="titlebar-title">
-                    {filings.length} Filing{filings.length !== 1 ? 's' : ''} to Defend
-                  </span>
-                  <InfoTip content="Click a row to open the chat and defend that filing's figures. Use the checkboxes to select filings for deletion." />
-                </div>
-                <div className="row-div-list">
-                  {sortedFilings.map((rec) => {
-                    const tp = rec.computation?.fields?.tax_payable?.value
-                    const showTp = tp != null && isPlausibleFigure(tp)
-                    const isSelected = selected.has(rec.id)
-                    return (
-                      <div
-                        key={rec.id}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '32px minmax(0, 1fr) auto',
-                          alignItems: 'center',
-                          gap: 12,
-                          padding: '12px 18px',
-                          background: isSelected ? 'var(--screen)' : 'transparent',
-                          transition: 'background 150ms'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(rec.id)}
-                            style={{ cursor: 'pointer' }}
-                            aria-label={`Select ${rec.label}`}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void selectFiling(rec)}
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            minWidth: 0,
-                            textAlign: 'left',
-                            background: 'transparent',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontFamily: 'var(--font-display)',
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: 'var(--ink)',
-                              marginBottom: 4
-                            }}
-                          >
-                            {rec.label}
-                          </div>
-                          <div
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontSize: 11,
-                              color: 'var(--ink-soft)',
-                              display: 'flex',
-                              gap: 12,
-                              flexWrap: 'wrap'
-                            }}
-                          >
-                            <span>{rec.tin}</span>
-                            <span>{formatDate(rec.created_at)}</span>
-                            {showTp && <span>Tax payable: {formatRM(tp)}</span>}
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void selectFiling(rec)}
-                          style={{
-                            padding: '8px 16px',
-                            border: 'none',
-                            background: 'var(--denim)',
-                            color: 'var(--paper)',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            borderRadius: 'var(--radius)',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          Defend This Filing
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* Two-pane workbench (shown once a filing is selected) */}
-      {selectedFiling && (
-        <>
-          {/* Breadcrumb back-link */}
-          <div style={{ marginBottom: 10 }}>
-            <button
-              type="button"
-              onClick={clearFiling}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                color: 'var(--ink-soft)',
-                textDecoration: 'none'
-              }}
-            >
-              ← Back to Chat Records
-            </button>
-          </div>
-
-          {/* Selected filing header */}
-          <div
-            className="window"
-            style={{
-              marginBottom: 16,
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1fr) auto',
-              alignItems: 'center',
-              gap: 12,
-              padding: '14px 18px'
-            }}
-          >
-            <div>
-              <div
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
                 style={{
+                  display: 'inline-block',
+                  padding: '8px 18px',
+                  border: 'none',
+                  background: 'var(--denim)',
+                  color: 'var(--paper)',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  color: 'var(--ink-soft)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  marginBottom: 4
+                  fontSize: 12,
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius)',
+                  cursor: 'pointer'
                 }}
               >
-                Defending Filing
-              </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-                {selectedFiling.label}
-              </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)', marginTop: 2 }}>
-                {selectedFiling.tin} · {formatDate(selectedFiling.created_at)}
-              </div>
+                + Select Filing
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={clearFiling}
-              style={{
-                padding: '6px 14px',
-                border: 'var(--border)',
-                background: 'transparent',
-                color: 'var(--ink-soft)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                borderRadius: 'var(--radius)',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Switch Filing
-            </button>
-          </div>
 
-          {/* Two-pane layout: responsive grid (stacks on narrow viewports via CSS) */}
-          <div className="audit-workbench">
-            {/* LEFT PANE: figure rows */}
-            <div className="window audit-pane">
+            <div className="window">
               <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="titlebar-title">Filing Figures</span>
-                <InfoTip content="Click any figure to ask Pandai about it. Each figure is derived from the selected filing's deterministic computation." />
+                <span className="titlebar-title">
+                  {filings.length} Filing{filings.length !== 1 ? 's' : ''} to Defend
+                </span>
+                <InfoTip content="Click a row to open the chat and defend that filing's figures. Use the checkboxes to select filings for deletion." />
               </div>
-              {figureRows.length === 0 ? (
-                <div
-                  style={{
-                    padding: '16px 18px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    color: 'var(--ink-soft)'
-                  }}
-                >
-                  No figures available for this filing.
-                </div>
-              ) : (
-                <div className="row-div-list audit-pane-scroll">
-                  {figureRows.map((row) => (
-                    <button
-                      key={row.key}
-                      type="button"
-                      onClick={() => handleChip(row.question)}
-                      disabled={chatLoading}
+              <div className="row-div-list">
+                {sortedFilings.map((rec) => {
+                  const tp = rec.computation?.fields?.tax_payable?.value
+                  const showTp = tp != null && isPlausibleFigure(tp)
+                  const isSelected = selected.has(rec.id)
+                  return (
+                    <div
+                      key={rec.id}
                       style={{
-                        width: '100%',
                         display: 'grid',
-                        gridTemplateColumns: 'minmax(0, 1fr) auto',
+                        gridTemplateColumns: '32px minmax(0, 1fr) auto',
                         alignItems: 'center',
-                        gap: 8,
+                        gap: 12,
                         padding: '12px 18px',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: chatLoading ? 'default' : 'pointer',
-                        textAlign: 'left',
-                        opacity: chatLoading ? 0.6 : 1
+                        background: isSelected ? 'var(--screen)' : 'transparent',
+                        transition: 'background 150ms'
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(rec.id)}
+                          style={{ cursor: 'pointer' }}
+                          aria-label={`Select ${rec.label}`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void selectFiling(rec)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          minWidth: 0,
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer'
+                        }}
+                      >
                         <div
                           style={{
-                            fontFamily: 'var(--font-body)',
-                            fontSize: 13,
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 14,
+                            fontWeight: 600,
                             color: 'var(--ink)',
-                            marginBottom: 2
+                            marginBottom: 4
                           }}
                         >
-                          {row.label}
+                          {rec.label}
                         </div>
                         <div
                           style={{
                             fontFamily: 'var(--font-mono)',
                             fontSize: 11,
                             color: 'var(--ink-soft)',
-                            overflowWrap: 'anywhere'
+                            display: 'flex',
+                            gap: 12,
+                            flexWrap: 'wrap'
                           }}
                         >
-                          {row.amount}
+                          <span>{rec.tin}</span>
+                          <span>{formatDate(rec.created_at)}</span>
+                          {showTp && <span>Tax payable: {formatRM(tp)}</span>}
                         </div>
-                      </div>
-                      <span
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void selectFiling(rec)}
                         style={{
+                          padding: '8px 16px',
+                          border: 'none',
+                          background: 'var(--denim)',
+                          color: 'var(--paper)',
                           fontFamily: 'var(--font-mono)',
                           fontSize: 11,
-                          color: 'var(--denim)',
-                          flexShrink: 0
+                          fontWeight: 700,
+                          borderRadius: 'var(--radius)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
                         }}
                       >
-                        Ask
-                      </span>
-                    </button>
-                  ))}
+                        Defend This Filing
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </>
+
+      {/* Chat workbench — floats over the dashboard in a blurred modal so the page never scrolls */}
+      {selectedFiling && (
+        <div className="audit-modal-backdrop">
+          <button type="button" className="audit-modal-scrim" aria-label="Close chat" onClick={clearFiling} />
+          <dialog open className="window audit-modal-panel" aria-label={`Audit chat for ${selectedFiling.label}`}>
+            {/* Modal header: defending-filing info + Switch Filing + Close */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--ink-soft)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em'
+                  }}
+                >
+                  Defending Filing
+                </span>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {selectedFiling.label}
                 </div>
-              )}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                  {selectedFiling.tin} · {formatDate(selectedFiling.created_at)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearFiling()
+                    setPickerOpen(true)
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    border: 'var(--border)',
+                    background: 'transparent',
+                    color: 'var(--ink-soft)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    borderRadius: 'var(--radius)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Switch Filing
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close chat"
+                  onClick={clearFiling}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    border: 'var(--border)',
+                    background: 'transparent',
+                    color: 'var(--ink-soft)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 13,
+                    borderRadius: 'var(--radius)',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* RIGHT PANE: single "Conversation" card with thread + chips + composer */}
-            <div className="window audit-conversation">
-              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="titlebar-title">Conversation</span>
-                <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are rejected by the deterministic gate." />
-              </div>
-
-              {/* (a) Message thread (scrolls; composer + chips stay pinned below) */}
-              <div
-                className="audit-pane-scroll"
-                style={{ padding: '16px 18px', display: 'grid', gap: 16, alignContent: 'start' }}
-              >
-                {convLoading && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                      Loading conversation...
-                    </span>
+            {/* Two-pane layout fills the modal; stacks on narrow viewports via CSS */}
+            <div className="audit-workbench">
+              {/* LEFT PANE: figure rows */}
+              <div className="window audit-pane">
+                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="titlebar-title">Filing Figures</span>
+                  <InfoTip content="Click any figure to ask Pandai about it. Each figure is derived from the selected filing's deterministic computation." />
+                </div>
+                {figureRows.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '16px 18px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      color: 'var(--ink-soft)'
+                    }}
+                  >
+                    No figures available for this filing.
                   </div>
-                )}
-                {thread.map((msg, idx) => (
-                  <div key={`${msg.role}-${idx}`}>
-                    {msg.role === 'user' ? (
-                      <UserBubble text={msg.text} isFabrication={msg.isFabrication} />
-                    ) : (
-                      <AssistantTurn msg={msg} />
-                    )}
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                      Pandai is thinking...
-                    </span>
-                  </div>
-                )}
-                <div ref={threadEndRef} />
-              </div>
-
-              {/* (b) Chips: collapsible suggested/follow-up questions (collapsed by default);
-                  the Trust Demo action stays visible. */}
-              <div style={{ borderTop: 'var(--border)' }}>
-                <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {activeChips.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setChipsExpanded((v) => !v)}
-                      aria-expanded={chipsExpanded}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        background: 'transparent',
-                        border: 'var(--border)',
-                        borderRadius: 'var(--radius)',
-                        padding: '5px 10px',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: 'var(--ink-soft)'
-                      }}
-                    >
-                      <span
+                ) : (
+                  <div className="row-div-list audit-pane-scroll">
+                    {figureRows.map((row) => (
+                      <button
+                        key={row.key}
+                        type="button"
+                        onClick={() => handleChip(row.question)}
+                        disabled={chatLoading}
                         style={{
-                          display: 'inline-block',
-                          transform: chipsExpanded ? 'rotate(90deg)' : 'none',
-                          transition: 'transform 150ms'
+                          width: '100%',
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(0, 1fr) auto',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '12px 18px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: chatLoading ? 'default' : 'pointer',
+                          textAlign: 'left',
+                          opacity: chatLoading ? 0.6 : 1
                         }}
                       >
-                        ▸
-                      </span>
-                      {chipSectionLabel} ({activeChips.length})
-                    </button>
-                  )}
-                  {/* Trust Demo chip: always visible */}
-                  <Chip
-                    label="Trust Demo: inject fabricated clause"
-                    onClick={handleTrustDemo}
-                    disabled={chatLoading}
-                    variant="trust-demo"
-                  />
-                </div>
-                {chipsExpanded && activeChips.length > 0 && (
-                  <div style={{ padding: '0 16px 10px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {activeChips.map((q) => (
-                      <Chip
-                        key={q}
-                        label={q}
-                        onClick={() => handleChip(q)}
-                        disabled={chatLoading}
-                        variant={chipVariant}
-                      />
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-body)',
+                              fontSize: 13,
+                              color: 'var(--ink)',
+                              marginBottom: 2
+                            }}
+                          >
+                            {row.label}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 11,
+                              color: 'var(--ink-soft)',
+                              overflowWrap: 'anywhere'
+                            }}
+                          >
+                            {row.amount}
+                          </div>
+                        </div>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            color: 'var(--denim)',
+                            flexShrink: 0
+                          }}
+                        >
+                          Ask
+                        </span>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* (c) Ask composer */}
-              <div style={{ padding: '12px 16px', borderTop: 'var(--border)', display: 'grid', gap: 10 }}>
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSend()
-                    }
-                  }}
-                  rows={3}
-                  placeholder="e.g. How do I justify the repairs deduction if LHDN questions it?"
-                  disabled={chatLoading}
-                  style={{
-                    width: '100%',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    background: 'var(--screen)',
-                    border: 'var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '10px 12px',
-                    color: 'var(--ink)',
-                    resize: 'vertical',
-                    opacity: chatLoading ? 0.6 : 1
-                  }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={!inputText.trim() || chatLoading}
-                    style={{
-                      padding: '8px 18px',
-                      border: 'none',
-                      borderRadius: 'var(--radius)',
-                      background: !inputText.trim() || chatLoading ? 'var(--grid)' : 'var(--denim)',
-                      color: 'var(--paper)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: !inputText.trim() || chatLoading ? 'default' : 'pointer'
-                    }}
+              {/* RIGHT PANE: single "Conversation" card with thread + chips + composer */}
+              <div className="window audit-conversation">
+                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="titlebar-title">Conversation</span>
+                  <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are rejected by the deterministic gate." />
+                </div>
+
+                {/* (a) Message thread (scrolls; composer + chips stay pinned below) */}
+                <div
+                  ref={threadScrollRef}
+                  className="audit-pane-scroll"
+                  style={{ padding: '16px 18px', display: 'grid', gap: 16, alignContent: 'start' }}
+                >
+                  {convLoading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                        Loading conversation...
+                      </span>
+                    </div>
+                  )}
+                  {thread.map((msg, idx) => (
+                    <div key={`${msg.role}-${idx}`}>
+                      {msg.role === 'user' ? (
+                        <UserBubble text={msg.text} isFabrication={msg.isFabrication} />
+                      ) : (
+                        <AssistantTurn msg={msg} />
+                      )}
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                        Pandai is thinking...
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* (b) Chips: collapsible suggested/follow-up questions (collapsed by default);
+                  the Trust Demo action stays visible. */}
+                <div style={{ borderTop: 'var(--border)' }}>
+                  <div
+                    style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
                   >
-                    {chatLoading ? 'Working...' : 'Send'}
-                  </button>
+                    {activeChips.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setChipsExpanded((v) => !v)}
+                        aria-expanded={chipsExpanded}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          background: 'transparent',
+                          border: 'var(--border)',
+                          borderRadius: 'var(--radius)',
+                          padding: '5px 10px',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--ink-soft)'
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            transform: chipsExpanded ? 'rotate(90deg)' : 'none',
+                            transition: 'transform 150ms'
+                          }}
+                        >
+                          ▸
+                        </span>
+                        {chipSectionLabel} ({activeChips.length})
+                      </button>
+                    )}
+                    {/* Trust Demo chip: always visible */}
+                    <Chip
+                      label="Trust Demo: inject fabricated clause"
+                      onClick={handleTrustDemo}
+                      disabled={chatLoading}
+                      variant="trust-demo"
+                    />
+                  </div>
+                  {chipsExpanded && activeChips.length > 0 && (
+                    <div style={{ padding: '0 16px 10px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {activeChips.map((q) => (
+                        <Chip
+                          key={q}
+                          label={q}
+                          onClick={() => handleChip(q)}
+                          disabled={chatLoading}
+                          variant={chipVariant}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* (c) Ask composer — Send sits inside the fixed (unresizable) input field */}
+                <div style={{ padding: '12px 16px', borderTop: 'var(--border)' }}>
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSend()
+                        }
+                      }}
+                      rows={3}
+                      placeholder="e.g. How do I justify the repairs deduction if LHDN questions it?"
+                      disabled={chatLoading}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        background: 'var(--screen)',
+                        border: 'var(--border)',
+                        borderRadius: 'var(--radius)',
+                        padding: '10px 12px 42px',
+                        color: 'var(--ink)',
+                        resize: 'none',
+                        opacity: chatLoading ? 0.6 : 1
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      disabled={!inputText.trim() || chatLoading}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        bottom: 8,
+                        padding: '6px 16px',
+                        border: 'none',
+                        borderRadius: 'var(--radius)',
+                        background: !inputText.trim() || chatLoading ? 'var(--grid)' : 'var(--denim)',
+                        color: 'var(--paper)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: !inputText.trim() || chatLoading ? 'default' : 'pointer'
+                      }}
+                    >
+                      {chatLoading ? 'Working...' : 'Send'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </>
+          </dialog>
+        </div>
+      )}
+
+      {/* Filing-picker modal — pick a completed filing to defend, or create a new one */}
+      {pickerOpen && (
+        <div className="audit-modal-backdrop">
+          <button type="button" className="audit-modal-scrim" aria-label="Close" onClick={() => setPickerOpen(false)} />
+          <dialog open className="window audit-picker-panel" aria-label="Select a filing to defend">
+            <div
+              className="titlebar"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <span className="titlebar-title">Select a Filing to Defend</span>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setPickerOpen(false)}
+                style={{
+                  width: 26,
+                  height: 26,
+                  border: 'var(--border)',
+                  background: 'transparent',
+                  color: 'var(--ink-soft)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  borderRadius: 'var(--radius)',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {filings.length === 0 ? (
+              <div
+                style={{
+                  padding: '24px 18px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--ink-soft)',
+                  lineHeight: 1.6
+                }}
+              >
+                No completed filings yet. Create one first, then come back to defend its figures.
+              </div>
+            ) : (
+              <div className="row-div-list audit-pane-scroll">
+                {sortedFilings.map((rec) => {
+                  const tp = rec.computation?.fields?.tax_payable?.value
+                  const showTp = tp != null && isPlausibleFigure(tp)
+                  return (
+                    <button
+                      key={rec.id}
+                      type="button"
+                      onClick={() => {
+                        setPickerOpen(false)
+                        void selectFiling(rec)
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'block',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '12px 18px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          marginBottom: 4
+                        }}
+                      >
+                        {rec.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--ink-soft)',
+                          display: 'flex',
+                          gap: 12,
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <span>{rec.tin}</span>
+                        <span>{formatDate(rec.created_at)}</span>
+                        {showTp && <span>Tax payable: {formatRM(tp)}</span>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <div style={{ padding: '12px 18px', borderTop: 'var(--border)' }}>
+              <Link
+                to="/filing/new"
+                style={{
+                  display: 'inline-block',
+                  padding: '8px 18px',
+                  background: 'var(--denim)',
+                  color: 'var(--paper)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  borderRadius: 'var(--radius)'
+                }}
+              >
+                + Create a Filing
+              </Link>
+            </div>
+          </dialog>
+        </div>
       )}
     </>
   )

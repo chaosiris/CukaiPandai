@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './AuthContext'
 import { ActivePersonaProvider } from './PersonaContext'
 import { AppShell } from './layouts/AppShell'
@@ -24,12 +25,24 @@ import { SignIn } from './pages/SignIn'
 import { SignUp } from './pages/SignUp'
 import Welcome from './pages/Welcome'
 
+// Reset the window scroll to the top on every route (pathname) change. Hash-only changes
+// (in-page anchors like the filing-record "On this page" links) are left untouched.
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger, not a body dep
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ActivePersonaProvider>
         <NotificationProvider>
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               {/* Public marketing routes */}
               <Route element={<MarketingShell />}>

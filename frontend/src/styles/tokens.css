@@ -1827,15 +1827,69 @@ a {
 
 /* ── Audit Workbench two-pane layout (FE-2.6 / PR-C) ───────────────── */
 /* Desktop: 1fr (figures) + 2fr (Q&A). Mobile (<=680px): single column. */
+/* ── Audit modal (chat + filing picker float over the dashboard, blurred backdrop) ─────── */
+.audit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Click-to-close scrim — a real button (keyboard-focusable) behind the panel. */
+.audit-modal-scrim {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(18, 17, 15, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+/* Chat modal panel — large, fixed-height; the workbench fills it and scrolls internally. */
+.audit-modal-panel {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  width: min(1100px, 100%);
+  height: min(860px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px;
+  gap: 14px;
+}
+
+/* Filing-picker modal panel — compact; its own list scrolls. */
+.audit-picker-panel {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.audit-picker-panel .audit-pane-scroll {
+  flex: 1;
+}
+
 .audit-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 16px;
   align-items: stretch;
-  /* Bound the workbench height so both panes share the same bottom edge; inner regions scroll.
-     The offset clears the topbar + page-head + selected-filing header so the composer stays in view. */
-  height: calc(100vh - 440px);
-  min-height: 420px;
+  /* Fills the chat modal panel; both panes share the same bottom edge, inner regions scroll. */
+  flex: 1;
+  min-height: 0;
 }
 
 /* Left pane (Filing Figures): titlebar / list (scrolls). Keeps its bottom aligned with the chat. */
@@ -1860,15 +1914,25 @@ a {
 }
 
 @media (max-width: 680px) {
-  .audit-workbench {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: 0;
+  .audit-modal-backdrop {
+    padding: 12px;
   }
 
-  /* On narrow screens the panes stack and grow naturally instead of sharing a bounded height. */
+  .audit-modal-panel {
+    height: calc(100vh - 24px);
+  }
+
+  /* On narrow screens the panes stack and flow as blocks; the whole workbench scrolls as one
+     column (the desktop grid-rows would collapse the thread and overlap the composer). */
+  .audit-workbench {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
   .audit-pane,
   .audit-conversation {
+    display: block;
     overflow: visible;
   }
 
