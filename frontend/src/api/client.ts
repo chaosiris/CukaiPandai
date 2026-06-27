@@ -632,11 +632,64 @@ export async function getEntity(tin: string): Promise<EntityTaxProfile> {
 }
 
 /** POST /entities/{tin}/obligations — derive the YA2026 obligation calendar. */
+// Mock-mode obligation derivation — mirrors backend core/obligations.py so a CUSTOM company in
+// mock mode gets its OWN calendar (which forms apply + dates from its basis period) instead of
+// falling back to a seeded persona. Weekend-only shift (the FE has no public-holiday data; the
+// seeded personas keep their exact, public-holiday-shifted dates from MOCK_OBLIGATIONS_BY_TIN).
+function _isoDay(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+function _rollWeekend(d: Date): Date {
+  const x = new Date(d.getTime())
+  while (x.getUTCDay() === 0 || x.getUTCDay() === 6) x.setUTCDate(x.getUTCDate() + 1)
+  return x
+}
+function mockDeriveObligations(ssm: SsmProfile): ObligationCalendar {
+  const v = 'YA2026.1'
+  const start = new Date(`${ssm.basis_period_start}T00:00:00Z`)
+  const end = new Date(`${ssm.basis_period_end}T00:00:00Z`)
+  const now = Date.now()
+  const obs: Obligation[] = []
+  const add = (form: string, obligation_type: string, rule_id: string, due: Date, shift = true) => {
+    const d = shift ? _rollWeekend(due) : due
+    obs.push({
+      obligation_type,
+      form,
+      due_date: _isoDay(d),
+      rule_id,
+      config_version: v,
+      status: d.getTime() < now ? 'overdue' : 'pending'
+    })
+  }
+  // Form C: last day of the 7th month after the financial year-end.
+  add(
+    'C',
+    'income_tax',
+    'oblig.income_tax.formc',
+    new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 7 + 1, 0))
+  )
+  // CP204: commencement + 3m if commencement falls within the basis year, else basis_start - 30 days.
+  let cp204 = new Date(start.getTime())
+  cp204.setUTCDate(cp204.getUTCDate() - 30)
+  if (ssm.commencement_date) {
+    const comm = new Date(`${ssm.commencement_date}T00:00:00Z`)
+    const plus12 = new Date(Date.UTC(start.getUTCFullYear() + 1, start.getUTCMonth(), start.getUTCDate()))
+    if (comm >= start && comm <= plus12) {
+      cp204 = new Date(Date.UTC(comm.getUTCFullYear(), comm.getUTCMonth() + 3, comm.getUTCDate()))
+    }
+  }
+  add('CP204', 'income_tax', 'oblig.income_tax.cp204', cp204)
+  if (ssm.gross_income >= 1_000_000) add('MyInvois', 'einvoice', 'oblig.einvoice.phase', start, false) // mandate, not shifted
+  if (ssm.sst_registered) add('SST-02', 'sst', 'oblig.sst.return', end)
+  if (ssm.employee_count > 0) add('CP39', 'employer_mtd', 'oblig.employer.mtd', start)
+  return { entity_tin: ssm.tin, obligations: obs }
+}
+
 export async function getObligations(tin: string, ssm: SsmProfile): Promise<ObligationCalendar> {
   if (MOCK_MODE) {
-    // For the Custom persona (context tin='CUSTOM'), resolve via the real SSM TIN.
+    // Seeded personas use their exact baked calendar; a custom company derives its own from the SSM.
     const lookupTin = tin === 'CUSTOM' ? ssm.tin : tin
-    return MOCK_OBLIGATIONS_BY_TIN[lookupTin] ?? MOCK_OBLIGATIONS
+    return MOCK_OBLIGATIONS_BY_TIN[lookupTin] ?? mockDeriveObligations(ssm)
   }
   // Use the real SSM TIN in the URL path (not the 'CUSTOM' context key).
   const apiTin = tin === 'CUSTOM' ? ssm.tin : tin

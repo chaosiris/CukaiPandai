@@ -293,7 +293,8 @@ export default function ObligationRadar() {
       sst_registered: entity.sst_registered,
       basis_period_start: entity.basis_period_start,
       basis_period_end: entity.basis_period_end,
-      commencement_date: entity.commencement_date
+      commencement_date: entity.commencement_date,
+      state: entity.state
     })
       .then(setData)
       .catch((e: Error) => setError(e.message))

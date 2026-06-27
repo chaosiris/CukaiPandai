@@ -28,7 +28,9 @@ export const EMPTY_CUSTOM_SSM: SsmProfile = {
 
 /** Returns true when the entity has no valid TIN (blank or malformed). */
 export function isEntityIncomplete(ssm: SsmProfile): boolean {
-  return !/^[A-Z][0-9]{10}$/.test(ssm.tin)
+  // Matches the LHDN TIN format used by lib/tin.ts (prefix + 8-12 digits), so 2-letter prefixes
+  // (PT/IG/etc.) load their obligations instead of being treated as an empty placeholder.
+  return !/^[A-Z]{1,2}[0-9]{8,12}$/.test(ssm.tin)
 }
 
 export const PERSONAS: Persona[] = [
@@ -54,7 +56,8 @@ Depreciation  120000`
       sst_registered: false,
       basis_period_start: '2025-01-01',
       basis_period_end: '2025-12-31',
-      commencement_date: '2022-04-01'
+      commencement_date: '2022-04-01',
+      state: 'KUL'
     },
     demoRawText: `Revenue  380000
 Salaries and wages  120000
@@ -74,7 +77,8 @@ Depreciation  12000`
       sst_registered: true,
       basis_period_start: '2024-04-01',
       basis_period_end: '2025-03-31',
-      commencement_date: '2019-09-01'
+      commencement_date: '2019-09-01',
+      state: 'PNG'
     },
     demoRawText: `Revenue  2500000
 Salaries and wages  900000
