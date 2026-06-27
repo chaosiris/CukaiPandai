@@ -1930,3 +1930,31 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - Edge screenshots + programmatic check: **zero horizontal overflow** at 375px and 1440px across the filing computation/line-items, citations, Obligation Calendar (12-month grid + filing rows), and Dashboard (mock-data populated).
 - `frontend`: `tsc -b` 0 errors · `vite build` green (84 modules) · `biome lint` 0 violations.
 - Diff audited by subagent → GO (one parity gap closed: AuditAssistant figure-row amount).
+
+## [27/06/26] — PR-G1: Loading skeletons + tooltip overflow fix + full-bleed dividers `[FE]`
+
+**Branch:** `feat/loading-skeletons`
+
+### 1. Loading skeleton screens
+
+- New primitive: `frontend/src/components/Skeleton.tsx` — `Skeleton` (rect block), `SkeletonText` (n-line stack), `SkeletonCard` (window card with titlebar + body).
+- New CSS: `.skeleton` shimmer rule in `frontend/src/styles/tokens.css` — sweeping `background-position` gradient animation using `--screen`/`--grid` tokens. Under `.reduce-motion` and `prefers-reduced-motion: reduce`, animation is suppressed and falls back to a static `--screen` block.
+- Pages updated: `Dashboard.tsx` (Deadlines panel — 4-row grid skeleton), `Analytics.tsx` (5 KPI cards + Overdue + two compact panels), `Entity.tsx` (snapshot card + form card), `ObligationRadar.tsx` (calendar viz + obligations list), `FilingStudio.tsx` (3-row filing list), `AuditAssistant.tsx` (3-row filed returns picker), `FilingNew.tsx` (2-card form skeleton while entity loads).
+- Barber strips used for IN-PROGRESS ACTIONS (classifying, computing, pipeline steps) are untouched per spec.
+
+### 2. Tooltip overflow fix
+
+- Root cause: `Tooltip.tsx` bubble div had no `white-space` or `overflow-wrap` in its inline style. `maxWidth` was applied via `reposition()` correctly, but without `whiteSpace: 'normal'` and `overflowWrap: 'anywhere'`, the browser treated content as a single unbreakable run, so `max-width` never actually constrained the rendered width.
+- Fix: added `whiteSpace: 'normal'` + `overflowWrap: 'anywhere'` to the bubble div's inline style in `frontend/src/components/Tooltip.tsx`. Global (every InfoTip/Tooltip consumer). API unchanged.
+
+### 3. Full-bleed row dividers
+
+- Root cause: `.requirement-row + .requirement-row { box-shadow: inset 0 1px 0 var(--ink) }` — `box-shadow` can be clipped by the parent `.window`'s `border-radius: 3px` (browsers may apply implicit overflow clipping at border-radius boundaries), producing a left-edge gap while the right edge renders correctly.
+- Fix: replaced `box-shadow: inset 0 1px 0 var(--ink)` with `border-top: 1px solid var(--ink)` on `.requirement-row + .requirement-row`, which draws the divider at the element's border-box edge — guaranteed edge-to-edge. Added `overflow: hidden` to `.req-list` to contain any rendering artifacts. Last row has no `border-bottom`, so no collision with the `.window` bottom border.
+- Scope: only `.req-list` / `.requirement-row` in `frontend/src/styles/tokens.css`. Does not touch `.row-list`/`.row-div-list` (already correct). No regress on obligation rows, analytics rows, or filing-record rows.
+
+### Verify
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: green (85 modules, 0 errors)
+- `bunx biome check frontend/src`: 0 errors

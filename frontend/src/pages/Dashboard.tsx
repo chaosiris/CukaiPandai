@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
+import { Skeleton, SkeletonText } from '../components/Skeleton'
 import { isEntityIncomplete } from '../personas'
 
 function greeting(): string {
@@ -210,11 +211,17 @@ function DeadlinesPanel({
       </div>
 
       {loading && (
-        <div style={{ padding: '16px 18px' }}>
-          <div className="barber" style={{ marginTop: 0 }} />
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)', marginTop: 10 }}>
-            Loading obligations…
-          </p>
+        <div style={{ padding: '12px 18px', display: 'grid', gap: 10 }} aria-label="Loading upcoming deadlines">
+          {[80, 65, 75, 55].map((w) => (
+            <div
+              key={w}
+              style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 12, alignItems: 'center' }}
+            >
+              <Skeleton height={26} width={80} />
+              <SkeletonText lines={1} />
+              <Skeleton height={14} width={60} />
+            </div>
+          ))}
         </div>
       )}
 
@@ -237,11 +244,7 @@ function DeadlinesPanel({
             const urgent = !overdue && isUrgent(ob.due_date)
 
             return (
-              <li
-                key={ob.rule_id}
-                className="requirement-row"
-                style={{ borderBottom: 'var(--border)', padding: '12px 18px' }}
-              >
+              <li key={ob.rule_id} className="requirement-row" style={{ padding: '12px 18px' }}>
                 <div
                   style={{
                     display: 'grid',

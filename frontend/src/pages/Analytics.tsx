@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
+import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import { InfoTip } from '../components/Tooltip'
 import { isEntityIncomplete } from '../personas'
 
@@ -432,15 +433,30 @@ export default function Analytics() {
         </div>
       </header>
 
-      {/* Loading state */}
+      {/* Loading skeleton: 5 KPI cards + Overdue Exposure + two compact panels */}
       {loading && (
-        <div className="window loading-window">
-          <div className="titlebar">
-            <span className="closebox" aria-hidden="true" />
-            <span className="titlebar-title">Loading obligations...</span>
+        <div aria-label="Loading analytics">
+          {/* 5 KPI card skeletons */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(148px, 1fr))',
+              gap: 14,
+              marginBottom: 24
+            }}
+          >
+            {[1, 2, 3, 4, 5].map((n) => (
+              <SkeletonCard key={n} titleWidth="60%" bodyHeight={36} />
+            ))}
           </div>
-          <div className="loading-body">
-            <div className="barber" style={{ marginTop: 0 }} />
+          {/* Overdue Exposure panel skeleton */}
+          <div style={{ marginBottom: 20 }}>
+            <SkeletonCard titleWidth="45%" bodyHeight={80} />
+          </div>
+          {/* Status Breakdown + By Form Type skeleton */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 20 }}>
+            <SkeletonCard titleWidth="50%" bodyLines={3} />
+            <SkeletonCard titleWidth="40%" bodyLines={3} />
           </div>
         </div>
       )}

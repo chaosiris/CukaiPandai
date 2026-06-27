@@ -115,7 +115,9 @@ export function Tooltip({ trigger, content, className }: TooltipProps) {
             fontSize: 11,
             lineHeight: 1.5,
             color: 'var(--ink-soft)',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere'
           }}
         >
           {content}

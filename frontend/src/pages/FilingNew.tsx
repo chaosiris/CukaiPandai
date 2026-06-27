@@ -30,6 +30,7 @@ import {
   type StageStatus,
   TechnicalDetailsDisclosure
 } from '../components/FilingPipeline'
+import { SkeletonCard } from '../components/Skeleton'
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { CATEGORY_LABEL, TAX_GROUPS, accountByCode, accountsInGroup } from '../lib/taxAccounts'
@@ -478,6 +479,14 @@ export default function FilingNew() {
             <span className="titlebar-title">Error</span>
           </div>
           <div className="error-body">{displayError}</div>
+        </div>
+      )}
+
+      {/* Skeleton while entity profile loads */}
+      {entityLoading && (
+        <div style={{ display: 'grid', gap: 16, marginTop: 16 }} aria-label="Loading filing form">
+          <SkeletonCard titleWidth="50%" bodyLines={3} />
+          <SkeletonCard titleWidth="40%" bodyLines={4} />
         </div>
       )}
 
