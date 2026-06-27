@@ -583,8 +583,7 @@ export default function FilingNew() {
       <div className="page-head">
         <h1>New Filing</h1>
         <p className="page-kicker">
-          Add your line items, then compute a cited Form C with the deterministic core. Form C · YA2026 ·{' '}
-          {entity?.tin ?? '...'}
+          Add your line items, then compute a cited Form C automatically. Form C · YA2026 · {entity?.tin ?? '...'}
         </p>
       </div>
 
