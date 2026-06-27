@@ -1680,3 +1680,41 @@ Fix: added a `.lp-how-mobile` layout (hidden on desktop, shown at <=900px) that 
 - `bun run build` -- **green** (83 modules, 2.26s)
 - `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
 - Font file confirmed present at `frontend/public/fonts/talina.otf` (9 KB).
+
+---
+
+## [27/06/26] -- PR-E: post-#27 fixes `[FE]`
+
+**Branch:** `feat/pr27-fixes`. Five targeted follow-up fixes discovered after merging PR #27.
+
+### Fix 1 -- Row-divider left edge (GLOBAL)
+
+Changed `.row-list > * + *` and `.row-div-list > * + *` and `.requirement-row + .requirement-row` in `frontend/src/styles/tokens.css` from `border-top: var(--border)` to `box-shadow: inset 0 1px 0 var(--ink)`. The `inset` box-shadow spans the full element width regardless of border-radius or child padding, making dividers truly symmetric on both left and right edges. Added `border-bottom: none` guards on last children. Affects all consumers: Filing records, Classified Line Items, Analytics rows, ComputationPanel req-list bands, Audit picker/figure rows.
+
+### Fix 2 -- PENDING draft resume (functional)
+
+In `frontend/src/pages/FilingNew.tsx`, the `resumeId` effect now rehydrates `classifyResult`, `lineItems`, and sets `phase` to `{ tag: 'classified' }` when the fetched draft has `line_items`. Previously only `rawText` and `draftId` were restored, forcing a re-classify. Now opening a PENDING draft from `/filing` lands the user on the "classified, ready to compute" stage. The mock `createDraftFiling` already stores `line_items` and `raw_text`, so the full round-trip is demoable with `VITE_API_MOCK=1`.
+
+### Fix 3 -- /filing/[id] provenance into tooltip
+
+In `frontend/src/pages/FilingRecord.tsx`, removed the standalone "[i] How this was calculated..." info `.window` card. Passed the same provenance text as `headingTip` into `ComputationPanel` (the prop was already implemented in PR #27). The info now appears as an `InfoTip` on the "Tax Computation" heading.
+
+### Fix 4 -- /analytics bottom CTA cleanup
+
+In `frontend/src/pages/Analytics.tsx`, removed the bottom `borderTop` divider div and the two cross-link CTAs ("Open Obligation Calendar" and "Start Form C Filing"). The `Link` import was retained (still used in the entity-setup empty state).
+
+### Fix 5 -- Solid-background sweep (GLOBAL polish)
+
+Replaced `background: 'transparent'` with `background: 'var(--window)'` on bordered buttons/links that sit directly over the `.page-scroll` grid background:
+
+- `frontend/src/pages/FilingNew.tsx`: "Edit Trial Balance" secondary button.
+- `frontend/src/pages/FilingRecord.tsx`: "Back to Filing Records" (not-found card) and "All Filings" (bottom nav) links.
+- `frontend/src/pages/FilingStudio.tsx`: "Delete Selected" destructive toolbar button.
+- `frontend/src/pages/CustomCompany.tsx`: "Back" secondary button in the company form.
+  Elements inside `.window` (dialog, popovers, nav drawer, audit workbench) were left untouched. Intentional transparent elements (`.dash-cta-ghost` on denim hero, borderless text-link skip buttons) were not modified.
+
+### Verify results
+
+- `cd frontend && bunx tsc --noEmit` -- **0 errors**
+- `bun run build` -- **green** (83 modules, 2.05s)
+- `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)

@@ -459,7 +459,7 @@ export default function CustomCompany() {
               padding: '10px 16px',
               border: 'var(--border)',
               borderRadius: 'var(--radius)',
-              background: 'transparent',
+              background: 'var(--window)',
               color: 'var(--ink-soft)',
               fontFamily: 'var(--font-mono)',
               fontSize: 12,

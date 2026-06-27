@@ -228,7 +228,7 @@ export default function FilingStudio() {
               style={{
                 padding: '5px 14px',
                 border: '1px solid var(--rust)',
-                background: 'transparent',
+                background: 'var(--window)',
                 color: deleting ? 'var(--ink-soft)' : 'var(--rust)',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 11,

@@ -144,7 +144,7 @@ export default function FilingRecordPage() {
                 display: 'inline-block',
                 padding: '8px 18px',
                 border: 'var(--border)',
-                background: 'transparent',
+                background: 'var(--window)',
                 color: 'var(--ink)',
                 fontFamily: 'var(--font-mono)',
                 fontSize: 12,
@@ -208,33 +208,14 @@ export default function FilingRecordPage() {
         </Link>
       </div>
 
-      {/* Headline: tax payable card on top */}
-      {record.computation && <ComputationPanel computation={record.computation} title="Tax Computation" />}
-
-      {/* Provenance note */}
-      <div
-        className="window"
-        style={{
-          marginTop: 12,
-          padding: '14px 18px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 10,
-          background: 'var(--screen)'
-        }}
-      >
-        <span
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--denim)', flexShrink: 0, marginTop: 1 }}
-        >
-          [i]
-        </span>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)', lineHeight: 1.6 }}>
-          <strong>How this was calculated:</strong> The tax figure above was computed by the{' '}
-          <strong>deterministic, rule-based core</strong> -- not the AI. The AI only classified your trial-balance line
-          items. Every figure traces to a specific rule ID and config version. Expand "Show technical details" below to
-          see the full per-figure trace.
-        </div>
-      </div>
+      {/* Headline: tax payable card on top -- provenance in heading InfoTip (PR-E fix 3) */}
+      {record.computation && (
+        <ComputationPanel
+          computation={record.computation}
+          title="Tax Computation"
+          headingTip="The tax figure above was computed by the deterministic, rule-based core -- not the AI. The AI only classified your trial-balance line items. Every figure traces to a specific rule ID and config version. Expand Show technical details below to see the full per-figure trace."
+        />
+      )}
 
       {/* Risk flags */}
       {record.risk_flags && record.risk_flags.length > 0 && (
@@ -281,7 +262,7 @@ export default function FilingRecordPage() {
             display: 'inline-block',
             padding: '8px 18px',
             border: 'var(--border)',
-            background: 'transparent',
+            background: 'var(--window)',
             color: 'var(--ink)',
             fontFamily: 'var(--font-mono)',
             fontSize: 12,
