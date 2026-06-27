@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useActivePersona } from '../PersonaContext'
 import { type SsmProfile, putMyEntity } from '../api/client'
+import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { MY_STATES } from '../lib/states'
@@ -163,9 +164,36 @@ export default function Entity() {
         <header className="page-head">
           <div>
             <h1>Entity</h1>
-            <div className="page-kicker">Loading company profile…</div>
+            <div className="page-kicker">Your active company profile.</div>
           </div>
         </header>
+        {/* Skeleton: snapshot card + form fields card */}
+        <div aria-label="Loading company profile" style={{ display: 'grid', gap: 16 }}>
+          {/* Snapshot card */}
+          <div className="window">
+            <div className="titlebar">
+              <span className="closebox" />
+              <Skeleton height={14} width="35%" />
+            </div>
+            <div
+              style={{
+                padding: '16px 18px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: 12
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} style={{ display: 'grid', gap: 4 }}>
+                  <Skeleton height={10} width="40%" />
+                  <Skeleton height={18} width="80%" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Form card */}
+          <SkeletonCard titleWidth="45%" bodyLines={5} />
+        </div>
       </>
     )
   }

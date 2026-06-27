@@ -854,6 +854,9 @@ a {
 
 .req-list {
   display: grid;
+  /* overflow: hidden ensures border-top on rows reaches both card edges without
+     sub-pixel gaps caused by border-radius clipping on the parent .window */
+  overflow: hidden;
 }
 
 .requirement-row {
@@ -862,8 +865,11 @@ a {
   padding: 15px 18px 17px;
 }
 
+/* Full-bleed divider: border-top on the row element (which fills the req-list
+   width edge-to-edge) is guaranteed to span both card edges. The last row
+   emits no border-bottom so there is no double-line with the .window outline. */
 .requirement-row + .requirement-row {
-  box-shadow: inset 0 1px 0 var(--ink);
+  border-top: 1px solid var(--ink);
 }
 
 .requirement-topline {
@@ -1852,5 +1858,45 @@ a {
      so keep it moving even under reduced motion (re-asserted to beat the global * rule above). */
   .barber {
     animation: barber-pole 650ms steps(4, end) infinite !important;
+  }
+}
+
+/* ── Skeleton shimmer (loading placeholder screens) ─────────────────────── */
+/* Shimmer sweeps right using a 200%-wide background gradient animated on    */
+/* background-position. Uses --screen / --grid tokens (neutral in both       */
+/* light and dark themes). The animation conveys "loading in progress" so    */
+/* it is NOT suppressed by .reduce-motion; instead it freezes to a static    */
+/* muted block (matching .barber's special-case pattern above).              */
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  display: block;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--screen) 25%, var(--grid) 50%, var(--screen) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Under reduced motion: freeze to a static muted block (same visual weight, no motion). */
+.reduce-motion .skeleton,
+.reduce-motion .skeleton * {
+  animation: none !important;
+  background: var(--screen) !important;
+  background-image: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--screen);
+    background-image: none;
   }
 }

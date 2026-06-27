@@ -19,6 +19,7 @@ import {
   listFilings
 } from '../api/client'
 import { SovereignBadge, VerifiedBadge } from '../components/CitationPanel'
+import { Skeleton } from '../components/Skeleton'
 import { InfoTip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { useNotifications } from '../notifications'
@@ -597,20 +598,30 @@ export default function AuditAssistant() {
       {!selectedFiling && (
         <>
           {filingsLoading && (
-            <div className="window">
+            <div className="window" aria-label="Loading filed returns">
               <div className="titlebar">
                 <span className="titlebar-title">Your Filed Returns</span>
-                <div className="barber" style={{ width: 80, height: 4, flexShrink: 0 }} />
               </div>
-              <div
-                style={{
-                  padding: '24px 18px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  color: 'var(--ink-soft)'
-                }}
-              >
-                Loading filings...
+              <div className="row-div-list">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto',
+                      gap: 14,
+                      alignItems: 'center',
+                      padding: '14px 18px'
+                    }}
+                  >
+                    <div style={{ display: 'grid', gap: 5 }}>
+                      <Skeleton height={13} width="50%" />
+                      <Skeleton height={11} width="30%" />
+                    </div>
+                    <Skeleton height={18} width={80} />
+                    <Skeleton height={22} width={60} />
+                  </div>
+                ))}
               </div>
             </div>
           )}

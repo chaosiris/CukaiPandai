@@ -67,8 +67,8 @@
 
 /* In dark mode the hero panel flips to light periwinkle (--denim #93a7d6), so the mustard accent
    washes out. Use a deep caramel/amber for legible (AA-large) contrast on the light panel. */
-[data-theme='dark'] .auth-hero-line em,
-[data-theme='dark'] .auth-script {
+[data-theme="dark"] .auth-hero-line em,
+[data-theme="dark"] .auth-script {
   color: #6b4410;
 }
 
@@ -149,7 +149,7 @@
 
 .auth-or::before,
 .auth-or::after {
-  content: '';
+  content: "";
   flex: 1;
   border-top: 1px solid var(--ink);
   opacity: 0.15;

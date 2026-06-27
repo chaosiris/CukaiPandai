@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { type Obligation, type ObligationCalendar, getObligations } from '../api/client'
+import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import { InfoTip, Tooltip } from '../components/Tooltip'
 import { useEntity } from '../hooks/useEntity'
 import { isEntityIncomplete } from '../personas'
@@ -370,12 +371,27 @@ export default function ObligationRadar() {
       )}
 
       {(entityLoading || (!data && !displayError)) && !displayError && (
-        <div className="window loading-window">
-          <div className="titlebar">
-            <span className="titlebar-title">Loading Obligations...</span>
-          </div>
-          <div className="loading-body">
-            <div className="barber" />
+        <div aria-label="Loading obligations" style={{ display: 'grid', gap: 16 }}>
+          {/* Calendar viz skeleton */}
+          <SkeletonCard titleWidth="40%" bodyHeight={120} />
+          {/* Filing obligations list skeleton */}
+          <div className="window">
+            <div className="titlebar">
+              <span className="closebox" />
+              <Skeleton height={14} width="35%" />
+            </div>
+            <div style={{ padding: '12px 18px', display: 'grid', gap: 10 }}>
+              {[1, 2, 3, 4].map((n) => (
+                <div
+                  key={n}
+                  style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 12, alignItems: 'center' }}
+                >
+                  <Skeleton height={26} width={80} />
+                  <Skeleton height={14} />
+                  <Skeleton height={14} width={60} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -395,8 +411,17 @@ export default function ObligationRadar() {
             </div>
 
             {!data && !displayError && (
-              <div style={{ padding: '16px 18px' }}>
-                <div className="barber" style={{ marginTop: 0 }} />
+              <div style={{ padding: '12px 18px', display: 'grid', gap: 10 }} aria-hidden="true">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    style={{ display: 'grid', gridTemplateColumns: '80px 1fr auto', gap: 12, alignItems: 'center' }}
+                  >
+                    <Skeleton height={26} width={80} />
+                    <Skeleton height={14} />
+                    <Skeleton height={14} width={60} />
+                  </div>
+                ))}
               </div>
             )}
 
@@ -407,11 +432,7 @@ export default function ObligationRadar() {
                   const isUrgent = !overdue && daysUntil(ob.due_date) <= 30
 
                   return (
-                    <li
-                      key={ob.rule_id}
-                      className="requirement-row"
-                      style={{ borderBottom: 'var(--border)', padding: '12px 18px' }}
-                    >
+                    <li key={ob.rule_id} className="requirement-row" style={{ padding: '12px 18px' }}>
                       <div
                         style={{
                           display: 'grid',
