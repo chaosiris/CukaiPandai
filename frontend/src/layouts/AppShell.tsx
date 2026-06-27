@@ -555,7 +555,7 @@ export function AppShell() {
             <span className="footer-wordmark">CukaiPandai</span>
           </div>
           <nav className="footer-links" aria-label="CukaiPandai footer">
-            <a href="https://github.com/AlaskanTuna/CukaiPandai" target="_blank" rel="noreferrer">
+            <a href="https://github.com/chaosiris/CukaiPandai" target="_blank" rel="noreferrer">
               GitHub
             </a>
           </nav>
