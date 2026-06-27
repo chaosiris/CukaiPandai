@@ -241,7 +241,7 @@ function DeadlinesPanel({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '80px 1fr auto auto',
+                    gridTemplateColumns: '80px minmax(0, 1fr) auto auto',
                     alignItems: 'center',
                     gap: 12
                   }}
@@ -264,8 +264,16 @@ function DeadlinesPanel({
                     {ob.form}
                   </span>
 
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--ink)',
+                        overflowWrap: 'anywhere'
+                      }}
+                    >
                       {ob.obligation_type.replace(/_/g, ' ')}
                     </div>
                   </div>

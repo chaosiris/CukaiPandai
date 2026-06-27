@@ -368,6 +368,8 @@ a {
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 11px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .popover-title {
@@ -646,6 +648,7 @@ a {
   font-weight: 500;
   line-height: 0.94;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .page-kicker {
@@ -654,6 +657,7 @@ a {
   font-size: 12px;
   color: var(--ink-soft);
   text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .proof-grid {
@@ -864,9 +868,28 @@ a {
 
 .requirement-topline {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(110px, 190px) 62px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 200px) minmax(0, 150px);
   align-items: center;
   gap: 14px;
+}
+
+/* Grid items must be allowed to shrink below their content size, and long
+   unbreakable values (large RM figures, rule codes like IGNORE_INSTRUCTIONS_001)
+   must wrap inside their cell rather than forcing the row past the viewport. */
+.requirement-topline > * {
+  min-width: 0;
+}
+
+.requirement-topline > span {
+  overflow-wrap: anywhere;
+}
+
+/* Mono trace/detail disclosures: long rule_id / config_version / input slugs
+   and joined clause/URL lists must wrap inside the card, not widen it. */
+.trace-detail,
+.trace-detail * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .requirement-label {
@@ -884,12 +907,16 @@ a {
 }
 
 .kind-tag {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 140px;
+  overflow: hidden;
   padding: 1px 5px;
   border: 1px solid var(--ink);
   font-size: 9px;
   line-height: 1.4;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .kind-tag.must {
@@ -1052,16 +1079,19 @@ a {
   font-family: var(--font-display);
   font-size: clamp(32px, 5vw, 54px);
   line-height: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .empty-hello {
   display: block;
-  width: max-content;
+  max-width: 100%;
   margin-bottom: 8px;
   color: var(--denim);
   font-family: var(--font-script);
   font-size: clamp(48px, 7vw, 76px);
   line-height: 0.85;
+  overflow-wrap: anywhere;
   transform: rotate(-4deg);
 }
 
@@ -1345,6 +1375,7 @@ a {
   font-size: 11px;
   color: var(--ink-soft);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 @keyframes toast-in {
@@ -1477,9 +1508,11 @@ a {
 
 .dash-hero-form {
   font-family: var(--font-display);
-  font-size: clamp(36px, 5vw, 58px);
+  font-size: clamp(30px, 5vw, 58px);
   font-weight: 600;
   line-height: 0.95;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dash-hero-type {

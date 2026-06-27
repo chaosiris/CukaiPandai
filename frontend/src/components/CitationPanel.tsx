@@ -29,7 +29,11 @@ export function SovereignBadge({ sovereign, model }: { sovereign: boolean; model
         color: sovereign ? 'var(--denim)' : 'var(--ink-soft)',
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        minWidth: 0,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis'
       }}
     >
       {label}
@@ -52,7 +56,8 @@ export function CitationPanel({ citation }: CitationPanelProps) {
           fontSize: 11,
           color: 'var(--ink-soft)',
           paddingTop: 4,
-          paddingLeft: 10
+          paddingLeft: 10,
+          overflowWrap: 'anywhere'
         }}
       >
         {citation.clause_ids.join(', ')}
@@ -71,6 +76,7 @@ export function CitationPanel({ citation }: CitationPanelProps) {
             Source detail
           </summary>
           <div
+            className="trace-detail"
             style={{
               paddingTop: 8,
               paddingLeft: 12,

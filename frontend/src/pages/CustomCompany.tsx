@@ -387,7 +387,7 @@ export default function CustomCompany() {
             </span>
           </div>
           <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
               <Field label="Start Date" error={visibleErrors.basis_period_start}>
                 <input
                   type="date"

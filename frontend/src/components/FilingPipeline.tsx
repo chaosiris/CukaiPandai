@@ -191,6 +191,7 @@ export function FigureTraceRow({
           Trace detail
         </summary>
         <div
+          className="trace-detail"
           style={{
             paddingTop: 8,
             paddingLeft: 12,
@@ -265,11 +266,13 @@ export function ComputationPanel({
           <div
             style={{
               fontFamily: 'var(--font-mono)',
-              fontSize: 96,
+              fontSize: 'clamp(2.25rem, 12vw, 96px)',
               fontWeight: 700,
-              lineHeight: 1,
+              lineHeight: 1.05,
               color: 'var(--ink)',
-              letterSpacing: '-0.02em'
+              letterSpacing: '-0.02em',
+              maxWidth: '100%',
+              overflowWrap: 'anywhere'
             }}
           >
             RM {heroEntry[1].value.toLocaleString('en-MY')}
@@ -429,6 +432,7 @@ export function TechnicalDetailsDisclosure({
         Show technical details
       </summary>
       <div
+        className="trace-detail"
         style={{
           padding: '16px 18px',
           display: 'grid',

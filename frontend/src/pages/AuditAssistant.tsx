@@ -231,12 +231,16 @@ function CitationChip({ citation }: { citation: Citation }) {
         maxWidth: '100%'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
         <VerifiedBadge verified={citation.verified} />
-        <span style={{ color: 'var(--ink)', lineHeight: 1.4 }}>{citation.claim}</span>
+        <span style={{ color: 'var(--ink)', lineHeight: 1.4, minWidth: 0, overflowWrap: 'anywhere' }}>
+          {citation.claim}
+        </span>
       </div>
       {citation.clause_ids.length > 0 && (
-        <div style={{ color: 'var(--ink-soft)', paddingLeft: 2 }}>{citation.clause_ids.join(', ')}</div>
+        <div style={{ color: 'var(--ink-soft)', paddingLeft: 2, overflowWrap: 'anywhere' }}>
+          {citation.clause_ids.join(', ')}
+        </div>
       )}
       {hasDetail && (
         <button
@@ -257,7 +261,7 @@ function CitationChip({ citation }: { citation: Citation }) {
         </button>
       )}
       {expanded && (
-        <div style={{ paddingLeft: 4, display: 'grid', gap: 3, color: 'var(--ink-soft)' }}>
+        <div className="trace-detail" style={{ paddingLeft: 4, display: 'grid', gap: 3, color: 'var(--ink-soft)' }}>
           {citation.section && (
             <div>
               <strong style={{ color: 'var(--ink)' }}>Section:</strong> {citation.section}
@@ -653,7 +657,7 @@ export default function AuditAssistant() {
                       key={rec.id}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr auto',
+                        gridTemplateColumns: 'minmax(0, 1fr) auto',
                         alignItems: 'center',
                         gap: 16,
                         padding: '14px 18px'
@@ -744,7 +748,7 @@ export default function AuditAssistant() {
             style={{
               marginBottom: 16,
               display: 'grid',
-              gridTemplateColumns: '1fr auto',
+              gridTemplateColumns: 'minmax(0, 1fr) auto',
               alignItems: 'center',
               gap: 12,
               padding: '14px 18px'
@@ -819,7 +823,7 @@ export default function AuditAssistant() {
                       style={{
                         width: '100%',
                         display: 'grid',
-                        gridTemplateColumns: '1fr auto',
+                        gridTemplateColumns: 'minmax(0, 1fr) auto',
                         alignItems: 'center',
                         gap: 8,
                         padding: '12px 18px',
@@ -830,7 +834,7 @@ export default function AuditAssistant() {
                         opacity: chatLoading ? 0.6 : 1
                       }}
                     >
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div
                           style={{
                             fontFamily: 'var(--font-body)',
@@ -841,7 +845,14 @@ export default function AuditAssistant() {
                         >
                           {row.label}
                         </div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            color: 'var(--ink-soft)',
+                            overflowWrap: 'anywhere'
+                          }}
+                        >
                           {row.amount}
                         </div>
                       </div>

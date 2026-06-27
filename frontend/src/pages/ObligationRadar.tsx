@@ -131,7 +131,7 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(12, 1fr)',
+              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
               gap: 4
             }}
           >
@@ -153,6 +153,7 @@ function ObligationCalendarViz({ obligations }: { obligations: Obligation[] }) {
                     alignItems: 'center',
                     gap: 4,
                     padding: '6px 2px',
+                    minWidth: 0,
                     borderTop: isActive ? `2px solid ${accentColor}` : '2px solid transparent',
                     background: isActive ? 'var(--screen)' : undefined,
                     borderRadius: 2
@@ -414,7 +415,7 @@ export default function ObligationRadar() {
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: '72px 1fr auto auto',
+                          gridTemplateColumns: '72px minmax(0, 1fr) auto auto',
                           alignItems: 'center',
                           gap: 12
                         }}
@@ -439,13 +440,14 @@ export default function ObligationRadar() {
                         </span>
 
                         {/* Type + rule */}
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                           <div
                             style={{
                               fontFamily: 'var(--font-body)',
                               fontSize: 13,
                               fontWeight: 600,
-                              color: 'var(--ink)'
+                              color: 'var(--ink)',
+                              overflowWrap: 'anywhere'
                             }}
                           >
                             {ob.obligation_type.replace(/_/g, ' ')}

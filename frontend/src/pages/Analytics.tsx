@@ -53,10 +53,11 @@ function KpiCard({ label, value, sub, alert, tip }: KpiCardProps) {
       <div
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 32,
+          fontSize: 'clamp(22px, 6vw, 32px)',
           fontWeight: 600,
           lineHeight: 1,
-          color: alert ? 'var(--rust)' : 'var(--ink)'
+          color: alert ? 'var(--rust)' : 'var(--ink)',
+          overflowWrap: 'anywhere'
         }}
       >
         {value}

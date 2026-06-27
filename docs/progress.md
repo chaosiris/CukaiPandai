@@ -1878,3 +1878,29 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 ### Verify results
 - `backend`: `python -m pytest -q` → **257 passed** (+11).
 - `frontend`: `tsc --noEmit` 0 errors · `vite build` green · `biome check` clean.
+
+## [27/06/26] — Mobile + filing UI overflow sweep `[FE]`
+
+**Why:** screenshots showed the filing page's RM tax hero clipping off-screen on mobile and the Classified Line Items table running past the viewport on desktop (long rule codes / extreme RM figures). A deep, viewport-driven UI audit (Edge via playwright-core; programmatic overflow detection at 375px + 1440px, then a 4-lens read-only sweep of every page + the global CSS) confirmed both and surfaced the same root causes elsewhere.
+
+### Root causes (one of three patterns each)
+1. Fixed px font-size on large numbers/headings with no `clamp()` → overflow on narrow screens.
+2. Grid tracks (`1fr` / `Npx` / `repeat(12,1fr)`) without `minmax(0,…)`, so a wide/unbreakable cell (grid items default `min-width:auto`) forces the track past the viewport.
+3. Long unbreakable mono strings (URLs, rule codes, big RM figures, model IDs) with no `overflow-wrap`.
+
+### Fixed (9 files)
+- **FilingPipeline** — hero tax number `clamp(2.25rem,12vw,96px)` + wrap; `.requirement-topline` regrid to `minmax(0,1fr) minmax(0,200px) minmax(0,150px)` + shrinkable/wrapping cells; new `.trace-detail` rule wraps rule_id/config_version/input slugs.
+- **CitationPanel** — citation URL/clause/passage wrap; SovereignBadge truncates long model IDs.
+- **ObligationRadar** — 12-month calendar `repeat(12,minmax(0,1fr))` + `min-width:0` cells; filing-obligation rows `72px minmax(0,1fr) auto auto`.
+- **Dashboard** — deadline rows `80px minmax(0,1fr) auto auto`.
+- **Analytics** — KPI value `clamp(22px,6vw,32px)` + wrap.
+- **Entity / CustomCompany** — basis-period date grids `repeat(2,minmax(0,1fr))`.
+- **AuditAssistant** — three `minmax(0,1fr) auto` rows + CitationChip clause/URL wrap.
+- **tokens.css** — additive `overflow-wrap` guards on `.page-head h1`, `.page-kicker`, `.popover-detail`, `.toast-body`, `.empty-hello`/`.empty-copy`, `.kind-tag`, `.dash-hero-form`.
+
+> Two refuted by the audit (no action): no other 96px-class heroes; `.dash-main-grid`/`.dash-orient`/`.dash-hero-sub` are already responsive-safe. Remaining audit items were `low` (defensive guards on devkit-dead-code classes — left untouched).
+
+### Verify results
+- Edge screenshots + programmatic check: **zero horizontal overflow** at 375px and 1440px across the filing computation/line-items, citations, Obligation Calendar (12-month grid + filing rows), and Dashboard (mock-data populated).
+- `frontend`: `tsc -b` 0 errors · `vite build` green (84 modules) · `biome lint` 0 violations.
+- Diff audited by subagent → GO (one parity gap closed: AuditAssistant figure-row amount).
