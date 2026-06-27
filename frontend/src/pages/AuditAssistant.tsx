@@ -185,9 +185,10 @@ function Chip({
   label: string
   onClick: () => void
   disabled?: boolean
-  variant?: 'default' | 'trust-demo'
+  variant?: 'default' | 'followup' | 'trust-demo'
 }) {
   const isTrust = variant === 'trust-demo'
+  const isFollowup = variant === 'followup'
   return (
     <button
       type="button"
@@ -195,12 +196,12 @@ function Chip({
       disabled={disabled}
       style={{
         padding: '6px 12px',
-        border: isTrust ? '1px solid var(--rust)' : 'var(--border)',
+        border: isTrust ? '1px solid var(--rust)' : isFollowup ? '1px solid var(--mustard)' : 'var(--border)',
         borderRadius: 'var(--radius)',
-        background: isTrust ? 'rgba(181,80,60,0.06)' : 'var(--screen)',
+        background: isTrust ? 'rgba(181,80,60,0.06)' : isFollowup ? 'rgba(224,169,59,0.12)' : 'var(--screen)',
         fontFamily: 'var(--font-mono)',
         fontSize: 11,
-        color: isTrust ? 'var(--rust)' : 'var(--ink)',
+        color: isTrust ? 'var(--rust)' : isFollowup ? 'var(--ink)' : 'var(--ink)',
         cursor: disabled ? 'default' : 'pointer',
         textAlign: 'left',
         opacity: disabled ? 0.6 : 1
@@ -717,6 +718,26 @@ export default function AuditAssistant() {
       {/* Two-pane workbench (shown once a filing is selected) */}
       {selectedFiling && (
         <>
+          {/* Breadcrumb back-link */}
+          <div style={{ marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={clearFiling}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--ink-soft)',
+                textDecoration: 'none'
+              }}
+            >
+              ← Back to Chat Records
+            </button>
+          </div>
+
           {/* Selected filing header */}
           <div
             className="window"
@@ -840,122 +861,117 @@ export default function AuditAssistant() {
               )}
             </div>
 
-            {/* RIGHT PANE: chips + thread + composer */}
-            <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
-              {/* Chips: suggested questions (empty thread) OR follow-up chips (after reply) */}
-              <div className="window">
-                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="titlebar-title">
-                    {followupChips.length > 0 ? 'Follow-up Questions' : 'Suggested Questions'}
-                  </span>
-                  <InfoTip content="These questions are seeded from your filing's figures. After each Pandai reply, contextual follow-up suggestions appear here." />
-                </div>
-                <div style={{ padding: '12px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {/* Show follow-ups after a reply, otherwise seed questions */}
-                  {(followupChips.length > 0 ? followupChips : suggestedQuestions).map((q) => (
-                    <Chip key={q} label={q} onClick={() => handleChip(q)} disabled={chatLoading} />
-                  ))}
-
-                  {/* Trust Demo chip: always visible */}
-                  <Chip
-                    label="Trust Demo: inject fabricated clause"
-                    onClick={handleTrustDemo}
-                    disabled={chatLoading}
-                    variant="trust-demo"
-                  />
-                </div>
+            {/* RIGHT PANE: single "Conversation" card with thread + chips + composer */}
+            <div className="window" style={{ display: 'grid', gridTemplateRows: 'auto 1fr auto auto', minHeight: 0 }}>
+              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="titlebar-title">Conversation</span>
+                <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are stamped REJECTED." />
               </div>
 
-              {/* Conversation thread */}
-              {(thread.length > 0 || convLoading) && (
-                <div className="window">
-                  <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="titlebar-title">Conversation</span>
-                    <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are stamped REJECTED." />
+              {/* (a) Message thread */}
+              <div style={{ padding: '16px 18px', display: 'grid', gap: 16, alignContent: 'start' }}>
+                {convLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                      Loading conversation...
+                    </span>
                   </div>
-                  <div style={{ padding: '16px 18px', display: 'grid', gap: 16 }}>
-                    {convLoading && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                          Loading conversation...
-                        </span>
-                      </div>
+                )}
+                {thread.map((msg, idx) => (
+                  <div key={`${msg.role}-${idx}`}>
+                    {msg.role === 'user' ? (
+                      <UserBubble text={msg.text} isFabrication={msg.isFabrication} />
+                    ) : (
+                      <AssistantTurn msg={msg} />
                     )}
-                    {thread.map((msg, idx) => (
-                      <div key={`${msg.role}-${idx}`}>
-                        {msg.role === 'user' ? (
-                          <UserBubble text={msg.text} isFabrication={msg.isFabrication} />
-                        ) : (
-                          <AssistantTurn msg={msg} />
-                        )}
-                      </div>
-                    ))}
-                    {chatLoading && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                          Pandai is thinking...
-                        </span>
-                      </div>
-                    )}
-                    <div ref={threadEndRef} />
                   </div>
-                </div>
-              )}
+                ))}
+                {chatLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                      Pandai is thinking...
+                    </span>
+                  </div>
+                )}
+                <div ref={threadEndRef} />
+              </div>
 
-              {/* Free-text composer */}
-              <div className="window">
-                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="titlebar-title">Ask a Question</span>
-                  <InfoTip content="Ask how to justify any figure LHDN might question. Pandai grounds every answer in the law corpus and flags fabricated citations." />
-                </div>
-                <div style={{ padding: '14px 16px', display: 'grid', gap: 10 }}>
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSend()
-                      }
-                    }}
-                    rows={3}
-                    placeholder="e.g. How do I justify the repairs deduction if LHDN questions it?"
+              {/* (b) Chips: suggested questions (empty thread) OR follow-up chips (after reply) */}
+              <div
+                style={{
+                  padding: '10px 16px',
+                  borderTop: 'var(--border)',
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap'
+                }}
+              >
+                {(followupChips.length > 0 ? followupChips : suggestedQuestions).map((q) => (
+                  <Chip
+                    key={q}
+                    label={q}
+                    onClick={() => handleChip(q)}
                     disabled={chatLoading}
+                    variant={followupChips.length > 0 ? 'followup' : 'default'}
+                  />
+                ))}
+                {/* Trust Demo chip: always visible */}
+                <Chip
+                  label="Trust Demo: inject fabricated clause"
+                  onClick={handleTrustDemo}
+                  disabled={chatLoading}
+                  variant="trust-demo"
+                />
+              </div>
+
+              {/* (c) Ask composer */}
+              <div style={{ padding: '12px 16px', borderTop: 'var(--border)', display: 'grid', gap: 10 }}>
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSend()
+                    }
+                  }}
+                  rows={3}
+                  placeholder="e.g. How do I justify the repairs deduction if LHDN questions it?"
+                  disabled={chatLoading}
+                  style={{
+                    width: '100%',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    background: 'var(--screen)',
+                    border: 'var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '10px 12px',
+                    color: 'var(--ink)',
+                    resize: 'vertical',
+                    opacity: chatLoading ? 0.6 : 1
+                  }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={!inputText.trim() || chatLoading}
                     style={{
-                      width: '100%',
+                      padding: '8px 18px',
+                      border: 'none',
+                      borderRadius: 'var(--radius)',
+                      background: !inputText.trim() || chatLoading ? 'var(--grid)' : 'var(--denim)',
+                      color: 'var(--paper)',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 12,
-                      background: 'var(--screen)',
-                      border: 'var(--border)',
-                      borderRadius: 'var(--radius)',
-                      padding: '10px 12px',
-                      color: 'var(--ink)',
-                      resize: 'vertical',
-                      opacity: chatLoading ? 0.6 : 1
+                      fontWeight: 700,
+                      cursor: !inputText.trim() || chatLoading ? 'default' : 'pointer'
                     }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={handleSend}
-                      disabled={!inputText.trim() || chatLoading}
-                      style={{
-                        padding: '8px 18px',
-                        border: 'none',
-                        borderRadius: 'var(--radius)',
-                        background: !inputText.trim() || chatLoading ? 'var(--grid)' : 'var(--denim)',
-                        color: 'var(--paper)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: !inputText.trim() || chatLoading ? 'default' : 'pointer'
-                      }}
-                    >
-                      {chatLoading ? 'Working...' : 'Send'}
-                    </button>
-                  </div>
+                  >
+                    {chatLoading ? 'Working...' : 'Send'}
+                  </button>
                 </div>
               </div>
             </div>

@@ -1383,3 +1383,60 @@ All five fixes are implemented correctly, surgically, and within scope. All thre
 - **progress.md** entry is accurate and matches the diff.
 
 **Return to PM:** **APPROVE.** All five PR-E fixes are correct, surgical, and in scope, and all three gates pass clean (tsc 0, build 83 modules / 2.09s, biome 0). Fix 1's inset-box-shadow divider genuinely spans both edges (every consumer's row sits in an unpadded list directly inside a no-padding `.window`, so nothing re-insets the line) and keeps full `--ink` weight; Fix 2's resume lands on the classified stage, round-trips `line_items` in mock mode, and upgrades the SAME record on compute (no duplicate) with a graceful idle fallback for empty drafts; Fix 3 moves provenance to an InfoTip on the card title (never an h1) with InfoTip still used elsewhere; Fix 4 drops the divider + both CTAs while keeping the `Link` import for the empty state; Fix 5 fills the five over-grid bordered controls with `--window` (borders kept, contrast holds in both themes) and correctly leaves in-window/text-link transparency alone. No blocking issues — only a post-merge browser smoke test recommended to eyeball the two visual fixes (divider edge-bleed, dark-theme solid buttons).
+
+---
+
+# QA Verdict — PR-F (audit conversation card · back-to-records · wordmark spacing · landing finale removal)
+
+**Date:** 27/06/26 · **Branch:** `feat/audit-layout-polish` (uncommitted vs `main`) · **Reviewer:** QA
+**Scope reviewed:** `git diff main -- frontend/ docs/` — `AuditAssistant.tsx`, `Landing.tsx`, `Landing.css`, `Auth.css`, `tokens.css`, `progress.md`.
+
+## Verdict: **APPROVE**
+
+All four PO follow-ups are implemented correctly, surgically, and in scope. All three gates pass clean. Two items are visual-only and flagged for the post-merge browser smoke test.
+
+### Gate results
+
+- `cd frontend && bunx tsc --noEmit` → **0 errors** (exit 0)
+- `bun run build` → **green** (83 modules; CSS 50.29 kB / JS 360.69 kB)
+- `bunx biome check frontend/src` → **0 errors** (46 files, no fixes applied)
+
+### Change 1 — Conversation card consolidation (`AuditAssistant.tsx`)
+
+- PASS — Right pane is now a single `.window` titled "Conversation" (line 865) with `gridTemplateRows: 'auto 1fr auto auto'`: (a) thread top → (b) chips → (c) composer bottom, chips/composer divided by `borderTop: 'var(--border)'`. The three former stacked cards are gone.
+- PASS — `Chip` variant union extended to `'default' | 'followup' | 'trust-demo'` (line 187). Follow-up chips use `border: 1px solid var(--mustard)` + `background: rgba(224,169,59,0.12)` (lines 199, 201) — distinct from default (`--border`/`--screen`) and from the rust trust-demo chip. `--mustard` is themed (`#e0a93b` light / `#d6a64a` dark) and text `--ink` is `#1c1b19` light / `#e9edf3` dark over a 12%-opacity tint — legible in both themes.
+- PASS — Behavior preserved: empty-thread seeds render `variant='default'`, post-reply follow-ups render `variant='followup'` (lines 911-919); empty-string follow-ups filtered at `sendMessage` line 532 (`.filter((f) => f.trim().length > 0)`); Trust Demo chip + fabrication path (`UserBubble` isFabrication styling, REJECTED citation render, `handleTrustDemo`, `AssistantTurn`) are untouched by the diff. Send + Enter-to-send (lines 934-938, 957) intact.
+- PASS — Left "Filing Figures" pane unchanged (line 797). Two-pane grid is `.audit-workbench` (`minmax(0,1fr) minmax(0,2fr)`, tokens.css 1789) and still stacks to single column at `max-width: 680px` (tokens.css 1795-1797).
+
+### Change 2 — "Back to Chat Records" breadcrumb (`AuditAssistant.tsx`)
+
+- PASS — Present above the "Defending Filing" card (lines 721-739), breadcrumb style (`font-mono`, `--ink-soft`, no border/background). Leading glyph is `←` U+2190 (verified), not an em dash. Calls `clearFiling()` (line 725).
+- PASS — "Switch Filing" still present inside the card (line 788), also calls `clearFiling()`. `clearFiling` (516-520) resets selectedFiling/thread/inputText → clean return to picker, no dead state.
+
+### Change 3 — Wordmark letter-spacing (`tokens.css`, `Auth.css`)
+
+- PASS — Exactly four selectors got `letter-spacing: 0.03em`: `.topbar-wordmark` (tokens.css 295), `.drawer-wordmark` (503), `.footer-wordmark` (1178), `.auth-brand` (Auth.css 29). Diff confirms these are the only four added lines. Value consistent. `.menubar-wordmark` deliberately not touched (out of the named set).
+
+### Change 4 — Landing finale removal (`Landing.tsx`, `Landing.css`)
+
+- PASS — Entire `<section className="lp-section lp-finale">` (incl. "Open the Demo" CTA) removed; FAQ `</section>` now closes the `.lp-fold` container directly.
+- PASS — `.lp-top` scroll-to-top button preserved and lives OUTSIDE the removed block (Landing.tsx 302-309). `scrollTo({ top: 0, behavior: 'smooth' })` intact.
+- PASS — `.lp-finale`, `.lp-finale-inner`, `.lp-finale-cta`, `.lp-finale-cta:hover` rule blocks removed; `.lp-finale` removed from the dark-theme override (`.lp-trust` retained). No leftover empty spacing.
+- PASS — `Link` import still used by hero CTA (Landing.tsx 159). No remaining JSX/CSS rule reference to the removed CTA.
+
+## Findings
+
+| #   | Severity  | Location                 | Finding                                                                                                                                                                                                                                                 |
+| --- | --------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Low (nit) | `Landing.css:4`          | Stale doc comment still lists `.lp-finale` as an example fixed-color dark band ("`(.lp-trust, .lp-finale)`"). Cosmetic only — no rule orphan. Suggested fix: drop `, .lp-finale` from the comment. Non-blocking.                                        |
+| 2   | Low (nit) | `AuditAssistant.tsx:202` | Redundant ternary on chip text colour: `color: isTrust ? 'var(--rust)' : isFollowup ? 'var(--ink)' : 'var(--ink)'` — both `isFollowup` branches resolve to `--ink`. Harmless; could simplify to `isTrust ? 'var(--rust)' : 'var(--ink)'`. Non-blocking. |
+
+No Medium/High findings. No type, boundary, or contract issues. No backend/core/citation/tax-figure changes. No AI-attribution markers introduced.
+
+## Partially code-verifiable (defer to post-merge browser smoke test)
+
+- Visual distinctness + legibility of the mustard follow-up chip vs default/rust chips in **both** light and dark themes (code-level contrast checks pass; eyeball recommended).
+- The consolidated card's `auto 1fr auto auto` layout rendering (thread scroll/expand, chips + composer pinned) at desktop and at the ≤680px stacked breakpoint.
+- Landing ends cleanly (FAQ → footer) with no residual vertical gap where the finale band used to be.
+
+**Return to PM:** **APPROVE.** All four PR-F fixes are correct, surgical, in scope; all three gates clean (tsc 0, build 83 modules, biome 0). Single Conversation card has thread→chips→composer with a themed, legible, distinct mustard follow-up variant and every behavior preserved (seed chips, empty-padding-filtered follow-ups, Trust Demo fabrication path, send); left Filing Figures pane + responsive two-pane grid untouched. Back-to-Chat-Records breadcrumb (`←` U+2190, font-mono/ink-soft) and Switch Filing both call `clearFiling()` — no dead state. Exactly the four named wordmark selectors got `0.03em`. The whole `.lp-finale` section + its CSS (incl. dark override) are gone, scroll-to-top preserved outside the block, `Link` import still used. Only two Low nits (stale CSS comment, redundant ternary) — non-blocking. Recommend the planned browser smoke test to confirm chip contrast in both themes and clean landing tail.

@@ -292,6 +292,7 @@ a {
   font-size: 23px;
   font-weight: 600;
   line-height: 1;
+  letter-spacing: 0.03em;
 }
 
 .topbar-spacer {
@@ -499,6 +500,7 @@ a {
   font-family: var(--font-brand);
   font-size: 26px;
   font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .drawer-close {
@@ -1173,6 +1175,7 @@ a {
   font-size: 24px;
   font-weight: 600;
   line-height: 1;
+  letter-spacing: 0.03em;
   color: var(--paper);
 }
 

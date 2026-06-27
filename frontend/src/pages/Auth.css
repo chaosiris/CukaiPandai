@@ -26,6 +26,7 @@
   font-family: var(--font-brand);
   font-weight: 600;
   font-size: 1.3rem;
+  letter-spacing: 0.03em;
 }
 
 .auth-brand .brand-logo {

@@ -1718,3 +1718,35 @@ Replaced `background: 'transparent'` with `background: 'var(--window)'` on borde
 - `cd frontend && bunx tsc --noEmit` -- **0 errors**
 - `bun run build` -- **green** (83 modules, 2.05s)
 - `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
+
+---
+
+## [27/06/26] -- PR-F: audit conversation card consolidation + back-to-records + wordmark spacing + landing finale removal `[FE]`
+
+**Branch:** `feat/audit-layout-polish` (uncommitted; awaiting Gate 2).
+
+### Change 1 -- Audit Assistant right pane consolidated into one "Conversation" card
+
+In `frontend/src/pages/AuditAssistant.tsx`: replaced the three stacked `.window` cards in the right pane ("Follow-up Questions / Suggested Questions", "Conversation", "Ask a Question") with a single `.window` titled "Conversation". Internal layout order: (a) message thread at top; (b) follow-up/suggested chips; (c) ask composer (textarea + Send) at bottom. Chips section and composer section are separated from the thread by `borderTop: 'var(--border)'` lines. The merged card uses `gridTemplateRows: 'auto 1fr auto auto'` so the thread area expands and the chips + composer are pinned at the bottom.
+
+Follow-up chips now render with `variant='followup'` (mustard-tinted: `border: 1px solid var(--mustard)`, `background: rgba(224,169,59,0.12)`). Suggested question chips (empty-thread seeds) keep `variant='default'` (screen background). Trust Demo chip keeps `variant='trust-demo'` (rust). Added `'followup'` to the `Chip` variant union and resolved ternary formatting to satisfy biome's single-line preference.
+
+### Change 2 -- "Back to Chat Records" breadcrumb link
+
+In `frontend/src/pages/AuditAssistant.tsx`: added an unobtrusive `<- Back to Chat Records` button above the "Defending Filing" card. Uses `font-mono`, `ink-soft` colour, no border/background, calls `clearFiling()` to return to the filing picker. The existing "Switch Filing" button inside the card is preserved.
+
+### Change 3 -- Brand wordmark letter-spacing
+
+In `frontend/src/styles/tokens.css`: added `letter-spacing: 0.03em` to `.topbar-wordmark`, `.drawer-wordmark`, and `.footer-wordmark`. In `frontend/src/pages/Auth.css`: added `letter-spacing: 0.03em` to `.auth-brand`. No other text is affected.
+
+### Change 4 -- Landing finale section removed
+
+In `frontend/src/pages/Landing.tsx`: removed the entire `<section className="lp-section lp-finale">` block (the dark `.lp-finale` band with the "Open the Demo" CTA). The `lp-fold` div now closes directly after the FAQ `</section>`. The standalone scroll-to-top button (`.lp-top`) lives outside `.lp-fold` and is preserved. The `Link` import is still used by the hero CTA.
+
+In `frontend/src/pages/Landing.css`: removed `.lp-finale`, `.lp-finale-inner`, `.lp-finale-cta`, `.lp-finale-cta:hover` rule blocks; removed `.lp-finale` from the dark-theme rule (`.lp-trust` dark override retained).
+
+### Verify results
+
+- `cd frontend && bunx tsc --noEmit` -- **0 errors**
+- `bun run build` -- **green** (83 modules, 2.09s)
+- `bunx biome check frontend/src` -- **0 errors** (46 files, 0 fixes applied)
