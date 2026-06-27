@@ -1836,6 +1836,84 @@ a {
   }
 }
 
+/* ── Filing Record two-column layout with scroll-spy rail (PR-G3) ───────── */
+/* Desktop (>900px): main content in a wide left column; sticky "on this    */
+/* page" nav island in a narrow right rail.                                  */
+.filing-record-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 24px;
+  align-items: start;
+}
+
+.filing-record-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.filing-record-rail {
+  position: sticky;
+  top: 84px; /* topbar ~68px + 16px breathing room */
+}
+
+.page-index {
+  padding: 12px 14px;
+  border: var(--border);
+  background: var(--window);
+  border-radius: var(--radius);
+}
+
+.page-index-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+
+.page-index-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.page-index-link {
+  display: block;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 1px;
+  line-height: 1.4;
+  transition: color 120ms, border-color 120ms;
+}
+
+.page-index-link:hover {
+  color: var(--ink);
+}
+
+.page-index-link[aria-current="true"] {
+  color: var(--denim);
+  border-left-color: var(--denim);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .filing-record-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .filing-record-rail {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

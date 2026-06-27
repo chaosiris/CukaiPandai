@@ -2005,3 +2005,47 @@ Fast-forwarded `feat/engine-robustness` then rebased+FF `fix/auth-page` into `ma
 - `bunx tsc --noEmit`: clean
 - `bun run build`: green (85 modules, 0 errors, 400 kB JS)
 - `bunx biome check frontend/src`: 0 errors in our changed files (1 pre-existing format error in `client.ts` not touched by this PR)
+
+---
+
+## [28/06/26] — PR-G3: filing-record scroll-spy index + Ask AI deep-link + back-link/draft-text/All-Filings cleanup `[FE]`
+
+### Summary
+
+Four refinements to `/filing/[id]` (`FilingRecord.tsx`) and the Audit Assistant deep-link (`AuditAssistant.tsx`).
+
+### 1. Back-link rename
+
+- `&larr; Filing Records` → `&larr; Back to Filing Records` in the breadcrumb `<Link>` near the top of the loaded record view.
+
+### 2. Remove "draft · not submitted"
+
+- Removed `<span className="titlebar-meta">draft · not submitted</span>` from the "Filing Draft Pack" card titlebar. The card title + InfoTip are kept; no orphan left.
+
+### 3. Scroll-spy index island
+
+- Added a `PageIndex` sub-component (a `<nav aria-label="On this page">` with `.page-index` / `.page-index-list` / `.page-index-link` token-CSS classes) rendering the page section headings in order: "Tax Computation", "Risk Assessment" (only when risk flags exist), "Filing Draft Pack", "Filing Pipeline".
+- Each indexed card now has an `id` (`fr-tax-computation`, `fr-risk-assessment`, `fr-filing-draft-pack`, `fr-filing-pipeline`). Clicking a link calls `scrollIntoView`-equivalent via `window.scrollTo` with an 84px topbar offset and `behavior: 'smooth'`.
+- Active-section tracking via a `useActiveSection` hook using `IntersectionObserver` (`rootMargin: '-84px 0px -60% 0px'`). Active item gets `aria-current="true"` and the `.page-index-link[aria-current]` rule applies `color: var(--denim)` + left accent border.
+- Layout restructured with `.filing-record-layout` (two-column grid: `1fr 160px`) + `.filing-record-rail` (`position: sticky; top: 84px`) + `.filing-record-main`. On `max-width: 900px` the rail is hidden and layout collapses to single column.
+- CSS added to `frontend/src/styles/tokens.css` (`.filing-record-layout`, `.filing-record-main`, `.filing-record-rail`, `.page-index`, `.page-index-label`, `.page-index-list`, `.page-index-link`, responsive media query).
+- Main component refactored into `ActiveFilingRecord` to keep `useActiveSection` hook unconditional (avoids hooks-after-early-return).
+
+### 4. Bottom actions — remove "All Filings", add "Ask AI" deep-link
+
+- Removed the "All Filings" `<Link to="/filing">` button from the bottom nav.
+- Added `<HelpCircleIcon>` (new 14×14 SVG in `frontend/src/components/icons.tsx`) and "Ask AI" button beside "+ New Filing". Clicking navigates to `/audit-assistant?filing=<record.id>`.
+- In `AuditAssistant.tsx`: imported `useSearchParams` from `react-router-dom`; reads `?filing=<id>` param on mount. After filings load, a dedicated `useEffect` finds the matching filing (if any) in the eligible list and calls `selectFiling` to go straight to the workbench — skipping the picker. A `deepLinkApplied` ref prevents double-execution. Falls back to normal picker if param is absent or filing not found.
+
+### Files touched
+
+- `frontend/src/pages/FilingRecord.tsx` — all four items
+- `frontend/src/pages/AuditAssistant.tsx` — `useSearchParams` + deep-link `useEffect`
+- `frontend/src/components/icons.tsx` — added `HelpCircleIcon`
+- `frontend/src/styles/tokens.css` — filing-record two-column layout + scroll-spy island CSS
+
+### Verify
+
+- `bunx tsc --noEmit`: clean
+- `bun run build`: green (85 modules, 0 errors, ~405 kB JS)
+- `bunx biome check` on all 4 touched files: 0 errors, 0 warnings

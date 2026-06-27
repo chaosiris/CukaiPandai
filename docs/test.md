@@ -1558,3 +1558,65 @@ No type, boundary, or contract issues. Frontend-only — no `core/`/`api/`, no t
 - Whether the loaded-doc row/eye is reachable as intended right after upload, or only via Edit Line Items (Finding #3); and that body scroll behind the modal is acceptable without a scroll-lock.
 
 **Return to PM:** **APPROVE WITH COMMENTS.** All four PR-G2 items are correct, in scope, and surgical; gates clean (tsc 0, build 85 modules / 0 errors, biome 0 on the two changed files). The single full-src biome error is the **pre-existing `client.ts` formatter nit — not this PR** (client.ts not in the diff). Object-URL lifecycle is leak-free; draft-resume still lands on the classified stage; back link matches the existing breadcrumb. Findings: #1 Medium — the CSV preview's `dangerouslySetInnerHTML` is injectable and the "no XSS risk" ignore comment is inaccurate, though practical risk is LOW for the self-upload demo threat model (recommend escaping cells post-merge); #2/#3 Low — quoted-CSV preview misalignment and the loaded-doc row only being visible via Edit Line Items. None block the demo. Recommend the browser smoke test for modal a11y, backdrop blur, and the doc-row visibility/scroll-lock points.
+
+---
+
+## [28/06/26] — PR-G3: /filing/:id scroll-spy index + Ask AI deep-link + breadcrumb/draft/All-Filings cleanup `[FE]`
+
+**Branch:** `feat/filing-record-polish` (working tree, uncommitted). 5 files: `frontend/src/pages/{FilingRecord,AuditAssistant}.tsx`, `frontend/src/components/icons.tsx`, `frontend/src/styles/tokens.css`, `docs/progress.md`.
+
+**Verdict:** Approve with comments
+
+All four PR-G3 deliverables are implemented correctly and the refactor cleanly sidesteps the conditional-hook trap. All three gates are green on the four touched files (tsc 0, build 85 modules / exit 0, biome 0 on the four changed files). The one full-`frontend/src` biome error is the **pre-existing `client.ts` formatter nit — NOT this PR** (`client.ts` is not in the diff). No AI attribution leaked (grep → 0). The comments below are one dead-ref cleanliness item and a perf note on observer re-subscription — neither is a runtime bug; nothing blocks the commit. Recommend authorizing, with the browser smoke-test list below run post-merge.
+
+### Gates (touched files PASS)
+
+- **tsc:** `cd frontend && bunx tsc --noEmit` → **exit 0, clean.**
+- **build:** `cd frontend && bun run build` (`tsc -b && vite build`) → **85 modules transformed, dist/ emitted, exit 0.**
+- **biome (4 touched files):** `bunx biome check frontend/src/pages/FilingRecord.tsx frontend/src/pages/AuditAssistant.tsx frontend/src/components/icons.tsx frontend/src/styles/tokens.css` → **Checked 4 files, no fixes, exit 0.**
+- **biome (full `frontend/src`):** **1 error — `client.ts` format only.** `client.ts` is NOT in this diff (`git diff main` touches 5 files, none of them `client.ts`). Pre-existing, carried forward from prior verdicts; not introduced or fixable by PR-G3. Note only.
+- **No AI attribution:** `git diff main | grep -ciE 'co-authored|generated with|claude code|noreply@anthropic|🤖'` → **0**.
+
+### Item 1 — Back-link rename (VERIFIED)
+
+- The main loaded-record breadcrumb (`FilingRecord.tsx:408`) is `&larr; Back to Filing Records` (arrow, not em dash). The error-state breadcrumb (`:245`) and the not-found "Back to Filing Records" button (`:280`) are consistent. No `&mdash;`/`—` breadcrumb remains.
+
+### Item 2 — "draft · not submitted" removed (VERIFIED)
+
+- The Filing Draft Pack titlebar (`:448-451`) is now `<span className="titlebar-title">Filing Draft Pack</span>` + the `InfoTip` only — the status tag is gone, no orphan. The "is not submitted to LHDN" at `:457` is the descriptive body copy (intentional), not the removed titlebar tag. Title + InfoTip intact.
+
+### Item 3 — Scroll-spy index island + refactor (VERIFIED, with 2 non-blocking notes)
+
+- **Markup/a11y:** `<nav aria-label="On this page" className="page-index">` (`:54`) lists entries in order; active item gets `aria-current="true"` (`:62`) + denim/active styling (`tokens.css` `.page-index-link[aria-current="true"]` → `--denim` colour + left border + bold). ✓
+- **Order & presence:** `indexEntries` (`:329-333`) is built in order Tax Computation → Risk Assessment (only `if (hasRisk)`) → Filing Draft Pack → Filing Pipeline. Each rendered card carries a matching `id` (`SECTION_TAX :418`, `SECTION_RISK :429`, `SECTION_DRAFT :447`, `SECTION_PIPELINE :531`). ✓
+- **Smooth-scroll + offset:** `handleClick` (`:44-51`) `preventDefault`s, computes `getBoundingClientRect().top + scrollY - 84` and `scrollTo({behavior:'smooth'})` — 84px topbar offset matches the rail's `top: 84px` and the observer's `-84px` rootMargin. ✓
+- **IntersectionObserver active-tracking:** `useActiveSection` (`:76-105`) observes all ids, filters intersecting, sorts by top, picks topmost; `rootMargin:'-84px 0px -60% 0px'`. Cleanup `observer.disconnect()` on unmount/dep-change. ✓
+- **Layout:** `.filing-record-layout` is a `grid` `minmax(0,1fr) 160px`; `.filing-record-rail` is `position:sticky; top:84px`; rail holds `<PageIndex>`. `@media (max-width:900px)` collapses to `1fr` and `display:none` on the rail — single-column, no overlap. ✓
+- **No conditional-hook violation (PROBED):** the component is split into `FilingRecordPage` (all hooks — `useParams`/`useNavigate`/7×`useState`/`useRef`/2×`useEffect` — run unconditionally BEFORE the loading/error/notFound/draft early-returns) and `ActiveFilingRecord` (renders only after all guards pass), where `useActiveSection(ids)` is the ONLY hook and runs unconditionally within that always-mounted-when-rendered component. `useActiveSection` itself is never called inside `FilingRecordPage`, so the early `return`s never skip a hook. Loading/error/notFound/draft states all render correctly (verified by reading each branch). The `// eslint-disable react-hooks/rules-of-hooks` at `:335` is **superfluous** — it sits above plain non-hook code (`const ids = ...`), no hook is called there. Harmless; could be dropped.
+- **No-risk-flags case (PROBED):** `hasRisk=false` → `SECTION_RISK` omitted from `indexEntries` AND the `<div id={SECTION_RISK}>` is not rendered → no dangling `#risk` target and the index has no Risk row. The observer only observes ids for which `document.getElementById` resolves (`:96-98`), so a missing target is silently skipped. ✓
+- **[Minor] `idsRef` is dead code** — `FilingRecord.tsx:185` declares `const idsRef = useRef<string[]>([])` and `:338` assigns `idsRef.current = ids`, but the ref is **never read**. Its stated intent ("stabilise the ids array reference so IntersectionObserver doesn't thrash") is NOT achieved: `ids` (a fresh `.map()` array each render) is passed directly as a prop to `ActiveFilingRecord`, and `useActiveSection([ids])` keys its effect off that prop, not the ref. → Remove `idsRef` (both lines); it does nothing.
+- **[Minor, perf] Observer re-subscribes on every parent re-render** — because `ids` is a new array reference each `FilingRecordPage` render, `useActiveSection`'s `[ids]` effect tears down and rebuilds the IntersectionObserver whenever `reportUrl`/`reportLoading`/`reportError` (or any parent state) changes. Functionally correct (cleanup via `disconnect()` is sound, no leak), just wasteful. This is the exact thrash `idsRef` was meant to prevent but doesn't. → Optional: memoize `ids` with `useMemo` keyed on `indexEntries`, or have `useActiveSection` depend on `ids.join(',')`. Not blocking.
+
+### Item 4 — Ask AI deep-link, both sides (VERIFIED)
+
+- **FilingRecord side:** "All Filings" removed (0 occurrences except the descriptive header comment); "+ New Filing" kept (`:551-567`); new "Ask AI" button (`:568-587`) renders `<HelpCircleIcon/>` and `onClick={onNavigateAudit}` → `navigate('/audit-assistant?filing=' + record.id)` (`:353`). The new `HelpCircleIcon` (`icons.tsx`) is a self-contained 14px SVG with `aria-hidden`. Route `/audit-assistant` is registered (`App.tsx:64`). ✓
+- **AuditAssistant side:** `useSearchParams` reads `?filing` (`:457-458`). Deep-link effect (`:488-494`) bails unless `deepLinkFilingId && !filingsLoading && !deepLinkApplied.current && !selectedFiling`; finds the match in the (already eligibility-filtered) `filings`, sets `deepLinkApplied.current = true`, then `void selectFiling(match)`. The `deepLinkApplied` ref guards double-run; it is reset to `false` in the persona-switch effect (`:502`) so a persona change re-arms the deep-link. ✓
+- **Eligible-list fallback (PROBED):** `filings` is filtered to `r.status === 'final' && r.computation != null` (`:479`, `:506`). A `?filing=<draft-id>` or `<computation-less id>` is absent from `filings` → `match` undefined → effect returns, `deepLinkApplied` stays false, picker renders. ✓
+- **`?filing=<nonexistent>` (PROBED):** no match → graceful picker fallback, no crash. ✓
+- **No-param normal flow (PROBED):** `deepLinkFilingId` null → effect short-circuits at `:489`; the picker renders as before. Mock mode unaffected (the effect operates on whatever `listFilings()` returns; mock-mode list flows through the same filter). ✓
+- **Back-and-forth:** navigating away unmounts AuditAssistant (ref resets on remount); re-entering with the param re-applies once. The double `listFilings()` (mount-`[]` effect + `[entityError]` effect) is **pre-existing** (only the `[entityError]` effect was touched, to add the `deepLinkApplied.current = false` reset) and is harmless to the deep-link because the `selectedFiling` + ref guards make `selectFiling` run at most once. ✓
+- **Note (not a finding):** `selectFiling` is omitted from the deep-link effect's dep array (`:494`); it's a hoisted function declaration and biome's `useExhaustiveDependencies` did not flag it, and the guards make behaviour correct regardless. Acceptable.
+
+### Surgical / scope (PASS)
+
+- Changes confined to the four FE files + `progress.md`. No backend, no tax figures, no citations, no core math touched. The `FigureTrace` grounding rendering in `ComputationPanel`/`TechnicalDetailsDisclosure` is reused unchanged (`classifyRouteInfo={null}` on a saved record is correct — a finalized record has no live classify route to report).
+
+### Browser-only — defer to post-merge smoke test
+
+- Sticky right-rail behaviour and that the index top aligns near the Tax Computation card.
+- Active-highlight tracking as you scroll (IntersectionObserver picking the topmost section; the `-60%` bottom rootMargin feel).
+- Smooth-scroll landing position with the 84px topbar offset (no section hidden under the topbar).
+- `<=900px` rail hide + single-column collapse (no overlap, no horizontal scroll).
+- Deep-link selection end-to-end: click "Ask AI" on a finalized record → lands on the workbench with that filing auto-selected (picker skipped); `?filing=<nonexistent>` → picker; persona switch re-arms.
+
+**Return to PM:** **APPROVE WITH COMMENTS.** All four PR-G3 items are correct and surgical. The split into `FilingRecordPage` + `ActiveFilingRecord` cleanly makes `useActiveSection`/IntersectionObserver run unconditionally — no conditional-hook violation, and loading/error/not-found/draft branches all render. No-risk records omit both the index row and the `#risk` target; observer cleanup is leak-free. The Ask AI deep-link works on both sides with a `deepLinkApplied` ref guard and graceful picker fallback for missing/ineligible/absent ids, and doesn't break the no-param flow. Gates clean: tsc 0, build 85 modules / exit 0, biome 0 on the four touched files; the lone full-src biome error is the **pre-existing `client.ts` formatter nit, not this PR**; no AI attribution. Two **Minor** non-blockers: `idsRef` (FilingRecord.tsx:185,338) is dead code that should be removed (its ids-stabilisation intent is unmet — `ids` is passed as a fresh-each-render prop), and the IntersectionObserver consequently re-subscribes on every parent re-render (correct but wasteful; memoize `ids` to fix). The `:335` eslint-disable is superfluous. None block the demo. Recommend the browser smoke-test list for sticky-rail, scroll-active-highlight, offset, mobile-hide, and deep-link selection.

@@ -50,3 +50,19 @@ export function ProfileIcon() {
     </svg>
   )
 }
+
+export function HelpCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M10 9.5a2 2 0 1 1 2.5 1.9c-.8.3-1.3.9-1.3 1.6v.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="11.2" cy="16" r="0.8" fill="currentColor" />
+    </svg>
+  )
+}
