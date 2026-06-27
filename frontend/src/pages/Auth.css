@@ -23,12 +23,12 @@
   gap: 10px;
   color: var(--paper);
   text-decoration: none;
-  font-family: var(--font-display);
+  font-family: var(--font-brand);
   font-weight: 600;
   font-size: 1.3rem;
 }
 
-.auth-brand .logo-mark {
+.auth-brand .brand-logo {
   width: 26px;
   height: 26px;
 }

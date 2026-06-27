@@ -116,13 +116,17 @@ function StepMock({ num }: { num: string }) {
 export function Landing() {
   const [activeStep, setActiveStep] = useState(0)
   const [showTop, setShowTop] = useState(false)
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const desktopCardRefs = useRef<(HTMLDivElement | null)[]>([])
+  const mobileCardRefs = useRef<(HTMLLIElement | null)[]>([])
 
   useEffect(() => {
     const onScroll = () => {
       const trigger = window.innerHeight * 0.5
+      // Use the ref array for whichever layout is currently rendered.
+      // The 900px breakpoint matches the CSS media query that swaps the layouts.
+      const refs = window.innerWidth > 900 ? desktopCardRefs.current : mobileCardRefs.current
       let idx = 0
-      cardRefs.current.forEach((el, i) => {
+      refs.forEach((el, i) => {
         if (el && el.getBoundingClientRect().top <= trigger) idx = i
       })
       setActiveStep(idx)
@@ -165,7 +169,8 @@ export function Landing() {
       <div className="lp-fold">
         {/* How it works */}
         <section className="lp-section lp-how" id="how">
-          <div className="lp-inner lp-how-grid">
+          {/* Desktop: sticky left nav + scrolling right cards */}
+          <div className="lp-inner lp-how-grid lp-how-desktop">
             <div className="lp-how-left">
               <p className="lp-kicker">How It Works</p>
               <h2 className="lp-h2 lp-how-h2">Three Consoles. One Sovereign Stack.</h2>
@@ -187,7 +192,7 @@ export function Landing() {
                   key={step.num}
                   className="lp-card-slot"
                   ref={(el) => {
-                    cardRefs.current[i] = el
+                    desktopCardRefs.current[i] = el
                   }}
                 >
                   <div className="window lp-mock">
@@ -204,6 +209,41 @@ export function Landing() {
                 </div>
               ))}
             </div>
+          </div>
+          {/* Mobile: interleaved step + console pairs, scroll-driven active emphasis */}
+          <div className="lp-inner lp-how-mobile">
+            <p className="lp-kicker">How It Works</p>
+            <h2 className="lp-h2 lp-how-h2">Three Consoles. One Sovereign Stack.</h2>
+            <ol className="lp-steps lp-steps-mobile">
+              {STEPS.map((step, i) => (
+                <li
+                  key={step.num}
+                  className={`lp-step lp-step-mobile${i === activeStep ? ' is-active' : ''}`}
+                  ref={(el) => {
+                    mobileCardRefs.current[i] = el
+                  }}
+                >
+                  <div className="lp-step-header">
+                    <span className="lp-step-num">{step.num}</span>
+                    <div className="lp-step-text">
+                      <h3 className="lp-step-title">{step.title}</h3>
+                      <p className="lp-step-body">{step.body}</p>
+                    </div>
+                  </div>
+                  <div className="window lp-mock lp-step-mock">
+                    <div className="titlebar">
+                      <span className="closebox" aria-hidden="true" />
+                      <span className="titlebar-title">
+                        {step.num} · {step.label}
+                      </span>
+                    </div>
+                    <div className="lp-mock-body">
+                      <StepMock num={step.num} />
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 
@@ -231,35 +271,36 @@ export function Landing() {
         {/* FAQ — featured pairs, document style */}
         <section className="lp-section lp-faq" id="faq">
           <div className="lp-inner lp-faq-inner">
-            <p className="lp-kicker">Frequently Asked</p>
-            <h2 className="lp-h2 lp-faq-h2">Straight Answers, No Fabrication.</h2>
-            <div className="lp-faq-list">
-              {FEATURED_FAQS.map((item, i) => (
-                <details className="lp-faq-item" key={item.q}>
-                  <summary className="lp-faq-q">
-                    <span className="lp-faq-num">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="lp-faq-q-text">{item.q}</span>
-                    <span className="lp-faq-toggle" aria-hidden="true">
-                      +
-                    </span>
-                  </summary>
-                  <div className="lp-faq-a">
-                    <span className="lp-faq-cat">{item.category}</span>
-                    <p>{item.a}</p>
-                  </div>
-                </details>
-              ))}
+            <div className="lp-faq-mascot-col" aria-hidden="true">
+              <img src="/pandai-thinking.png" alt="" className="lp-faq-mascot" />
             </div>
-            <Link className="lp-faq-more" to="/faq">
-              See All Questions
-            </Link>
+            <div className="lp-faq-content-col">
+              <p className="lp-kicker">Frequently Asked</p>
+              <h2 className="lp-h2 lp-faq-h2">Straight Answers, No Fabrication.</h2>
+              <div className="lp-faq-list">
+                {FEATURED_FAQS.map((item, i) => (
+                  <details className="lp-faq-item" key={item.q}>
+                    <summary className="lp-faq-q">
+                      <span className="lp-faq-num">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="lp-faq-q-text">{item.q}</span>
+                      <span className="lp-faq-toggle" aria-hidden="true">
+                        +
+                      </span>
+                    </summary>
+                    <div className="lp-faq-a">
+                      <span className="lp-faq-cat">{item.category}</span>
+                      <p>{item.a}</p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
         {/* Finale CTA */}
         <section className="lp-section lp-finale">
           <div className="lp-inner lp-finale-inner">
-            <p className="lp-script">every figure has a citation.</p>
             <Link className="lp-finale-cta" to="/sign-in">
               Open the Demo
             </Link>

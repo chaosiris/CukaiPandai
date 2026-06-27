@@ -1,7 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
-import { LogoMark } from '../components/icons'
 import './Auth.css'
 
 const MOCK_MODE = import.meta.env.VITE_API_MOCK === '1'
@@ -125,7 +124,7 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       {/* Left: denim hero panel */}
       <section className="auth-hero">
         <Link className="auth-brand" to="/" aria-label="CukaiPandai home">
-          <LogoMark />
+          <img src="/logo.png" alt="CukaiPandai" className="brand-logo" />
           <span>CukaiPandai</span>
         </Link>
         <div className="auth-hero-copy">
