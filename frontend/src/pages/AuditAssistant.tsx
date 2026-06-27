@@ -14,6 +14,7 @@ import {
   type ConversationTurn,
   type FilingRecord,
   type LineItem,
+  deleteFilings,
   getAuditDefense,
   getFilingConversation,
   listFilings
@@ -348,6 +349,8 @@ function AssistantTurn({ msg }: { msg: ChatMessage }) {
 
   const verifiedCitations = data.citations.filter((c) => c.verified)
   const rejectedCitations = data.citations.filter((c) => !c.verified)
+  // Show rejected chips only in the Trust Demo (where rejection is the point); otherwise only verified.
+  const citationChips = msg.isFabrication ? data.citations : verifiedCitations
   const answerText = data.answer ?? data.exposure_note
 
   return (
@@ -408,10 +411,12 @@ function AssistantTurn({ msg }: { msg: ChatMessage }) {
           {answerText}
         </div>
 
-        {/* Inline citation chips */}
-        {data.citations.length > 0 && (
+        {/* Inline citation chips — only verified citations on ordinary answers. Rejected
+            citations are surfaced (and explained) by the Trust Demo's dedicated panel above,
+            so we don't stamp a confusing "REJECTED" chip on normal scope/refusal answers. */}
+        {citationChips.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {data.citations.map((c) => (
+            {citationChips.map((c) => (
               <CitationChip key={`${c.claim}-${c.clause_ids.join(',')}`} citation={c} />
             ))}
           </div>
@@ -449,6 +454,12 @@ function UserBubble({ text, isFabrication }: { text: string; isFabrication?: boo
   )
 }
 
+type SortKey = 'newest' | 'oldest' | 'tax-payable'
+
+function filingTaxPayable(rec: FilingRecord): number | null {
+  return rec.computation?.fields?.tax_payable?.value ?? null
+}
+
 // --- Main component ---
 
 export default function AuditAssistant() {
@@ -464,11 +475,19 @@ export default function AuditAssistant() {
   // Track whether the deep-link preselect has been attempted (once per mount)
   const deepLinkApplied = useRef(false)
 
+  // Frontpage dashboard state (multi-select + delete + sort), mirroring the Filing Records page
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [pageError, setPageError] = useState<string | null>(null)
+
   // Chat state
   const [thread, setThread] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [convLoading, setConvLoading] = useState(false)
+  // Suggested/follow-up chips are collapsed by default to save vertical space
+  const [chipsExpanded, setChipsExpanded] = useState(false)
   const threadEndRef = useRef<HTMLDivElement>(null)
 
   // Load filing records on mount
@@ -538,6 +557,45 @@ export default function AuditAssistant() {
     setSelectedFiling(null)
     setThread([])
     setInputText('')
+    setChipsExpanded(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Sorted view of the defensible filings
+  const sortedFilings = [...filings]
+  if (sortKey === 'oldest') {
+    sortedFilings.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  } else if (sortKey === 'tax-payable') {
+    sortedFilings.sort((a, b) => (filingTaxPayable(b) ?? -1) - (filingTaxPayable(a) ?? -1))
+  }
+  const allSelected = sortedFilings.length > 0 && sortedFilings.every((r) => selected.has(r.id))
+
+  function toggleAll() {
+    if (allSelected) setSelected(new Set())
+    else setSelected(new Set(sortedFilings.map((r) => r.id)))
+  }
+
+  async function handleDeleteFilings() {
+    if (selected.size === 0) return
+    setDeleting(true)
+    setPageError(null)
+    try {
+      await deleteFilings(Array.from(selected))
+      setFilings((prev) => prev.filter((r) => !selected.has(r.id)))
+      setSelected(new Set())
+    } catch (e) {
+      setPageError(`Could not delete the selected filing(s): ${(e as Error).message}`)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function sendMessage(query: string, evidence: [string, string][], isFabrication: boolean) {
@@ -599,6 +657,10 @@ export default function AuditAssistant() {
   // Last assistant message's follow-up chips (shown after a reply)
   const lastAssistantMsg = [...thread].reverse().find((m) => m.role === 'assistant' && (m.followups?.length ?? 0) > 0)
   const followupChips: string[] = lastAssistantMsg?.followups ?? []
+  // Collapsible chip section: follow-ups after a reply, else the seed suggestions
+  const activeChips = followupChips.length > 0 ? followupChips : suggestedQuestions
+  const chipSectionLabel = followupChips.length > 0 ? 'Follow-up questions' : 'Suggested questions'
+  const chipVariant: 'default' | 'followup' = followupChips.length > 0 ? 'followup' : 'default'
 
   return (
     <>
@@ -669,79 +731,207 @@ export default function AuditAssistant() {
             </div>
           )}
 
-          {!filingsLoading && filings.length > 0 && (
-            <div className="window">
-              <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="titlebar-title">Your Filed Returns</span>
-                <InfoTip content="Select a filing to defend its figures. Pandai will use that filing's actual computed figures as evidence when building justifications." />
+          {pageError && (
+            <div className="window error-window" style={{ marginBottom: 12 }}>
+              <div className="titlebar">
+                <span className="titlebar-title">Error</span>
               </div>
-              <div className="row-div-list">
-                {filings.map((rec) => {
-                  const tp = rec.computation?.fields?.tax_payable?.value
-                  const showTp = tp != null && isPlausibleFigure(tp)
-                  return (
-                    <div
-                      key={rec.id}
+              <div className="error-body">{pageError}</div>
+            </div>
+          )}
+
+          {!filingsLoading && filings.length > 0 && (
+            <>
+              {/* Sort control */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  aria-label="Sort by"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    border: 'var(--border)',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--screen)',
+                    color: 'var(--ink)',
+                    padding: '4px 8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="tax-payable">Tax payable (high to low)</option>
+                </select>
+              </div>
+
+              {/* Toolbar: select-all + delete-selected (left), New Filing CTA (right) */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 8,
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    type="checkbox"
+                    id="audit-select-all"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    style={{ cursor: 'pointer' }}
+                    aria-label="Select all filings"
+                  />
+                  <label
+                    htmlFor="audit-select-all"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      color: 'var(--ink-soft)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {allSelected ? 'Deselect All' : 'Select All'}
+                  </label>
+                  {selected.size > 0 && (
+                    <button
+                      type="button"
+                      disabled={deleting}
+                      onClick={() => void handleDeleteFilings()}
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'minmax(0, 1fr) auto',
-                        alignItems: 'center',
-                        gap: 16,
-                        padding: '14px 18px'
+                        padding: '5px 14px',
+                        border: '1px solid var(--rust)',
+                        background: 'var(--window)',
+                        color: deleting ? 'var(--ink-soft)' : 'var(--rust)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        cursor: deleting ? 'not-allowed' : 'pointer',
+                        borderRadius: 'var(--radius)'
                       }}
                     >
-                      <div>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: 'var(--ink)',
-                            marginBottom: 4
-                          }}
-                        >
-                          {rec.label}
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 11,
-                            color: 'var(--ink-soft)',
-                            display: 'flex',
-                            gap: 12,
-                            flexWrap: 'wrap'
-                          }}
-                        >
-                          <span>{rec.tin}</span>
-                          <span>{formatDate(rec.created_at)}</span>
-                          {showTp && <span>Tax payable: {formatRM(tp)}</span>}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void selectFiling(rec)
-                        }}
+                      {deleting ? 'Deleting...' : `Delete Selected (${selected.size})`}
+                    </button>
+                  )}
+                </div>
+                <Link
+                  to="/filing/new"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 18px',
+                    background: 'var(--denim)',
+                    color: 'var(--paper)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    borderRadius: 'var(--radius)'
+                  }}
+                >
+                  + New Filing
+                </Link>
+              </div>
+
+              <div className="window">
+                <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="titlebar-title">
+                    {filings.length} Filing{filings.length !== 1 ? 's' : ''} to Defend
+                  </span>
+                  <InfoTip content="Click a row to open the chat and defend that filing's figures. Use the checkboxes to select filings for deletion." />
+                </div>
+                <div className="row-div-list">
+                  {sortedFilings.map((rec) => {
+                    const tp = rec.computation?.fields?.tax_payable?.value
+                    const showTp = tp != null && isPlausibleFigure(tp)
+                    const isSelected = selected.has(rec.id)
+                    return (
+                      <div
+                        key={rec.id}
                         style={{
-                          padding: '8px 16px',
-                          border: 'none',
-                          background: 'var(--denim)',
-                          color: 'var(--paper)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          borderRadius: 'var(--radius)',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap'
+                          display: 'grid',
+                          gridTemplateColumns: '32px minmax(0, 1fr) auto',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 18px',
+                          background: isSelected ? 'var(--screen)' : 'transparent',
+                          transition: 'background 150ms'
                         }}
                       >
-                        Defend This Filing
-                      </button>
-                    </div>
-                  )
-                })}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(rec.id)}
+                            style={{ cursor: 'pointer' }}
+                            aria-label={`Select ${rec.label}`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void selectFiling(rec)}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            minWidth: 0,
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-display)',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: 'var(--ink)',
+                              marginBottom: 4
+                            }}
+                          >
+                            {rec.label}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 11,
+                              color: 'var(--ink-soft)',
+                              display: 'flex',
+                              gap: 12,
+                              flexWrap: 'wrap'
+                            }}
+                          >
+                            <span>{rec.tin}</span>
+                            <span>{formatDate(rec.created_at)}</span>
+                            {showTp && <span>Tax payable: {formatRM(tp)}</span>}
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void selectFiling(rec)}
+                          style={{
+                            padding: '8px 16px',
+                            border: 'none',
+                            background: 'var(--denim)',
+                            color: 'var(--paper)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            borderRadius: 'var(--radius)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Defend This Filing
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </>
       )}
@@ -823,7 +1013,7 @@ export default function AuditAssistant() {
           {/* Two-pane layout: responsive grid (stacks on narrow viewports via CSS) */}
           <div className="audit-workbench">
             {/* LEFT PANE: figure rows */}
-            <div className="window">
+            <div className="window audit-pane">
               <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="titlebar-title">Filing Figures</span>
                 <InfoTip content="Click any figure to ask Pandai about it. Each figure is derived from the selected filing's deterministic computation." />
@@ -840,7 +1030,7 @@ export default function AuditAssistant() {
                   No figures available for this filing.
                 </div>
               ) : (
-                <div className="row-div-list">
+                <div className="row-div-list audit-pane-scroll">
                   {figureRows.map((row) => (
                     <button
                       key={row.key}
@@ -900,14 +1090,17 @@ export default function AuditAssistant() {
             </div>
 
             {/* RIGHT PANE: single "Conversation" card with thread + chips + composer */}
-            <div className="window" style={{ display: 'grid', gridTemplateRows: 'auto 1fr auto auto', minHeight: 0 }}>
+            <div className="window audit-conversation">
               <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="titlebar-title">Conversation</span>
-                <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are stamped REJECTED." />
+                <InfoTip content="Each answer is grounded in Malaysian tax law. Citations show the exact clause IDs and source passages. Fabricated clause IDs are rejected by the deterministic gate." />
               </div>
 
-              {/* (a) Message thread */}
-              <div style={{ padding: '16px 18px', display: 'grid', gap: 16, alignContent: 'start' }}>
+              {/* (a) Message thread (scrolls; composer + chips stay pinned below) */}
+              <div
+                className="audit-pane-scroll"
+                style={{ padding: '16px 18px', display: 'grid', gap: 16, alignContent: 'start' }}
+              >
                 {convLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="barber" style={{ width: 60, height: 3, flexShrink: 0 }} />
@@ -936,32 +1129,62 @@ export default function AuditAssistant() {
                 <div ref={threadEndRef} />
               </div>
 
-              {/* (b) Chips: suggested questions (empty thread) OR follow-up chips (after reply) */}
-              <div
-                style={{
-                  padding: '10px 16px',
-                  borderTop: 'var(--border)',
-                  display: 'flex',
-                  gap: 8,
-                  flexWrap: 'wrap'
-                }}
-              >
-                {(followupChips.length > 0 ? followupChips : suggestedQuestions).map((q) => (
+              {/* (b) Chips: collapsible suggested/follow-up questions (collapsed by default);
+                  the Trust Demo action stays visible. */}
+              <div style={{ borderTop: 'var(--border)' }}>
+                <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {activeChips.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setChipsExpanded((v) => !v)}
+                      aria-expanded={chipsExpanded}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: 'transparent',
+                        border: 'var(--border)',
+                        borderRadius: 'var(--radius)',
+                        padding: '5px 10px',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        color: 'var(--ink-soft)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          transform: chipsExpanded ? 'rotate(90deg)' : 'none',
+                          transition: 'transform 150ms'
+                        }}
+                      >
+                        ▸
+                      </span>
+                      {chipSectionLabel} ({activeChips.length})
+                    </button>
+                  )}
+                  {/* Trust Demo chip: always visible */}
                   <Chip
-                    key={q}
-                    label={q}
-                    onClick={() => handleChip(q)}
+                    label="Trust Demo: inject fabricated clause"
+                    onClick={handleTrustDemo}
                     disabled={chatLoading}
-                    variant={followupChips.length > 0 ? 'followup' : 'default'}
+                    variant="trust-demo"
                   />
-                ))}
-                {/* Trust Demo chip: always visible */}
-                <Chip
-                  label="Trust Demo: inject fabricated clause"
-                  onClick={handleTrustDemo}
-                  disabled={chatLoading}
-                  variant="trust-demo"
-                />
+                </div>
+                {chipsExpanded && activeChips.length > 0 && (
+                  <div style={{ padding: '0 16px 10px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {activeChips.map((q) => (
+                      <Chip
+                        key={q}
+                        label={q}
+                        onClick={() => handleChip(q)}
+                        disabled={chatLoading}
+                        variant={chipVariant}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* (c) Ask composer */}

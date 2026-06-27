@@ -1831,12 +1831,49 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  /* Bound the workbench height so both panes share the same bottom edge; inner regions scroll.
+     The offset clears the topbar + page-head + selected-filing header so the composer stays in view. */
+  height: calc(100vh - 440px);
+  min-height: 420px;
+}
+
+/* Left pane (Filing Figures): titlebar / list (scrolls). Keeps its bottom aligned with the chat. */
+.audit-pane {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.audit-pane-scroll {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Conversation pane: titlebar / thread (scrolls) / chips / composer. */
+.audit-conversation {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 680px) {
   .audit-workbench {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* On narrow screens the panes stack and grow naturally instead of sharing a bounded height. */
+  .audit-pane,
+  .audit-conversation {
+    overflow: visible;
+  }
+
+  .audit-pane-scroll {
+    overflow-y: visible;
   }
 }
 
