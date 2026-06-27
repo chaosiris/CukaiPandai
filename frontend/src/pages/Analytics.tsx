@@ -522,27 +522,6 @@ export default function Analytics() {
           <div style={{ marginBottom: 28 }}>
             <StatusAndFormCounts obligations={obligations} />
           </div>
-
-          {/* Cross-link footer */}
-          <div
-            style={{
-              padding: '12px 0',
-              borderTop: 'var(--border)',
-              display: 'flex',
-              gap: 20,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em'
-            }}
-          >
-            <Link to="/obligations" style={{ color: 'var(--denim)', textDecoration: 'none' }}>
-              Open Obligation Calendar &rarr;
-            </Link>
-            <Link to="/filing" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>
-              Start Form C Filing &rarr;
-            </Link>
-          </div>
         </>
       )}
     </>

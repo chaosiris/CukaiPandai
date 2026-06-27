@@ -857,7 +857,7 @@ a {
 }
 
 .requirement-row + .requirement-row {
-  border-top: var(--border);
+  box-shadow: inset 0 1px 0 var(--ink);
 }
 
 .requirement-topline {
@@ -1745,11 +1745,12 @@ a {
   }
 }
 
-/* ── Row-divider full-bleed helper (FE-2.2) ─────────────────────────── */
-/* Use on a list/container whose rows need full-bleed top borders.       */
-/* .row-list children get a full-width top border via negative-margin so */
-/* the 1px line reaches the .window left/right outline (cancels padding)  */
-/* and the LAST child renders no bottom border colliding with the window. */
+/* ── Row-divider full-bleed helper (FE-2.2 / PR-E fix 1) ───────────── */
+/* Full-bleed inter-row dividers: the separator reaches BOTH the left    */
+/* and right inner edges of the .window (no inset), and the last row     */
+/* never emits a bottom border that collides with the window outline.    */
+/* Uses box-shadow inset so the 1px line is unaffected by border-radius  */
+/* or child padding — truly symmetric on left and right.                 */
 
 .row-list {
   list-style: none;
@@ -1757,24 +1758,25 @@ a {
   margin: 0;
 }
 
-/* Every child that is NOT the first gets a full-bleed top border.        */
-/* mx-auto inset: stretch border to edge by pulling it out of the row pad */
+/* Every child after the first gets a full-bleed top divider via         */
+/* inset box-shadow — spans edge-to-edge, no left inset.                 */
 .row-list > * + * {
-  border-top: var(--border);
+  box-shadow: inset 0 1px 0 var(--ink);
 }
 
-/* Last child never emits a bottom border (avoids collision with .window) */
+/* Last child: no bottom border collision with .window outline           */
+/* (no border-bottom was ever set, so this is a safety guard only)       */
 .row-list > *:last-child {
-  border-bottom: none !important;
+  border-bottom: none;
 }
 
 /* Convenience: a non-ul div row-list (div children) */
 .row-div-list > * + * {
-  border-top: var(--border);
+  box-shadow: inset 0 1px 0 var(--ink);
 }
 
 .row-div-list > *:last-child {
-  border-bottom: none !important;
+  border-bottom: none;
 }
 
 /* ── Audit Workbench two-pane layout (FE-2.6 / PR-C) ───────────────── */

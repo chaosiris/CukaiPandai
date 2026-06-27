@@ -158,15 +158,22 @@ export default function FilingNew() {
   const { notify } = useNotifications()
   const navigate = useNavigate()
 
-  // Resume a draft: restore raw_text and set draftId so the user can re-classify or compute
+  // Resume a draft: rehydrate raw_text + classified line_items so the user lands on the
+  // "classified, ready to compute" stage (or idle if no line_items yet).
   const resumeId = searchParams.get('resume')
   useEffect(() => {
     if (!resumeId) return
     getFiling(resumeId)
       .then((rec) => {
-        if (rec.status === 'draft') {
-          if (rec.raw_text) setRawText(rec.raw_text)
-          setDraftId(rec.id)
+        if (rec.status !== 'draft') return
+        if (rec.raw_text) setRawText(rec.raw_text)
+        setDraftId(rec.id)
+        // If classified line_items are stored, land on the "classified" stage —
+        // user can review/edit and then compute, or edit raw text and re-classify.
+        if (rec.line_items && rec.line_items.length > 0) {
+          setClassifyResult({ line_items: rec.line_items, sovereign: true, active_model: 'draft' })
+          setLineItems(rec.line_items)
+          setPhase({ tag: 'classified' })
         }
       })
       .catch(() => {
@@ -594,7 +601,7 @@ Depreciation  120000"
                     style={{
                       padding: '8px 16px',
                       border: 'var(--border)',
-                      background: 'transparent',
+                      background: 'var(--window)',
                       color: 'var(--ink)',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 12,
