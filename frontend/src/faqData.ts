@@ -21,40 +21,46 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
 ]
 
 export const FAQ_ITEMS: FaqItem[] = [
-  // ── Getting Started ──────────────────────────────────────────────
+  // Getting Started
   {
     category: 'Getting Started',
     featured: true,
     q: 'What Is CukaiPandai?',
-    a: 'CukaiPandai is a citation-grounded tax-assurance tool for Malaysian SMEs. It derives your obligation calendar, helps you prepare a cited Form C, and builds audit-defense packs where every figure traces back to a verified source. It is decision support that keeps a human in the loop, not an automated filer.'
+    a: 'CukaiPandai is a citation-grounded tax-assurance tool for Malaysian SMEs. It derives your YA2026 obligations, prepares a cited Form C with computed tax payable, and lets you ask Pandai about any figure on the filing. It is decision support, not legal advice or an automated filer.'
+  },
+  {
+    category: 'Getting Started',
+    featured: true,
+    q: 'What Are the Three Consoles?',
+    a: 'Obligations shows the YA2026 deadline calendar derived from the entity profile. Filing turns uploaded or structured line items into a cited Form C with computed tax payable. Audit Assistant lets you ask Pandai about a saved filing and get a citation-grounded answer.'
   },
   {
     category: 'Getting Started',
     q: 'How Do I Start Using the App?',
-    a: 'Open the demo from the landing page, then move through the three consoles in the Workspace and Compliance nav groups: the Obligation Radar for deadlines, the Filing Studio for Form C preparation, and Audit Defense for grounded answers to audit queries. Each console explains what it needs before you proceed.'
+    a: 'Open the demo, choose a seeded Malaysian SME such as Acme Trading, then use Obligations, Filing, and Audit Assistant in sequence. The demo data is fixture data, so you can explore the full flow without exposing a real taxpayer record.'
   },
   {
     category: 'Getting Started',
     q: 'Do I Need to Be a Tax Professional to Use It?',
-    a: 'No. CukaiPandai is written for SME owners and their finance staff. It surfaces the rule behind every figure in plain language, so you can understand what drives a result. For anything binding, we still recommend reviewing the output with a licensed tax agent.'
-  },
-  {
-    category: 'Getting Started',
-    q: 'What Are the Three Consoles?',
-    a: 'Obligation Radar shows your upcoming filing deadlines derived from your entity profile. Filing Studio classifies trial-balance line items and assembles a cited Form C. Audit Defense retrieves relevant clauses and answers audit-style questions with verified citations. They share the same deterministic core.'
+    a: 'No. CukaiPandai is written for SME owners and finance staff. It explains the rule and trace behind each figure in plain language. For anything binding, have a licensed tax agent or qualified professional review the output before you rely on it.'
   },
 
-  // ── Sovereignty & Data ───────────────────────────────────────────
+  // Sovereignty & Data
   {
     category: 'Sovereignty & Data',
     featured: true,
     q: 'Where Does the AI Inference Run?',
-    a: 'CukaiPandai is routed ILMU-first, using the sovereign nemo-super model for in-country inference. The goal is that your tax data is reasoned over within Malaysia rather than being sent abroad by default. A second model can be used as failover or escalation when the primary is unavailable.'
+    a: 'CukaiPandai routes to ILMU first, using the sovereign nemo-super model for in-country inference. Escalation stays sovereign by default through a stronger model on the same ILMU gateway. A direct Anthropic or Claude call is a flagged, off-by-default opt-in that leaves Malaysia.'
   },
   {
     category: 'Sovereignty & Data',
     q: 'What Does Sovereign Inference Mean Here?',
-    a: 'It means the primary model that reads your data is hosted in-country, so sensitive financial figures are processed under Malaysian jurisdiction. Sovereignty is about where and under whose control the inference happens, which matters for organisations that must keep tax data local.'
+    a: 'It means the model route that reasons over your filing data is hosted in-country by default. Sovereignty is about where inference happens and who controls that route. It does not mean every deployment dependency is automatically Malaysian.'
+  },
+  {
+    category: 'Sovereignty & Data',
+    q: 'Does All Data Stay in Malaysia?',
+    a: 'Not as an unqualified claim. Inference and deterministic computation are in-country in the current design, but prelim persistence can use managed Neon Postgres in Singapore with fixture and in-memory fallback. The production sovereignty path is self-hosted or Malaysia-region Postgres with the same schema.'
   },
   {
     category: 'Sovereignty & Data',
@@ -64,31 +70,30 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     category: 'Sovereignty & Data',
     q: 'Does the Model Make the Tax Calculations?',
-    a: 'No. The deterministic core owns all tax math, deadlines, and law lookups. The model layer orchestrates the workflow and explains results in plain language, but the authoritative numbers come from the core. This separation is deliberate so figures stay reproducible.'
+    a: 'No. The deterministic core owns all tax math, deadlines, rule IDs, and citation lookups. The model layer can classify, orchestrate, and explain, but the authoritative figures come from the core so they remain reproducible.'
   },
 
-  // ── Citations & Accuracy ─────────────────────────────────────────
+  // Citations & Accuracy
   {
     category: 'Citations & Accuracy',
     featured: true,
     q: 'How Does the Citation Gate Work?',
-    a: 'Before any clause reference is shown, a deterministic verifier checks it against the verified corpus. If a clause ID is not present in that corpus, the citation is rejected at the gate rather than displayed. The check is rule-based, not probabilistic, so fabricated references are blocked.'
+    a: 'Before a clause reference is trusted, a deterministic verifier checks the clause ID against the verified law corpus. If the ID is not present, the citation is rejected instead of being treated as real. The Audit Assistant trust demo shows this with a fabricated clause.'
   },
   {
     category: 'Citations & Accuracy',
-    featured: true,
     q: 'Can the AI Make Up a Tax Figure or Law?',
-    a: 'The system is built specifically to prevent that. Tax figures come from the deterministic core, and legal references are validated against the verified corpus before they reach you. A reference the verifier cannot confirm is rejected instead of being passed through as if it were real.'
+    a: 'The system is built to prevent that. Tax figures come from the deterministic core, and legal references are validated before they are trusted. If Pandai or any agent returns a fabricated clause ID, the deterministic gate marks it unverified and blocks it from passing as a real citation.'
   },
   {
     category: 'Citations & Accuracy',
     q: 'What Does "Every Figure Is Cited" Mean?',
-    a: 'Each computed line in your filing carries the rule it came from and the configuration version that produced it. That lets you trace a number back to its source and reproduce it, rather than trusting an unexplained total.'
+    a: 'Each computed filing figure carries a trace: value, inputs, rule ID, and YA2026 config version. The UI exposes those traces in the filing record, and Pandai answers against the selected filing evidence rather than inventing figures.'
   },
   {
     category: 'Citations & Accuracy',
     q: 'What Year Are the Figures Based On?',
-    a: 'Rates, thresholds, and deadlines are sourced for the YA2026 assessment year and cited to their source. We do not publish invented rates in this FAQ; you will see the specific figures and their citations inside the consoles when you run your own data.'
+    a: 'The app currently targets YA2026. Obligation dates, filing traces, and mock Form C computations use the YA2026 configuration. The specific values appear inside the consoles with their trace and source context.'
   },
   {
     category: 'Citations & Accuracy',
@@ -96,12 +101,23 @@ export const FAQ_ITEMS: FaqItem[] = [
     a: 'It is rejected. The design favours showing nothing over showing an unverifiable claim, because in a tax context a confident but wrong citation is worse than an honest gap. Rejected references are surfaced so you know the gate acted.'
   },
 
-  // ── Filing & Compliance ──────────────────────────────────────────
+  // Filing & Compliance
   {
     category: 'Filing & Compliance',
     featured: true,
     q: 'Does CukaiPandai File Form C for Me Automatically?',
-    a: 'No. It prepares a cited Form C and pauses for your approval at a human-in-the-loop gate before anything is treated as final. You review the figures and their citations, and you remain the person who decides to proceed. It is decision support, not an auto-filer.'
+    a: 'No. It prepares a cited Form C computation and can generate a draft pack for review, but it does not submit to LHDN or MyTax. The filing graph includes a human-in-the-loop approval interrupt, and any real filing decision remains with you or your authorised tax agent.'
+  },
+  {
+    category: 'Filing & Compliance',
+    q: 'What Does Filing Do Today?',
+    a: 'Filing accepts an Income Statement, P&L, Trial Balance, or structured manual line items. It maps the rows to fixed tax accounts, creates a draft record after classification, then the deterministic core computes Form C and tax payable. The app auto-saves the same record as final after computation.'
+  },
+  {
+    category: 'Filing & Compliance',
+    featured: true,
+    q: 'What Can I Ask Pandai in Audit Assistant?',
+    a: 'Select a saved filing, click a figure such as tax payable or chargeable income, or type your own question. Pandai answers from the filing evidence and verified citations, shows inline citation chips, and keeps per-filing conversation history.'
   },
   {
     category: 'Filing & Compliance',
@@ -111,24 +127,24 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     category: 'Filing & Compliance',
     q: 'How Are My Filing Deadlines Determined?',
-    a: 'The Obligation Radar derives your calendar from your entity profile and the applicable filing rules, then lists the obligations that apply to you with their due dates. Because it is derived rather than hand-entered, it is easier to keep consistent as your profile changes.'
+    a: 'The Obligations console derives the YA2026 calendar from the entity profile and applicable rules, then lists the forms and due dates that apply. Seeded personas include state-aware, fixture-backed dates; custom mock entities derive their own calendar from the entered profile.'
   },
   {
     category: 'Filing & Compliance',
     q: 'What Is the Human Approval Gate?',
-    a: 'The filing workflow deliberately interrupts itself and waits for you to approve before finalising. This keeps a person accountable for the submission and gives you a checkpoint to inspect every cited figure before committing to it.'
+    a: 'The backend filing graph has a HITL interrupt that pauses for approval before the workflow is treated as approved. In the UI, the saved filing and draft pack remain review aids. Nothing is submitted externally without a human decision.'
   },
   {
     category: 'Filing & Compliance',
     q: 'Is the Demo Using Real Company Data?',
-    a: 'No. The demo runs on seeded fixtures for sample entities so you can explore the full flow without exposing real records. It is meant to show how the consoles behave, not to file on behalf of an actual company.'
+    a: 'No. The live demo uses seeded Malaysian SME fixture data, including Acme Trading and other sample personas. Mock mode can also derive demo obligations and filings in the browser. It is not a real taxpayer dataset.'
   },
 
-  // ── Privacy & Account ────────────────────────────────────────────
+  // Privacy & Account
   {
     category: 'Privacy & Account',
     q: 'How Is My Data Handled?',
-    a: 'The product is designed to keep sensitive tax data processed in-country via sovereign inference, and to apply data-protection practices in line with Malaysian privacy expectations. In the fixtures-based demo, you are working with seeded sample data rather than live records.'
+    a: 'The product separates deterministic tax computation from model reasoning and routes inference through sovereign ILMU by default. Guest and demo flows may use shared seeded data or fixture-backed storage, so do not enter real taxpayer data into a public demo environment.'
   },
   {
     category: 'Privacy & Account',
@@ -138,6 +154,6 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     category: 'Privacy & Account',
     q: 'How Do I Sign Out?',
-    a: 'Open the profile menu in the top bar and choose Sign Out. In the demo this clears your local guest session and returns you to the landing page. No filing is submitted simply by signing in or out.'
+    a: 'Open the profile menu in the top bar and choose Sign Out. In the demo this clears the local session marker and returns you to the landing page. Signing in or out never submits a filing.'
   }
 ]
