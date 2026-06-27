@@ -1,9 +1,18 @@
 /* Auth — standalone full-screen 50:50 split. Left: denim hero. Right: cream form. */
 
 .auth {
+  position: relative;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
+}
+
+/* Light/dark toggle — pinned top-right over the form panel (this page is outside the app shell). */
+.auth-theme-toggle {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
 }
 
 /* Left: branded hero */
@@ -54,6 +63,13 @@
   font-size: clamp(1.6rem, 2.4vw, 2.1rem);
   color: var(--mustard);
   margin: 0;
+}
+
+/* In dark mode the hero panel flips to light periwinkle (--denim #93a7d6), so the mustard accent
+   washes out. Use a deep caramel/amber for legible (AA-large) contrast on the light panel. */
+[data-theme='dark'] .auth-hero-line em,
+[data-theme='dark'] .auth-script {
+  color: #6b4410;
 }
 
 .auth-hero-foot {
@@ -115,6 +131,28 @@
   border-top: 1px solid var(--ink);
   opacity: 0.15;
   margin: 0 0 16px;
+}
+
+/* "or" separator between the SSO and email methods — replaces the redundant "Email and password"
+   section label (the EMAIL / PASSWORD field labels already say it). */
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.auth-or::before,
+.auth-or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--ink);
+  opacity: 0.15;
 }
 
 /* SSO (Google) — outline button */

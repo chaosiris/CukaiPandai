@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
+import { ThemeIcon } from '../components/icons'
+import { useTheme } from '../hooks/useTheme'
 import './Auth.css'
 
 const MOCK_MODE = import.meta.env.VITE_API_MOCK === '1'
@@ -24,6 +26,7 @@ declare global {
 export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const navigate = useNavigate()
   const { signIn, signUp, signInWithGoogle, continueAsGuest } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const isSignIn = mode === 'sign-in'
 
   const [email, setEmail] = useState('')
@@ -121,6 +124,15 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
   return (
     <div className="auth">
+      <button
+        className="icon-button auth-theme-toggle"
+        type="button"
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        aria-pressed={theme === 'dark'}
+        onClick={toggleTheme}
+      >
+        <ThemeIcon theme={theme} />
+      </button>
       {/* Left: denim hero panel */}
       <section className="auth-hero">
         <Link className="auth-brand" to="/" aria-label="CukaiPandai home">
@@ -170,10 +182,9 @@ export function AuthScreen({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             )}
           </div>
 
-          <hr className="auth-divider" />
+          <div className="auth-or">or</div>
 
           <form className="auth-section" onSubmit={handleSubmit}>
-            <span className="auth-section-label">Email and password</span>
             {!isSignIn && (
               <label className="auth-field">
                 <span>Name</span>
