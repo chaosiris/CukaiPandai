@@ -5,7 +5,7 @@
 // Uploading a financial document (Income Statement / Trial Balance) instead uses the AI to extract +
 // classify the figures into the same taxonomy. On compute: auto-save (upgrade draft) → /filing/[id].
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useActivePersona } from '../PersonaContext'
 import {
@@ -77,102 +77,19 @@ const DOC_TYPE_META: Record<DocType, { label: string; caption: string; dropCopy:
 
 // Loaded-document descriptor: either an uploaded File or a fixture sample path.
 interface LoadedDoc {
+  id: string
   name: string
   docType: DocType
-  // For uploaded files: an object URL (revoke on close/unmount); for samples: the fixture path.
+  // For uploaded files: an object URL (revoke on remove/unmount); for samples: the fixture path.
   previewSrc: string
   isSample: boolean
   mimeType: string
 }
 
-/**
- * Parse a single CSV line into fields, respecting RFC-4180 double-quote escaping.
- * A field may be wrapped in double-quotes; commas and escaped quotes inside are handled.
- * Preview-only: optimised for clarity, not strict RFC compliance on all edge cases.
- */
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = []
-  let i = 0
-  while (i < line.length) {
-    if (line[i] === '"') {
-      // Quoted field
-      i++ // skip opening quote
-      let value = ''
-      while (i < line.length) {
-        if (line[i] === '"' && line[i + 1] === '"') {
-          value += '"'
-          i += 2
-        } else if (line[i] === '"') {
-          i++ // skip closing quote
-          break
-        } else {
-          value += line[i]
-          i++
-        }
-      }
-      fields.push(value)
-      if (line[i] === ',') i++ // skip trailing comma
-    } else {
-      // Unquoted field — read until next comma
-      const end = line.indexOf(',', i)
-      if (end === -1) {
-        fields.push(line.slice(i).trim())
-        break
-      }
-      fields.push(line.slice(i, end).trim())
-      i = end + 1
-    }
-  }
-  return fields
-}
-
-/** Parse up to 200 rows of a CSV text into a 2-D string array for React rendering. */
-function parseCsvRows(text: string): string[][] {
-  return text.trim().split(/\r?\n/).slice(0, 200).map(parseCsvLine)
-}
-
-/** Render a parsed CSV (array of string rows) as a React table. No dangerouslySetInnerHTML. */
-function CsvTable({ rows }: { rows: string[][] }) {
-  if (rows.length === 0) {
-    return <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>Empty file</div>
-  }
-  const [header, ...body] = rows
-  const cellStyle: React.CSSProperties = {
-    padding: '3px 8px',
-    border: '1px solid var(--grid)',
-    fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-    whiteSpace: 'nowrap'
-  }
-  return (
-    <table style={{ borderCollapse: 'collapse' }}>
-      {header && (
-        <thead>
-          <tr style={{ background: 'var(--screen)' }}>
-            {header.map((cell, ci) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: column index is stable for a static preview table
-              <th key={ci} style={{ ...cellStyle, fontWeight: 700, textAlign: 'left' }}>
-                {cell}
-              </th>
-            ))}
-          </tr>
-        </thead>
-      )}
-      <tbody>
-        {body.map((row, ri) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: row index is stable for a static preview table
-          <tr key={ri}>
-            {row.map((cell, ci) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: column index is stable for a static preview table
-              <td key={ci} style={cellStyle}>
-                {cell}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
+let _docSeq = 0
+function docId(): string {
+  _docSeq += 1
+  return `d${_docSeq}`
 }
 
 function buildSsm(entity: {
@@ -244,181 +161,6 @@ function buildLineItems(rows: Row[]): LineItem[] {
     items.push({ code: acct.code, description: acct.label, amount, category: acct.category })
   }
   return items
-}
-
-// ---- Document preview modal ----
-// Renders a blurred-backdrop floating modal with an inline preview of the loaded document.
-// PDF → <iframe> of the src; CSV → simple HTML table; XLSX → best-effort note.
-// Accessible: Escape closes, backdrop click closes, focus trap (focus modal on open, restore on close).
-
-function DocPreviewModal({
-  doc,
-  onClose
-}: {
-  doc: LoadedDoc
-  onClose: () => void
-}) {
-  const modalRef = useRef<HTMLDialogElement>(null)
-  const [csvRows, setCsvRows] = useState<string[][] | null>(null)
-  const [csvError, setCsvError] = useState(false)
-  const triggerRef = useRef<Element | null>(null)
-
-  // Capture the element that had focus before opening
-  useEffect(() => {
-    triggerRef.current = document.activeElement
-    modalRef.current?.focus()
-    return () => {
-      // Restore focus on close
-      if (triggerRef.current instanceof HTMLElement) {
-        triggerRef.current.focus()
-      }
-    }
-  }, [])
-
-  // Escape key handler
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  // Load + parse CSV for preview (quote-aware; renders as React elements — no innerHTML)
-  useEffect(() => {
-    const isCsvFile = doc.mimeType === 'text/csv' || doc.name.endsWith('.csv')
-    if (!isCsvFile) return
-    fetch(doc.previewSrc)
-      .then((r) => r.text())
-      .then((text) => setCsvRows(parseCsvRows(text)))
-      .catch(() => setCsvError(true))
-  }, [doc.previewSrc, doc.mimeType, doc.name])
-
-  const isPdf = doc.mimeType === 'application/pdf' || doc.name.endsWith('.pdf')
-  const isCsv = doc.mimeType === 'text/csv' || doc.name.endsWith('.csv')
-  const isXlsx = doc.name.endsWith('.xlsx')
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 300,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
-      }}
-    >
-      {/* Dim scrim + blur */}
-      <button
-        type="button"
-        aria-label="Close preview"
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          border: 0,
-          background: 'rgba(18, 17, 15, 0.75)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
-          cursor: 'pointer'
-        }}
-      />
-      {/* Modal window */}
-      <dialog
-        ref={modalRef}
-        open
-        className="window"
-        aria-labelledby="doc-preview-title"
-        tabIndex={-1}
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          width: 'min(820px, calc(100vw - 32px))',
-          maxHeight: 'calc(100vh - 32px)',
-          display: 'flex',
-          flexDirection: 'column',
-          border: 'var(--border)',
-          padding: 0,
-          background: 'var(--window)',
-          borderRadius: 'var(--radius)',
-          boxShadow: 'var(--shadow)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Title bar */}
-        <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span
-            className="titlebar-title"
-            id="doc-preview-title"
-            style={{ fontFamily: 'var(--font-display)', fontSize: 14 }}
-          >
-            {doc.name}
-          </span>
-          <span className="titlebar-meta">{DOC_TYPE_META[doc.docType].label}</span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close preview"
-            style={{
-              marginLeft: 'auto',
-              border: 0,
-              background: 'none',
-              color: 'var(--ink-soft)',
-              fontFamily: 'var(--font-display)',
-              fontSize: 20,
-              lineHeight: 1,
-              cursor: 'pointer',
-              padding: '0 2px'
-            }}
-          >
-            ×
-          </button>
-        </div>
-        {/* Preview body */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 0, minHeight: 0 }}>
-          {isPdf && (
-            <iframe
-              src={doc.previewSrc}
-              title={`Preview: ${doc.name}`}
-              style={{ width: '100%', height: '70vh', border: 'none', display: 'block' }}
-            />
-          )}
-          {isCsv && (
-            <div style={{ padding: '16px 18px', overflowX: 'auto' }}>
-              {csvError ? (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--rust)' }}>
-                  Could not load CSV preview.
-                </div>
-              ) : csvRows ? (
-                <CsvTable rows={csvRows} />
-              ) : (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-soft)' }}>
-                  Loading CSV preview...
-                </div>
-              )}
-            </div>
-          )}
-          {isXlsx && (
-            <div
-              style={{
-                padding: '32px 24px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12,
-                color: 'var(--ink-soft)',
-                lineHeight: 1.7,
-                textAlign: 'center'
-              }}
-            >
-              XLSX preview is not supported inline. The file has been uploaded and the AI will extract the figures from
-              it. Download the file to review its contents.
-            </div>
-          )}
-        </div>
-      </dialog>
-    </div>
-  )
 }
 
 // One-shot pipeline phases (no Human Approval)
@@ -528,9 +270,12 @@ export default function FilingNew() {
   const [mode, setMode] = useState<'upload' | 'manual'>('upload')
   const [draftId, setDraftId] = useState<string | null>(null)
   const [docType, setDocType] = useState<DocType | null>(null)
+  // pendingDocs: the list of documents staged for extraction (not yet classified).
+  const [pendingDocs, setPendingDocs] = useState<LoadedDoc[]>([])
+  // loadedDoc: the single document used as source for the AI classification (set after extraction).
   const [loadedDoc, setLoadedDoc] = useState<LoadedDoc | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const previewObjectUrlRef = useRef<string | null>(null)
+  // Keep a ref to pending docs so unmount cleanup can revoke object URLs without a stale closure.
+  const pendingDocsRef = useRef<LoadedDoc[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { notify } = useNotifications()
   const navigate = useNavigate()
@@ -566,21 +311,24 @@ export default function FilingNew() {
     setPhase({ tag: 'idle' })
     setLatestResult(null)
     setDraftId(null)
+    // Revoke object URLs for any uploaded (non-sample) pending docs before clearing
+    for (const d of pendingDocsRef.current) {
+      if (!d.isSample) URL.revokeObjectURL(d.previewSrc)
+    }
+    pendingDocsRef.current = []
+    setPendingDocs([])
     setLoadedDoc(null)
     setDocType(null)
   }, [persona.tin])
 
-  // Revoke object URLs created for uploaded file previews when they are no longer needed.
+  // Revoke object URLs for pending docs on unmount.
   useEffect(() => {
     return () => {
-      if (previewObjectUrlRef.current) {
-        URL.revokeObjectURL(previewObjectUrlRef.current)
-        previewObjectUrlRef.current = null
+      for (const d of pendingDocsRef.current) {
+        if (!d.isSample) URL.revokeObjectURL(d.previewSrc)
       }
     }
   }, [])
-
-  const closePreview = useCallback(() => setPreviewOpen(false), [])
 
   const stages = deriveStages(phase, classifyResult)
   const activeStageId: StageId | null =
@@ -677,8 +425,20 @@ export default function FilingNew() {
     })()
   }
 
-  async function handleUpload(file: File, sampleFixturePath?: string) {
-    if (!entity) return
+  // Add a document to the pending list (does NOT start classification).
+  function addPendingDoc(doc: LoadedDoc) {
+    pendingDocsRef.current = [...pendingDocsRef.current, doc]
+    setPendingDocs(pendingDocsRef.current)
+  }
+
+  function removePendingDoc(id: string) {
+    const removed = pendingDocsRef.current.find((d) => d.id === id)
+    if (removed && !removed.isSample) URL.revokeObjectURL(removed.previewSrc)
+    pendingDocsRef.current = pendingDocsRef.current.filter((d) => d.id !== id)
+    setPendingDocs(pendingDocsRef.current)
+  }
+
+  function handleAddFile(file: File) {
     const allowed = ['.csv', '.xlsx', '.pdf']
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
     if (!allowed.includes(ext)) {
@@ -686,47 +446,77 @@ export default function FilingNew() {
       return
     }
     setUploadError(null)
+    const effectiveDocType = docType ?? 'income-statement'
+    const objUrl = URL.createObjectURL(file)
+    addPendingDoc({
+      id: docId(),
+      name: file.name,
+      docType: effectiveDocType,
+      previewSrc: objUrl,
+      isSample: false,
+      mimeType: file.type
+    })
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleAddFile(file)
+  }
+
+  async function handleUseSample() {
+    if (!entity) return
+    const personaSamples = SAMPLE_DOCS[entity.tin]
+    if (!personaSamples) return
+    const effectiveType: DocType = docType ?? 'income-statement'
+    const sample = personaSamples[effectiveType] ?? Object.values(personaSamples)[0]
+    if (!sample) return
+    setUploadError(null)
+    try {
+      const fixturePath = `/fixtures/${sample.file}`
+      const mime = sample.file.endsWith('.csv')
+        ? 'text/csv'
+        : sample.file.endsWith('.xlsx')
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf'
+      addPendingDoc({
+        id: docId(),
+        name: sample.file,
+        docType: effectiveType,
+        previewSrc: fixturePath,
+        isSample: true,
+        mimeType: mime
+      })
+    } catch (e) {
+      setUploadError(`Could not add sample document: ${(e as Error).message}`)
+    }
+  }
+
+  // Extract figures: classify the first (primary) pending document, leave others listed.
+  async function handleExtract() {
+    if (!entity || pendingDocs.length === 0) return
+    const primary = pendingDocs[0]
+    setUploadError(null)
     setPhase({ tag: 'classifying' })
     try {
+      // Fetch the file bytes from the previewSrc (object URL or fixture path).
+      const res = await fetch(primary.previewSrc)
+      if (!res.ok) throw new Error(`could not load document (${res.status})`)
+      const blob = await res.blob()
+      const file = new File([blob], primary.name, { type: primary.mimeType })
       const result = await uploadDocument(entity.tin, file, entity)
-      // Pre-fill the structured rows from the AI-extracted items so the user can review/edit them.
       setRows(rowsFromItems(result.line_items))
       setClassifyResult(result)
       setLineItems(result.line_items)
       setAiClassified(true)
       setPhase({ tag: 'classified' })
+      setLoadedDoc(primary)
       notify({
         title: 'Document Classified',
-        body: `${file.name} mapped to ${result.line_items.length} line items.`,
+        body: `${primary.name} mapped to ${result.line_items.length} line items.`,
         kind: 'success'
       })
-      // Track which document was loaded for the doc-row + preview modal.
-      if (previewObjectUrlRef.current) {
-        URL.revokeObjectURL(previewObjectUrlRef.current)
-        previewObjectUrlRef.current = null
-      }
-      const effectiveDocType = docType ?? 'income-statement'
-      if (sampleFixturePath) {
-        // Sample: use the fixture path directly (no object URL needed)
-        setLoadedDoc({
-          name: file.name,
-          docType: effectiveDocType,
-          previewSrc: sampleFixturePath,
-          isSample: true,
-          mimeType: file.type
-        })
-      } else {
-        // Uploaded file: create a revocable object URL
-        const objUrl = URL.createObjectURL(file)
-        previewObjectUrlRef.current = objUrl
-        setLoadedDoc({
-          name: file.name,
-          docType: effectiveDocType,
-          previewSrc: objUrl,
-          isSample: false,
-          mimeType: file.type
-        })
-      }
       const label = `${persona.label} · Form C ${new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'short', year: 'numeric' })}`
       try {
         const draft = await createDraftFiling({ tin: entity.tin, label, line_items: result.line_items })
@@ -736,40 +526,8 @@ export default function FilingNew() {
       }
     } catch (e) {
       const msg = (e as Error).message
-      setUploadError(`Upload failed: ${msg}. Enter the line items manually above instead.`)
+      setUploadError(`Extraction failed: ${msg}. Enter the line items manually above instead.`)
       setPhase({ tag: 'idle' })
-    }
-  }
-
-  function handleDrop(e: React.DragEvent<HTMLButtonElement>) {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) void handleUpload(file, undefined)
-  }
-
-  async function handleUseSample() {
-    if (!entity) return
-    const personaSamples = SAMPLE_DOCS[entity.tin]
-    if (!personaSamples) return
-    // Pick sample matching the selected docType; fall back to whichever is available.
-    const effectiveType: DocType = docType ?? 'income-statement'
-    const sample = personaSamples[effectiveType] ?? Object.values(personaSamples)[0]
-    if (!sample) return
-    setUploadError(null)
-    try {
-      const fixturePath = `/fixtures/${sample.file}`
-      const res = await fetch(fixturePath)
-      if (!res.ok) throw new Error(`could not load sample (${res.status})`)
-      const blob = await res.blob()
-      const mime = sample.file.endsWith('.csv')
-        ? 'text/csv'
-        : sample.file.endsWith('.xlsx')
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : 'application/pdf'
-      await handleUpload(new File([blob], sample.file, { type: mime }), fixturePath)
-    } catch (e) {
-      setUploadError(`Could not load the sample document: ${(e as Error).message}`)
     }
   }
 
@@ -822,25 +580,7 @@ export default function FilingNew() {
 
   return (
     <>
-      {/* Document preview modal */}
-      {previewOpen && loadedDoc && <DocPreviewModal doc={loadedDoc} onClose={closePreview} />}
-
-      {/* Breadcrumb — above the page heading */}
-      <div style={{ paddingTop: 26, paddingBottom: 4 }}>
-        <Link
-          to="/filing"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--ink-soft)',
-            textDecoration: 'none'
-          }}
-        >
-          &larr; Back to Filing Records
-        </Link>
-      </div>
-
-      <div className="page-head" style={{ paddingTop: 18 }}>
+      <div className="page-head">
         <h1>New Filing</h1>
         <p className="page-kicker">
           Add your line items, then compute a cited Form C with the deterministic core. Form C · YA2026 ·{' '}
@@ -867,269 +607,222 @@ export default function FilingNew() {
 
       {/* Stage 1: structured line-item entry */}
       {!entityLoading && entity && (phase.tag === 'idle' || phase.tag === 'error') && (
-        <div className="window" style={{ marginTop: 16 }}>
-          <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="titlebar-title">Stage 01 - Provide Your Figures</span>
-            <InfoTip content="Upload a financial document (Income Statement / P&L or Trial Balance) and AI extracts + maps the figures to the fixed tax accounts, or switch to Manual Entry to pick the accounts yourself. Manual entry is deterministic -- no AI -- and only valid tax accounts can be added, so there is no free-text guessing." />
-            <span className="titlebar-meta">upload or enter</span>
-          </div>
-          <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
-            {/* Document-first tab toggle */}
-            <div
-              role="tablist"
-              aria-label="Input mode"
-              style={{ display: 'flex', gap: 4, borderBottom: 'var(--border)' }}
+        <>
+          {/* Breadcrumb — just above the Stage 01 card (mirrors FilingRecord placement) */}
+          <div style={{ marginTop: 12, marginBottom: 8 }}>
+            <Link
+              to="/filing"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--ink-soft)',
+                textDecoration: 'none'
+              }}
             >
-              {(
-                [
-                  ['upload', 'Upload Document'],
-                  ['manual', 'Manual Entry']
-                ] as const
-              ).map(([m, lbl]) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === m}
-                  onClick={() => setMode(m)}
-                  style={{
-                    appearance: 'none',
-                    border: 'none',
-                    background: 'transparent',
-                    padding: '8px 14px',
-                    marginBottom: -1,
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    fontWeight: mode === m ? 700 : 500,
-                    color: mode === m ? 'var(--ink)' : 'var(--ink-soft)',
-                    borderBottom: mode === m ? '2px solid var(--denim)' : '2px solid transparent'
-                  }}
-                >
-                  {lbl}
-                </button>
-              ))}
+              &larr; Back to Filing Records
+            </Link>
+          </div>
+          <div className="window">
+            <div className="titlebar" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="titlebar-title">Stage 01 - Provide Your Figures</span>
+              <InfoTip content="Upload a financial document (Income Statement / P&L or Trial Balance) and AI extracts + maps the figures to the fixed tax accounts, or switch to Manual Entry to pick the accounts yourself. Manual entry is deterministic -- no AI -- and only valid tax accounts can be added, so there is no free-text guessing." />
+              <span className="titlebar-meta">upload or enter</span>
             </div>
-
-            {/* Manual entry panel */}
-            <div style={{ display: mode === 'manual' ? 'grid' : 'none', gap: 14 }}>
+            <div style={{ padding: '16px 18px', display: 'grid', gap: 14 }}>
+              {/* Document-first tab toggle */}
               <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  color: 'var(--ink)',
-                  fontWeight: 600
-                }}
+                role="tablist"
+                aria-label="Input mode"
+                style={{ display: 'flex', gap: 4, borderBottom: 'var(--border)' }}
               >
-                Add each account from your trial balance or P&amp;L
+                {(
+                  [
+                    ['upload', 'Upload Document'],
+                    ['manual', 'Manual Entry']
+                  ] as const
+                ).map(([m, lbl]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === m}
+                    onClick={() => setMode(m)}
+                    style={{
+                      appearance: 'none',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '8px 14px',
+                      marginBottom: -1,
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      fontWeight: mode === m ? 700 : 500,
+                      color: mode === m ? 'var(--ink)' : 'var(--ink-soft)',
+                      borderBottom: mode === m ? '2px solid var(--denim)' : '2px solid transparent'
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
               </div>
 
-              {/* Column headings */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
-                  gap: 8,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  color: 'var(--ink-soft)'
-                }}
-              >
-                <span>Category group</span>
-                <span>Account</span>
-                <span>Amount (RM)</span>
-                <span />
-              </div>
-
-              {/* Rows */}
-              <div style={{ display: 'grid', gap: 10 }}>
-                {rows.map((r) => {
-                  const acct = r.code ? accountByCode(r.code) : undefined
-                  return (
-                    <div key={r.key} style={{ display: 'grid', gap: 4 }}>
-                      <div
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
-                          gap: 8,
-                          alignItems: 'center'
-                        }}
-                      >
-                        <select
-                          value={r.group}
-                          onChange={(e) => updateRow(r.key, { group: e.target.value, code: '' })}
-                          style={selectStyle}
-                        >
-                          <option value="">Group…</option>
-                          {TAX_GROUPS.map((g) => (
-                            <option key={g} value={g}>
-                              {g}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={r.code}
-                          onChange={(e) => updateRow(r.key, { code: e.target.value })}
-                          disabled={!r.group}
-                          style={{ ...selectStyle, opacity: r.group ? 1 : 0.5 }}
-                        >
-                          <option value="">{r.group ? 'Account…' : 'Pick a group first'}</option>
-                          {accountsInGroup(r.group).map((a) => (
-                            <option key={a.code} value={a.code}>
-                              {a.label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          value={r.amount}
-                          onChange={(e) => updateRow(r.key, { amount: e.target.value })}
-                          placeholder="0"
-                          style={{ ...selectStyle, textAlign: 'right' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}
-                          aria-label="Remove line item"
-                          title="Remove line item"
-                          style={{
-                            border: 'var(--border)',
-                            background: 'var(--window)',
-                            color: 'var(--ink-soft)',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 14,
-                            lineHeight: 1,
-                            height: 30,
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius)'
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                      {acct && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, minHeight: 16 }}>
-                          <span className="kind-tag">{CATEGORY_LABEL[acct.category]}</span>
-                          <InfoTip content={acct.note} />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => setRows((rs) => [...rs, blankRow()])}
-                  style={{
-                    padding: '7px 14px',
-                    border: 'var(--border)',
-                    background: 'var(--window)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius)'
-                  }}
-                >
-                  + Add line item
-                </button>
-                <button
-                  type="button"
-                  onClick={handleManualSubmit}
-                  disabled={validItems.length === 0}
-                  style={{
-                    padding: '8px 20px',
-                    border: 'var(--border)',
-                    background: 'var(--denim)',
-                    color: 'var(--paper)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: validItems.length === 0 ? 'not-allowed' : 'pointer',
-                    borderRadius: 'var(--radius)',
-                    opacity: validItems.length === 0 ? 0.5 : 1
-                  }}
-                >
-                  Continue
-                </button>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                  {validItems.length} valid line item{validItems.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-
-            {/* Upload panel (document-first / default) */}
-            <div style={{ display: mode === 'upload' ? 'grid' : 'none', gap: 16 }}>
-              {/* Step A: document-type picker */}
-              <div style={{ display: 'grid', gap: 8 }}>
+              {/* Manual entry panel */}
+              <div style={{ display: mode === 'manual' ? 'grid' : 'none', gap: 14 }}>
                 <div
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--ink-soft)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em'
+                    fontSize: 12,
+                    color: 'var(--ink)',
+                    fontWeight: 600
                   }}
                 >
-                  Step 1 — Select document type
+                  Add each account from your trial balance or P&amp;L
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {(['income-statement', 'trial-balance'] as DocType[]).map((dt) => {
-                    const meta = DOC_TYPE_META[dt]
-                    const selected = docType === dt
+
+                {/* Column headings */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                    gap: 8,
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--ink-soft)'
+                  }}
+                >
+                  <span>Category group</span>
+                  <span>Account</span>
+                  <span>Amount (RM)</span>
+                  <span />
+                </div>
+
+                {/* Rows */}
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {rows.map((r) => {
+                    const acct = r.code ? accountByCode(r.code) : undefined
                     return (
-                      <button
-                        key={dt}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setDocType(dt)}
-                        style={{
-                          appearance: 'none',
-                          padding: '12px 14px',
-                          border: selected ? '2px solid var(--denim)' : 'var(--border)',
-                          borderRadius: 'var(--radius)',
-                          background: selected ? 'rgba(65,82,110,0.08)' : 'var(--screen)',
-                          color: 'var(--ink)',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'border-color 120ms, background 120ms'
-                        }}
-                      >
+                      <div key={r.key} style={{ display: 'grid', gap: 4 }}>
                         <div
                           style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 12,
-                            fontWeight: selected ? 700 : 500,
-                            color: selected ? 'var(--denim)' : 'var(--ink)'
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.7fr) 130px 30px',
+                            gap: 8,
+                            alignItems: 'center'
                           }}
                         >
-                          {meta.label}
+                          <select
+                            value={r.group}
+                            onChange={(e) => updateRow(r.key, { group: e.target.value, code: '' })}
+                            style={selectStyle}
+                          >
+                            <option value="">Group…</option>
+                            {TAX_GROUPS.map((g) => (
+                              <option key={g} value={g}>
+                                {g}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={r.code}
+                            onChange={(e) => updateRow(r.key, { code: e.target.value })}
+                            disabled={!r.group}
+                            style={{ ...selectStyle, opacity: r.group ? 1 : 0.5 }}
+                          >
+                            <option value="">{r.group ? 'Account…' : 'Pick a group first'}</option>
+                            {accountsInGroup(r.group).map((a) => (
+                              <option key={a.code} value={a.code}>
+                                {a.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            value={r.amount}
+                            onChange={(e) => updateRow(r.key, { amount: e.target.value })}
+                            placeholder="0"
+                            style={{ ...selectStyle, textAlign: 'right' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}
+                            aria-label="Remove line item"
+                            title="Remove line item"
+                            style={{
+                              border: 'var(--border)',
+                              background: 'var(--window)',
+                              color: 'var(--ink-soft)',
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 14,
+                              lineHeight: 1,
+                              height: 30,
+                              cursor: 'pointer',
+                              borderRadius: 'var(--radius)'
+                            }}
+                          >
+                            ×
+                          </button>
                         </div>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 10,
-                            color: 'var(--ink-soft)',
-                            marginTop: 4
-                          }}
-                        >
-                          {meta.caption}
-                        </div>
-                      </button>
+                        {acct && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, minHeight: 16 }}>
+                            <span className="kind-tag">{CATEGORY_LABEL[acct.category]}</span>
+                            <InfoTip content={acct.note} />
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRows((rs) => [...rs, blankRow()])}
+                    style={{
+                      padding: '7px 14px',
+                      border: 'var(--border)',
+                      background: 'var(--window)',
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius)'
+                    }}
+                  >
+                    + Add line item
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    disabled={validItems.length === 0}
+                    style={{
+                      padding: '8px 20px',
+                      border: 'var(--border)',
+                      background: 'var(--denim)',
+                      color: 'var(--paper)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: validItems.length === 0 ? 'not-allowed' : 'pointer',
+                      borderRadius: 'var(--radius)',
+                      opacity: validItems.length === 0 ? 0.5 : 1
+                    }}
+                  >
+                    Continue
+                  </button>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                    {validItems.length} valid line item{validItems.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
 
-              {/* Step B: tailored dropzone (shown once a type is picked) */}
-              {docType && (
-                <div style={{ display: 'grid', gap: 10 }}>
+              {/* Upload panel (document-first / default) */}
+              <div style={{ display: mode === 'upload' ? 'grid' : 'none', gap: 16 }}>
+                {/* Step A: document-type picker */}
+                <div style={{ display: 'grid', gap: 8 }}>
                   <div
                     style={{
                       fontFamily: 'var(--font-mono)',
@@ -1139,216 +832,343 @@ export default function FilingNew() {
                       letterSpacing: '0.08em'
                     }}
                   >
-                    Step 2 — Upload your document
+                    Step 1 — Select document type
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {(['income-statement', 'trial-balance'] as DocType[]).map((dt) => {
+                      const meta = DOC_TYPE_META[dt]
+                      const selected = docType === dt
+                      return (
+                        <button
+                          key={dt}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setDocType(dt)}
+                          style={{
+                            appearance: 'none',
+                            padding: '12px 14px',
+                            border: selected ? '2px solid var(--denim)' : 'var(--border)',
+                            borderRadius: 'var(--radius)',
+                            background: selected ? 'rgba(65,82,110,0.08)' : 'var(--screen)',
+                            color: 'var(--ink)',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            transition: 'border-color 120ms, background 120ms'
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 12,
+                              fontWeight: selected ? 700 : 500,
+                              color: selected ? 'var(--denim)' : 'var(--ink)'
+                            }}
+                          >
+                            {meta.label}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 10,
+                              color: 'var(--ink-soft)',
+                              marginTop: 4
+                            }}
+                          >
+                            {meta.caption}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
 
-                  {/* "Use sample document" button — wired to the matching fixture for this docType */}
-                  {entity && SAMPLE_DOCS[entity.tin]?.[docType] && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => void handleUseSample()}
-                        style={{
-                          padding: '7px 14px',
-                          border: 'var(--border)',
-                          background: 'var(--window)',
-                          color: 'var(--ink)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          borderRadius: 'var(--radius)'
-                        }}
-                      >
-                        Use sample document
-                      </button>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                        {SAMPLE_DOCS[entity.tin]?.[docType]?.label}
-                      </span>
-                    </div>
-                  )}
-                  {/* Fallback sample button when the selected type has no dedicated sample */}
-                  {entity && SAMPLE_DOCS[entity.tin] && !SAMPLE_DOCS[entity.tin]?.[docType] && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => void handleUseSample()}
-                        style={{
-                          padding: '7px 14px',
-                          border: 'var(--border)',
-                          background: 'var(--window)',
-                          color: 'var(--ink)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          borderRadius: 'var(--radius)'
-                        }}
-                      >
-                        Use sample document
-                      </button>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
-                        (another document type sample)
-                      </span>
-                    </div>
-                  )}
-
-                  {/* File drop zone — copy tailored to selected type */}
-                  <button
-                    type="button"
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      setDragOver(true)
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      border: dragOver ? '2px dashed var(--denim)' : '2px dashed var(--grid)',
-                      borderRadius: 'var(--radius)',
-                      background: dragOver ? 'rgba(65,82,110,0.06)' : 'var(--screen)',
-                      padding: '20px 16px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      transition: 'border-color 150ms, background 150ms',
-                      width: '100%'
-                    }}
-                  >
+                {/* Step B: tailored dropzone (shown once a type is picked) */}
+                {docType && (
+                  <div style={{ display: 'grid', gap: 10 }}>
                     <div
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
+                        fontSize: 10,
+                        color: 'var(--ink-soft)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em'
                       }}
                     >
-                      {DOC_TYPE_META[docType].dropCopy} · {DOC_TYPE_META[docType].formats}
+                      Step 2 — Add documents
                     </div>
-                    <div
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 6 }}
-                    >
-                      AI extracts the figures and maps them to the tax accounts -- non-financial rows are dropped. Or
-                      click to browse.
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".csv,.xlsx,.pdf"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) void handleUpload(file, undefined)
-                        e.target.value = ''
-                      }}
-                    />
-                  </button>
 
-                  {/* Loaded document row */}
-                  {loadedDoc && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '8px 12px',
-                        border: 'var(--border)',
-                        borderRadius: 'var(--radius)',
-                        background: 'var(--screen)'
-                      }}
-                    >
-                      {/* Doc icon */}
-                      <svg
-                        aria-hidden="true"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        style={{ flexShrink: 0, color: 'var(--denim)' }}
-                      >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
+                    {/* "Use sample document" button */}
+                    {entity && SAMPLE_DOCS[entity.tin]?.[docType] && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => void handleUseSample()}
                           style={{
+                            padding: '7px 14px',
+                            border: 'var(--border)',
+                            background: 'var(--window)',
+                            color: 'var(--ink)',
                             fontFamily: 'var(--font-mono)',
                             fontSize: 12,
-                            fontWeight: 600,
-                            color: 'var(--ink)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius)'
                           }}
                         >
-                          {loadedDoc.name}
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 10,
-                            color: 'var(--ink-soft)',
-                            marginTop: 1
-                          }}
-                        >
-                          {DOC_TYPE_META[loadedDoc.docType].label}
-                          {loadedDoc.isSample ? ' · sample' : ''}
-                        </div>
+                          Use sample document
+                        </button>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                          {SAMPLE_DOCS[entity.tin]?.[docType]?.label}
+                        </span>
                       </div>
-                      {/* Eye / preview button */}
-                      <button
-                        type="button"
-                        aria-label="Preview document"
-                        title="Preview document"
-                        onClick={() => setPreviewOpen(true)}
+                    )}
+                    {/* Fallback sample button when the selected type has no dedicated sample */}
+                    {entity && SAMPLE_DOCS[entity.tin] && !SAMPLE_DOCS[entity.tin]?.[docType] && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => void handleUseSample()}
+                          style={{
+                            padding: '7px 14px',
+                            border: 'var(--border)',
+                            background: 'var(--window)',
+                            color: 'var(--ink)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius)'
+                          }}
+                        >
+                          Use sample document
+                        </button>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-soft)' }}>
+                          (another document type sample)
+                        </span>
+                      </div>
+                    )}
+
+                    {/* File drop zone */}
+                    <button
+                      type="button"
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        setDragOver(true)
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        border: dragOver ? '2px dashed var(--denim)' : '2px dashed var(--grid)',
+                        borderRadius: 'var(--radius)',
+                        background: dragOver ? 'rgba(65,82,110,0.06)' : 'var(--screen)',
+                        padding: '20px 16px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'border-color 150ms, background 150ms',
+                        width: '100%'
+                      }}
+                    >
+                      <div
                         style={{
-                          border: 'var(--border)',
-                          background: 'var(--window)',
-                          color: 'var(--ink-soft)',
-                          borderRadius: 'var(--radius)',
-                          width: 28,
-                          height: 28,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          flexShrink: 0
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                          color: dragOver ? 'var(--denim)' : 'var(--ink-soft)'
                         }}
                       >
-                        <svg
-                          aria-hidden="true"
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.7"
-                        >
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                        {DOC_TYPE_META[docType].dropCopy} · {DOC_TYPE_META[docType].formats}
+                      </div>
+                      <div
+                        style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-soft)', marginTop: 6 }}
+                      >
+                        Click to browse or drag and drop. Documents are added to the list below before extraction.
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,.xlsx,.pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleAddFile(file)
+                          e.target.value = ''
+                        }}
+                      />
+                    </button>
 
-              {uploadError && (
-                <div
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    color: 'var(--rust)',
-                    padding: '8px 12px',
-                    border: '1px solid var(--rust)',
-                    borderRadius: 'var(--radius)',
-                    background: 'rgba(181,80,60,0.04)'
-                  }}
-                >
-                  {uploadError}
-                </div>
-              )}
+                    {/* Pending document list */}
+                    {pendingDocs.length > 0 && (
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {pendingDocs.map((doc) => (
+                          <div
+                            key={doc.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 10,
+                              padding: '8px 12px',
+                              border: 'var(--border)',
+                              borderRadius: 'var(--radius)',
+                              background: 'var(--screen)'
+                            }}
+                          >
+                            {/* Doc icon */}
+                            <svg
+                              aria-hidden="true"
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              style={{ flexShrink: 0, color: 'var(--denim)' }}
+                            >
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontFamily: 'var(--font-mono)',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: 'var(--ink)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {doc.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontFamily: 'var(--font-mono)',
+                                  fontSize: 10,
+                                  color: 'var(--ink-soft)',
+                                  marginTop: 1
+                                }}
+                              >
+                                {DOC_TYPE_META[doc.docType].label}
+                                {doc.isSample ? ' · sample' : ''}
+                              </div>
+                            </div>
+                            {/* Eye button — opens in new tab */}
+                            <button
+                              type="button"
+                              aria-label="Preview document in new tab"
+                              title="Preview in new tab"
+                              onClick={() => window.open(doc.previewSrc, '_blank', 'noopener')}
+                              style={{
+                                border: 'var(--border)',
+                                background: 'var(--window)',
+                                color: 'var(--ink-soft)',
+                                borderRadius: 'var(--radius)',
+                                width: 28,
+                                height: 28,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                              >
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            </button>
+                            {/* Delete button */}
+                            <button
+                              type="button"
+                              aria-label={`Remove ${doc.name}`}
+                              title="Remove document"
+                              onClick={() => removePendingDoc(doc.id)}
+                              style={{
+                                border: 'var(--border)',
+                                background: 'var(--window)',
+                                color: 'var(--ink-soft)',
+                                borderRadius: 'var(--radius)',
+                                width: 28,
+                                height: 28,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                fontFamily: 'var(--font-display)',
+                                fontSize: 16,
+                                lineHeight: 1
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Extract figures button — primary action, enabled when list is non-empty */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => void handleExtract()}
+                        disabled={pendingDocs.length === 0}
+                        style={{
+                          padding: '8px 20px',
+                          border: 'var(--border)',
+                          background: pendingDocs.length > 0 ? 'var(--denim)' : 'var(--window)',
+                          color: pendingDocs.length > 0 ? 'var(--paper)' : 'var(--ink-soft)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: pendingDocs.length === 0 ? 'not-allowed' : 'pointer',
+                          borderRadius: 'var(--radius)',
+                          opacity: pendingDocs.length === 0 ? 0.5 : 1
+                        }}
+                      >
+                        Extract figures
+                      </button>
+                      {pendingDocs.length > 1 && (
+                        <span
+                          style={{
+                            marginLeft: 10,
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            color: 'var(--ink-soft)'
+                          }}
+                        >
+                          · primary document ({pendingDocs[0].name}) will be extracted
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      color: 'var(--rust)',
+                      padding: '8px 12px',
+                      border: '1px solid var(--rust)',
+                      borderRadius: 'var(--radius)',
+                      background: 'rgba(181,80,60,0.04)'
+                    }}
+                  >
+                    {uploadError}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Pipeline stepper + detail panels */}
@@ -1424,9 +1244,9 @@ export default function FilingNew() {
                   </div>
                   <button
                     type="button"
-                    aria-label="Preview source document"
-                    title="Preview source document"
-                    onClick={() => setPreviewOpen(true)}
+                    aria-label="Open source document in new tab"
+                    title="Open in new tab"
+                    onClick={() => window.open(loadedDoc.previewSrc, '_blank', 'noopener')}
                     style={{
                       border: 'var(--border)',
                       background: 'var(--window)',

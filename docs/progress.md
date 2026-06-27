@@ -2082,3 +2082,49 @@ Four refinements to `/filing/[id]` (`FilingRecord.tsx`) and the Audit Assistant 
 - `bunx tsc --noEmit`: clean (0 errors)
 - `bun run build`: green (85 modules, 2.07s, 0 errors)
 - `bunx biome check frontend/src`: 1 error (pre-existing `client.ts` format nit, not ours); 0 errors on touched files
+
+---
+
+## [28/06/26] — FE three refinements: breadcrumb move · upload list-first · island resize `[FE]`
+
+### 1. Breadcrumb move (FilingNew.tsx)
+
+- Removed the "Back to Filing Records" breadcrumb div from above `<div class="page-head">` (where it was above the h1).
+- Re-placed it inside a `<>` fragment directly before the Stage 01 `.window` card, with `marginTop: 12; marginBottom: 8` — mirrors the placement pattern on `/filing/[id]` (breadcrumb just above the first card).
+- The page-head now renders at the top with no breadcrumb preceding it.
+
+### 2. Upload list-first flow (FilingNew.tsx)
+
+- **Removed:** `DocPreviewModal` component, `parseCsvLine`, `parseCsvRows`, `CsvTable` helper functions (all only used for the in-page modal). Also removed `previewOpen`, `closePreview`, `previewObjectUrlRef` state/refs. Removed `useCallback` import (no longer needed).
+- **Added:** `pendingDocs: LoadedDoc[]` state (list of staged documents) + `pendingDocsRef` ref for safe cleanup. `docId()` counter for stable list keys. `id: string` field added to `LoadedDoc` interface.
+- `handleAddFile(file)`: validates extension, creates an object URL, pushes to `pendingDocs` list -- does NOT trigger classification.
+- `handleUseSample()`: fetches fixture path and pushes to `pendingDocs` list -- does NOT trigger classification.
+- `handleDrop()`: calls `handleAddFile` instead of `handleUpload`.
+- `handleExtract()`: new function -- takes the first (primary) pending document, fetches its bytes, calls `uploadDocument`, then sets `classifyResult`/`lineItems`/`loadedDoc` and proceeds to the classified stage exactly as before. Multiple docs: only the first is sent to the AI; the rest remain listed (noted in UI with "primary document (name) will be extracted" caption).
+- Upload panel now shows: a pending document list (each row has doc icon + filename + type label + eye button + delete button), then "Extract figures" primary button (enabled only when list is non-empty).
+- Eye button on each pending doc: `window.open(doc.previewSrc, '_blank', 'noopener')` (new tab, no modal).
+- Eye button on the persistent source-doc row (classified/computing stage): also `window.open(loadedDoc.previewSrc, '_blank', 'noopener')`.
+- Object URL cleanup: `removePendingDoc` revokes on delete; persona switch and unmount revoke via `pendingDocsRef`.
+- Mock mode verified: add sample doc (appears listed) -> delete works -> eye opens new tab -> "Extract figures" -> classified line items -> "Compute Form C" -> auto-save -> /filing/[id].
+
+### 3. Island position + size (tokens.css + FilingRecord.tsx)
+
+- `filing-record-layout` rail track: `160px` -> `210px`.
+- `.filing-record-rail`: added `margin-top: 12px` to align island's top with the Tax Computation card top (ComputationPanel has `marginTop: 12` from its own style, creating a 12px gap at the top of the main column that the island was previously overhanging).
+- `.page-index`: `padding: 12px 14px` -> `16px 18px`; added `min-width: 186px`.
+- `.page-index-label`: `font-size: 9px` -> `12px`.
+- `.page-index-link`: `font-size: 10px` -> `13px`; `padding: 4px 8px` -> `5px 10px`.
+- Overall island is ~30% larger; <=900px collapse/hide behavior unchanged.
+
+### Files touched
+
+- `frontend/src/pages/FilingNew.tsx`
+- `frontend/src/pages/FilingRecord.tsx` (no change needed -- CSS-only for island)
+- `frontend/src/styles/tokens.css`
+
+### Verify
+
+- `bunx tsc --noEmit`: clean (0 errors)
+- `bun run build`: green (85 modules, 2.11s, 0 errors)
+- `bunx biome check frontend/src/pages/FilingNew.tsx frontend/src/pages/FilingRecord.tsx frontend/src/styles/tokens.css`: clean (0 errors, 3 files)
+- `bunx biome check frontend/src`: 1 error (pre-existing `client.ts` nit, not ours)
