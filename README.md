@@ -31,7 +31,7 @@ _Obligation calendar · cited Form C filing · audit defense — **every figure 
 
 <br/>
 
-[**🎬 Watch the Demo (7 min)**](https://youtu.be/3MUFIZZHLxs) · [**Live Demo**](https://cukaipandai.vercel.app/) · [**Pitch Deck**](docs/demo/cukaipandai-pitch-deck.pdf) · [**Docs**](#-docs) · [**Architecture**](#-how-it-works) · [**Quickstart**](#-getting-started) · [**Demo**](#-demo)
+[**🎬 Watch the Demo (7 min)**](https://youtu.be/3MUFIZZHLxs) · [**Live Demo**](https://cukaipandai.vercel.app/) · [**Pitch Deck**](cukaipandai-pitch-deck.pdf) · [**Architecture**](#-how-it-works) · [**Quickstart**](#-getting-started) · [**Demo**](#-demo)
 
 </div>
 
