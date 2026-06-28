@@ -3,7 +3,7 @@
 > **Style reference:** modeled on the "Layar" demo pitch — persona cold-open → striking stat → the MyGov chatbot failure as the setup → "introducing…" → named pipeline steps → the citation guardrail as the hero → data-stays-in-Malaysia → live demo with the persona → emotional persona bookend.
 > **Budget:** ~3:00 pitch · ~4:00 live demo. _Italics_ = clicks / on-screen action. Plain text = spoken.
 > **Demo policy:** walk only the **verified-OK** paths. See **§5 Demo Safety**.
-> **One placeholder left to fill before recording:** the **persona** — swap `Encik Pandai` for a real seeded persona if you have one. _(The §1.7 impact metric is now filled with a sourced LHDN figure — the up-to-45% late-filing penalty, s.112(3) ITA 1967 / GPHDN 5/2019.)_
+> **Persona for recording:** narrate **Encik Pandai** as the owner of the seeded **Acme Trading (Demo)** entity (TIN `C2581234509`); demo via the **upload** path. **Recording LIVE** — the LLM classifies the upload non-deterministically, so the computed figures vary per run; read them off the screen (don't hard-commit a number). _(Mock mode `VITE_API_MOCK=1` gives fixed figures + the capital-allowance showcase if you ever want it. The §1.7 impact metric is filled with a sourced LHDN figure — the up-to-45% late-filing penalty, s.112(3) ITA 1967 / GPHDN 5/2019.)_
 > **Honesty flags:** do **not** claim in-memory-only privacy unless confirmed (bracketed below); the data-stays-in-Malaysia beat is real.
 
 ---
@@ -20,7 +20,7 @@
 
 > "But Malaysian corporate tax is built for accountants, not for Encik Pandai. Form C, CP204, capital allowances, Schedule 3, Section 44 deductions, e-invoicing phases — every figure has to be computed correctly _and_ justified under the right provision.
 >
-> So most SMEs do one of two things. They **overpay** — leaving capital allowances and deductions they're entitled to on the table, just to feel safe. Or they **misfile** — a wrong figure here, a required schedule or field left blank there, a deduction claimed without backing — and hope LHDN never looks too closely. One quietly costs them money; the other invites a penalty or an audit. Both hurt a business that can't spare it."
+> So most SMEs do one of two things. They either **overpay** their tax just to be safe. Or they **misfile** — a wrong figure here, or a field on a form accidentally left blank — and hope LHDN (Malaysia's IRS) never looks too closely. One quietly costs them money; the other invites a penalty or an audit. Both hurt a business that can't spare it."
 
 ## 1.3 The killer setup — why generic AI can't fix this (25 sec)
 
@@ -36,11 +36,11 @@
 
 ## 1.5 Under the hood — the architecture (30 sec)
 
-> "Under the hood, two layers — and the handoff between them is the whole point.
+> "Under the hood, CukaiPandai keeps the AI and the tax calculations apart — and that's how the magic happens.
 >
-> First, **six AI agents** read your documents and classify each line — that's the thinking.
+> First, the **AI** reads your uploaded document or manually typed data, and sorts every relevant line into their corresponding tax category.
 >
-> Then it hands off to a **rules engine** for the actual tax math and the citations. No AI touches it, so it _can't_ make a number up. The AI does the _thinking_; the rules engine does the _math and the law._"
+> Then a separate, **deterministic** rules engine — written in Python — calculates the Form C from those figures, applying Malaysian law the same fixed way every time. So your final tax bill is reproducible and traceable to the law: the AI only sorts the inputs, but the output is grounded firmly by the rules engine."
 
 > _On screen (caption / mini-diagram), don't say aloud: built on **Python · Pydantic · LangGraph · FastAPI · React**. Let the stack show for credibility while you speak plainly._
 
@@ -85,13 +85,18 @@
 
 _Open the calendar view._
 
-> "First, his obligations. CukaiPandai maps **every deadline** Pandai's company faces onto one calendar — Form C, CP204, SST, e-invoicing — instead of six portals he'd never check.
+> "First, his obligations. This is Pandai's company — **Acme Trading** — and CukaiPandai maps **every deadline** it faces onto one calendar: Form C, CP204, SST, e-invoicing — instead of six portals he'd never check.
 >
 > Form C lands exactly seven months after his financial year-end. And notice this one —"
 
-_Point to a holiday-shifted date._
+_Point to the date that lands on 2 January (shifted off 1 Jan, New Year's Day). Don't name the form — just the shift._
 
-> "— the statutory date fell on a weekend, so the engine rolled it forward to the next working day, **state-aware** for the public holidays in his state. That's deterministic date arithmetic. No LLM touches it. Deadlines he simply will not miss."
+> "— this one landed on **New Year's Day**, a public holiday, so the engine rolled it forward to the next working day — **state-aware** for the public holidays in his state. That's deterministic date arithmetic. No AI touches it. Deadlines he simply will not miss."
+
+--- ACTUAL SCRIPT ---
+Hi, this is Encik Pandai's wife here, and I will be demonstrating the end to end flow of CukaiPandai and how I use it to help him file his tax forms. As you can see, the UI here is very neat and I can even toggle the dark/light modes. So let's get started.
+
+We can log in with either Google SSO or the standard email & password. Our company is called Acme Trading, where we mainly sell aircons. Since we've preregistered our company on CukaiPandai, we just select it and it will bring us to the Obligation Calendar page. CukaiPandai helps us map **every deadline** our company faces onto one single calendar on this page, instead of six different portals we would never check. And notice the CP39 form, even though the deadline is supposed to be on 1st January, the engine rolled it forward to the next working day — CukaiPandai is **state-aware** for the public holidays in his state. That's deterministic date arithmetic. No AI touches it. Deadlines he simply will not miss.
 
 ## 2.2 Beat 2 — Upload, extract, classify (the agent pipeline, visible) (50 sec)
 
@@ -105,19 +110,63 @@ _Let the steps surface — extraction, then classification._
 >
 > This is the agentic layer earning its keep — it's doing the tedious reading-and-sorting a junior accountant would do, in seconds. But notice what happens next: the moment there's a _number_ to compute, control hands off to the deterministic core."
 
+--- ACTUAL SCRIPT ---
+Now let's move on to the actual filing — this is the New Filing page. Here I upload our company's financials. Any digital document works, as long as every amount has a label next to it — a spreadsheet, a CSV, or a text-based PDF. For us, it's our trial balance.
+
+You might wonder if there's some AI vision model scanning the document — there isn't, and we don't need one. CukaiPandai reads the text straight from the file, and then the AI agent — running on our sovereign **ILMU** model — classifies each line into its tax category. Clean text in, structured tax line items out, with no misread numbers — which really matters when it's our tax. As you can see, each line is now clearly labelled with its tax treatment — our income, and our deductible expenses. The AI does the reading and the sorting — but the moment there's a number to actually compute, it hands off to the deterministic rules engine, which I'll show you next.
+
 ## 2.3 Beat 3 — The computation trace, cited line by line (45 sec)
 
 _Open the computation trace / figure breakdown._
 
-> "Here's chargeable income, computed end to end. Watch this — his depreciation is added back, because accounting depreciation isn't deductible; and in its place the engine grants a **capital allowance** on his new machine: 34% of RM300,000, so **RM102,000**, straight from the Schedule 3 rates. Then the SME tax bands — 15, 17, then 24%.
+> "Here's the Form C, computed end to end — from business income down through the deductible expenses to chargeable income, then the SME tax bands — 15%, 17%, then 24% — to the tax payable.
 >
-> And this is the part that matters — **every figure has a trace.** This capital allowance isn't just a number on a screen; it links to the exact provision it comes from."
+> And this is the part that matters — **every figure has a trace.** It's not just a number on a screen; it links to the exact rule and law version it was computed from."
 
-_Click one figure through to its citation._
+_Expand one figure's trace._
 
-> "I click the figure — and there's the clause it's grounded in. An accountant can audit this return line by line. **Nothing here is unsourced.**"
+> "I expand any line — and there's the rule and the law version it's grounded in. An accountant can audit this return line by line. **Nothing here is unsourced.**"
 
-## 2.4 Beat 4 — The fabrication gate, head-to-head (40 sec)
+> _NOTE — live mode: the LLM classifies the uploaded trial balance non-deterministically, so the exact figures vary per run (this run: business income ~RM5.7m → chargeable RM241,280 → tax RM38,017.60; capital allowances RM0 because the machine line wasn't classified as a Sch-3 asset). Read the figures off the screen; don't hard-commit a number. To force the capital-allowance showcase + fixed numbers, run in mock mode (`VITE_API_MOCK=1`)._
+
+--- ACTUAL SCRIPT ---
+And here's the result — our fully computed Form C. The rules engine works through it for us: it starts from our business income of about RM5.7 million (which we input when we signed up), applies our deductible expenses, and brings it down to a chargeable income of RM241,280. Then it applies the SME tax bands — 15% on the first slice, then 17% — to land on exactly what we owe: RM38,017.60.
+
+And this is my favourite part — every single figure here has a trace. It's not just a number on a screen: if I expand any line, it shows the exact rule it used and the version of the law behind it. So our accountant can check this return line by line — nothing here is guessed, and nothing is unsourced.
+
+## 2.4 Beat 4 — The draft packet, downloaded (35 sec)
+
+_Open the generated Form C draft-pack PDF; show the watermark; hit download._
+
+> "And the payoff — his Form C, generated. Every page watermarked **draft, not submitted**, because Pandai reviews and files himself; we never file on his behalf.
+>
+> Every number on this page traces back to its source in the law corpus. He downloads it —"
+
+_Trigger the download._
+
+> "— and he walks into LHDN with a return he can defend, line by line. That's the whole loop: from a folder of documents to a defensible, sourced, ready-to-file Form C — in minutes."
+
+--- ACTUAL SCRIPT ---
+And here is the real payoff of CukaiPandai (aside from the very cute panda mascot) — with one click, we can generate a full draft pack of our Form C filing, and we can preview the whole thing right here on the page. Now, notice that every single page is stamped "DRAFT — not submitted" — and that's deliberate. CukaiPandai never files anything for us; it prepares the return, and we still have to review it and submits it ourselves. But all the hard work is already done for us in here: the computed figures, the supporting numbers, and every single one traceable back to the law it came from. We can download it — and instead of dreading tax season, he can walk into LHDN, or hand this straight to our accountant, with a return we can actually defend, line by line. That's the whole journey — from one uploaded document to a ready-to-file Form C, in minutes.
+
+## 2.5 Beat 5 — Ask AI (35 sec)
+
+_Drive the filing graph to the confirmation interrupt._
+
+> "And critically — CukaiPandai does not silently auto-file. The filing graph **pauses here and asks Pandai to confirm** before it finalizes anything.
+>
+> This is a real human-in-the-loop checkpoint built into the agent graph — the agent prepares, the human decides. For something as consequential as a tax return, that's not optional, and it's wired into the architecture, not bolted on."
+
+_Resume / approve._
+
+> "Pandai reviews, approves, and the graph continues."
+
+--- ACTUAL SCRIPT ---
+And honestly, a lot of this tax suff is still very new to me — so if there's ever a figure or a tax term I don't understand, I don't have to wait anymore for our company's accountant, which may take hours or days to reply in detail. I can just ask, right here. CukaiPandai has a built-in assistant: I type my question in plain language — something like "what does chargeable income mean, and how did we get this number?" — and it walks me through it in everyday terms and shows me exactly which figure in our filing it's talking about. It's like having a patient tax guide sitting next to me, so I'm never stuck staring at jargon I don't understand. And for the figures themselves, I don't even have to take its word for it — because, as you'll see right now, every single number is checked against the real corpus, and will be rejected if invalid. It will also reject invalid questions as shown.
+
+> _Internal (§5): the free-text conversational answer isn't fully grounded yet (CITE-1/2). Ask **one prepared question about a figure in THIS filing** — that's the cited path that holds up — and don't invite a judge to type their own. The bullet-proof grounding demo is the next beat (the fabrication gate)._
+
+## 2.6 Beat 6 — The fabrication gate, head-to-head (40 sec)
 
 _Trigger the citation-integrity probe._
 
@@ -131,41 +180,20 @@ _Show the gate rejecting the fake clause ID; show a real+fake mix also caught._
 >
 > _This_ is audit-defense at the root: every number Pandai files already carries the citation that defends it. He doesn't scramble when LHDN asks 'why' — the answer ships with the figure."
 
-## 2.5 Beat 5 — Human-in-the-loop filing (35 sec)
-
-_Drive the filing graph to the confirmation interrupt._
-
-> "And critically — CukaiPandai does not silently auto-file. The filing graph **pauses here and asks Pandai to confirm** before it finalizes anything.
->
-> This is a real human-in-the-loop checkpoint built into the agent graph — the agent prepares, the human decides. For something as consequential as a tax return, that's not optional, and it's wired into the architecture, not bolted on."
-
-_Resume / approve._
-
-> "Pandai reviews, approves, and the graph continues."
-
-## 2.6 Beat 6 — The draft packet, downloaded (35 sec)
-
-_Open the generated Form C draft-pack PDF; show the watermark; hit download._
-
-> "And the payoff — his Form C, generated. Every page watermarked **draft, not submitted**, because Pandai reviews and files himself; we never file on his behalf.
->
-> Every number on this page traces back to its source in the law corpus. He downloads it —"
-
-_Trigger the download._
-
-> "— and he walks into LHDN with a return he can defend, line by line. That's the whole loop: from a folder of documents to a defensible, sourced, ready-to-file Form C — in minutes."
+--- ACTUAL SCRIPT ---
+But this is the part which makes me trust CukaiPandai the most — and it's where CukaiPandai is completely different from a normal chatbot. Remember the government's own AI that quietly got shut down for making things up? Watch what happens when I try to make CukaiPandai do exactly that. I'll hand it a citation for a law that doesn't actually exist — and instantly, it's rejected. It simply will not let a made-up law anywhere near our tax return. And for irrelevant questions — it doesn't just quietly flag it for review, it throws it out completely. This is what real audit-defense looks like — every single number we file already carries the proof that backs it. So the day LHDN comes knocking and asks "why this figure?", we aren't scrambling through a shoebox of old receipts, because the answer is already attached, right there in the filing. This concludes my demo, thank you for listening!
 
 ---
 
 # PART 3 — CLOSE (the persona bookend) (20 sec)
 
-> "So Pandai no longer agonizes over which deduction, which schedule, which deadline. CukaiPandai gives him a filing he can **defend**, deadlines he won't miss, and an answer for every number before LHDN even asks.
+> "So Encik Pandai no longer agonizes over which deduction, which schedule, which deadline. CukaiPandai gives him a filing he can **defend**, deadlines he won't miss, and an answer for every number before LHDN even comes knocking.
 >
 > Less guessing, less penalty risk, more time running the business he built — and more time for the people whose payroll depends on it.
 >
-> A generic AI can summarize the tax act. CukaiPandai helps you _file_ it, and _defend_ it — grounded in Malaysian law, and verified by Malaysian AI.
+> A generic AI can help you summarize your tax, sure. CukaiPandai helps you _file_ it, and _defend_ it — grounded in Malaysian law, and verified by Malaysian AI.
 >
-> **One upload. Every ringgit cited. Ready to defend.** Thank you."
+> **One upload. Zero hallucinations. Every ringgit cited, for Malaysians by Malaysians.** Thank you."
 
 ---
 
@@ -175,7 +203,7 @@ Known open defects (see [`docs/defects.md`](defects.md)). **Do not click these o
 
 - **Full obligation calendar (CP39, SST-02, CP204, MyInvois) — CONDITIONAL.** Beat 1 shows the _full_ calendar, but only do this if DEAD-1,2,3,5 are **actually fixed and re-verified** in the build you're demoing. The dates must be correct on screen — a tax-literate judge spots a wrong SST or CP204 date instantly. **If the fixes haven't landed, fall back to Form C only** and say: _"Form C and the calendar engine are live; CP204 instalments and SST scheduling are landing this sprint."_
 - **Computation on arbitrary inputs:** COMP-1 (balancing charge dropped on a loss), COMP-2 (group relief uncapped), COMP-3 (EPF cap skipped at zero remuneration) can produce wrong figures. **Demo only with the prepared sample numbers.** If a judge asks to type their own, steer to the seeded persona or say the engine is tuned for the common SME case with edge cases on the hardening list.
-- **Free-text audit Q&A:** the conversational answer is not yet grounded (CITE-1/2). **Demo the deterministic citation gate (Beat 4), not a chat answer.** If asked: _"The deterministic gate is production-grade; the conversational layer rides the same gate next sprint."_
+- **Free-text audit Q&A (Beat 5 "Ask AI"):** the conversational answer is not yet grounded (CITE-1/2). Keep Ask AI to **one prepared question about a figure in the current filing**; the bullet-proof grounding demo is **the fabrication gate in Beat 6**, not a free chat answer. If asked: _"The deterministic gate is production-grade; the conversational layer rides the same gate next sprint."_
 - **File uploads:** only the **prepared valid samples** — malformed files currently error (API-2/3). Never let a judge hand you a file to upload live.
 - **Auth:** the seeded demo uses a proper secret — fine to show login/isolation. Don't discuss the default-secret config (AUTH-1/2).
 - **Privacy claims:** don't assert in-memory-only / no-storage unless confirmed in code.
