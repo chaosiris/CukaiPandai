@@ -48,7 +48,6 @@ _Obligation calendar · cited Form C filing · audit defense — **every figure 
   <tr>
     <td align="center"><strong>0</strong><br/><sub>hallucinated figures — the deterministic core computes, a verifier rejects fabricated citations</sub></td>
     <td align="center"><strong>88 / 14</strong><br/><sub>fixed tax accounts across 14 groups driving the full Form C ascertainment chain</sub></td>
-    <td align="center"><strong>250</strong><br/><sub>backend tests across 50 files, run fully offline (no API key)</sub></td>
     <td align="center"><strong>100%</strong><br/><sub>in-country inference on the prelim — ILMU <code>nemo-super</code>, PDPA-aligned</sub></td>
   </tr>
 </table>
@@ -381,7 +380,6 @@ CukaiPandai/
 │   └── Dockerfile · docker-compose.yml
 ├── frontend/                 # Vite 5 + React 18 + React Router 7 (token-CSS)
 │   └── src/pages/            #   ObligationRadar · FilingStudio · AuditAssistant · …
-├── docs/                     # spec · prd · trd · roles · plan · progress · runbook
 └── .env.example
 ```
 
@@ -393,8 +391,6 @@ CukaiPandai/
 
 This project has utilized AI tooling in the following ways to produce sustainable and maintainable code:
 
-- **Google AI Studio** — Prompt engineering and development-workflow design for the app.
-- **Google Antigravity IDE** — Code scaffolding and generation support.
 - **GitHub Copilot** — Documentation assistance and Git workflow support.
 - **Claude Code** — Programming assistance tooling.
 
@@ -431,17 +427,6 @@ All AI-assisted output is reviewed, tested, and integrated by human developers b
     </td>
   </tr>
 </table>
-
----
-
-## 📚 Docs
-
-- Inception: [`docs/cukaipandai-spec.md`](docs/cukaipandai-spec.md) · [`docs/prd.md`](docs/prd.md) · [`docs/trd.md`](docs/trd.md)
-- Workflow & gates: [`docs/roles.md`](docs/roles.md) · Run / demo: [`docs/runbook.md`](docs/runbook.md)
-- Demo & pitch: [`docs/demo/demo-script.md`](docs/demo/demo-script.md) · [`docs/demo/cukaipandai-pitch-deck.pdf`](docs/demo/cukaipandai-pitch-deck.pdf)
-- Design + plans: [`docs/superpowers/specs/`](docs/superpowers/specs/) · [`docs/superpowers/plans/`](docs/superpowers/plans/)
-- Research (cited): [`docs/superpowers/research/`](docs/superpowers/research/)
-- Shared team state: [`docs/plan.md`](docs/plan.md) · [`docs/progress.md`](docs/progress.md)
 
 ---
 
