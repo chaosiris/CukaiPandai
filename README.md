@@ -58,18 +58,20 @@ _Obligation calendar · cited Form C filing · audit defense — **every figure 
 ## 🎬 Demo
 
 - 🌐 **Live demo:** **<https://cukaipandai.vercel.app/>**
-- ▶️ **Demo video:** _TODO — paste the YouTube / Loom link here_ &nbsp;`<!-- [Watch the demo](VIDEO_URL) -->`
-- 🖼 **Screenshots:** _TODO — add console captures (Obligation Radar · Filing Studio · Audit Assistant)_
+- ▶️ **Demo video:** _coming soon_ &nbsp;`<!-- [Watch the demo](VIDEO_URL) -->`
 
-<!-- Screenshot grid placeholder — uncomment and point at real images when captured:
 <table>
   <tr>
-    <td width="33%"><img src="PATH/obligation-radar.png" alt="Obligation Radar" /></td>
-    <td width="33%"><img src="PATH/filing-studio.png" alt="Filing Studio" /></td>
-    <td width="33%"><img src="PATH/audit-assistant.png" alt="Audit Assistant" /></td>
+    <td width="33%"><img src="frontend/public/screenshots/01-landing.png" alt="Landing page" /><p align="center"><sub>Landing — <em>every tax figure, cited and verified</em></sub></p></td>
+    <td width="33%"><img src="frontend/public/screenshots/05-dashboard.png" alt="Dashboard" /><p align="center"><sub>Dashboard — YA2026 command center with an overdue-obligation radar</sub></p></td>
+    <td width="33%"><img src="frontend/public/screenshots/02-obligation-radar.png" alt="Obligation Calendar" /><p align="center"><sub>Obligation Calendar — every deadline derived from the entity profile</sub></p></td>
+  </tr>
+  <tr>
+    <td width="33%"><img src="frontend/public/screenshots/06-filing-new.png" alt="New Filing" /><p align="center"><sub>Cited Filing Studio — upload or manual entry → a cited Form C</sub></p></td>
+    <td width="33%"><img src="frontend/public/screenshots/07-form-c-computed.png" alt="Computed Form C" /><p align="center"><sub>Computed Form C — every figure traces to a rule ID + config version</sub></p></td>
+    <td width="33%"><img src="frontend/public/screenshots/08-audit-chat.png" alt="Audit Assistant chat" /><p align="center"><sub>Audit Assistant — Pandai defends any figure with cited law (sovereign ILMU)</sub></p></td>
   </tr>
 </table>
--->
 
 ---
 
