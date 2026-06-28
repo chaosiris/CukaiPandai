@@ -1240,7 +1240,7 @@ a {
 
 @media (max-width: 560px) {
   .app-shell {
-    width: min(100vw - 16px, var(--layout-max));
+    width: min(100vw - 20px, var(--layout-max));
   }
 
   .menubar-nav,
@@ -1252,7 +1252,7 @@ a {
   }
 
   .topbar-inner {
-    width: min(100vw - 16px, var(--layout-max));
+    width: min(100vw - 20px, var(--layout-max));
     gap: 9px;
   }
 
@@ -1282,7 +1282,7 @@ a {
     align-items: flex-end;
     flex-direction: column;
     justify-content: center;
-    width: min(100vw - 16px, var(--layout-max));
+    width: min(100vw - 20px, var(--layout-max));
   }
 }
 

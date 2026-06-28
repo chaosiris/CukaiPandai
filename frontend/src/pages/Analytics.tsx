@@ -249,7 +249,7 @@ function StatusAndFormCounts({ obligations }: { obligations: Obligation[] }) {
   ]
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, alignItems: 'start' }}>
       {/* Status Breakdown — compact count rows */}
       <div className="window">
         <div className="titlebar">
@@ -454,7 +454,7 @@ export default function Analytics() {
             <SkeletonCard titleWidth="45%" bodyHeight={80} />
           </div>
           {/* Status Breakdown + By Form Type skeleton */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
             <SkeletonCard titleWidth="50%" bodyLines={3} />
             <SkeletonCard titleWidth="40%" bodyLines={3} />
           </div>
