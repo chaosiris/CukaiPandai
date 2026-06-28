@@ -204,7 +204,7 @@ Known open defects (see [`docs/defects.md`](defects.md)). **Do not click these o
 
 **"Is the computation actually correct?"**
 
-> "The core is test-covered — 245 backend tests across SME band boundaries, capital-allowance rates, Schedule 3 / Section 44 ordering, and Form C deadline shifting including holiday and state-specific rolls. We're hardening edge cases like loss-year balancing charges next."
+> "The core is test-covered — 257 backend tests across SME band boundaries, capital-allowance rates, Schedule 3 / Section 44 ordering, and Form C deadline shifting including holiday and state-specific rolls. We're hardening edge cases like loss-year balancing charges next."
 
 **"Why does keeping the data in Malaysia matter?"**
 
