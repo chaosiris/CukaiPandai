@@ -57,7 +57,7 @@ _Obligation calendar · cited Form C filing · audit defense — **every figure 
 ## 🎬 Demo
 
 - 🌐 **Live demo:** **<https://cukaipandai.vercel.app/>**
-- ▶️ **Demo video:** _coming soon_ &nbsp;`<!-- [Watch the demo](VIDEO_URL) -->`
+- ▶️ **Demo video:** **<https://youtu.be/3MUFIZZHLxs?si=vE8K-ViguRUWtXP>**
 
 <table>
   <tr>
